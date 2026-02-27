@@ -1,0 +1,295 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Seed configuration
+// Run with: npm run db:seed
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // directUrl is optional - only needed for migrations with connection pooling
+  // directUrl = env("DIRECT_URL")
+}
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+// User profile that extends Supabase Auth
+// The id matches Supabase auth.users.id
+model User {
+  id            String    @id // Matches Supabase auth.users.id
+  email         String    @unique
+  fullName      String?
+  role          UserRole  @default(EMPLOYEE)
+  department    String?
+  position      String?
+  avatarUrl     String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  createdDocuments     Document[]           @relation("DocumentCreator")
+  approvals            Approval[]
+  workflowAssignments  WorkflowStep[]       @relation("WorkflowStepAssignee")
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  APPROVER
+  EMPLOYEE
+}
+
+// ============================================
+// JOB LIST
+// ============================================
+
+// Jobs that can be selected when creating documents (e.g. Advance Payment Request)
+model Job {
+  id          String   @id @default(cuid())
+  name        String   // Display name (e.g. "Project Alpha", "Event 2026")
+  code        String?  // Optional short code (e.g. "PA", "EV2026")
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("jobs")
+}
+
+// ============================================
+// FORM TEMPLATE SYSTEM
+// ============================================
+
+// Defines the structure of a form type
+// This allows adding new forms without code changes
+model FormTemplate {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Advance Payment Request"
+  slug        String   @unique // e.g., "advance-payment-request"
+  description String?
+  icon        String?  // Icon identifier for UI
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Form configuration stored as JSON
+  // Structure: { fields: [{ name, type, label, required, validation, options }] }
+  fields      Json     // Array of field definitions
+  settings    Json?    // Additional form settings (defaults, behaviors, etc.)
+
+  // Relations
+  documents         Document[]
+  approvalWorkflow  ApprovalWorkflow?
+
+  @@map("form_templates")
+}
+
+// ============================================
+// APPROVAL WORKFLOW SYSTEM
+// ============================================
+
+// Defines the approval sequence for a form type
+model ApprovalWorkflow {
+  id              String   @id @default(cuid())
+  formTemplateId  String   @unique
+  name            String
+  description     String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  formTemplate FormTemplate @relation(fields: [formTemplateId], references: [id], onDelete: Cascade)
+  steps        WorkflowStep[]
+
+  @@map("approval_workflows")
+}
+
+// Defines each step in the approval workflow
+model WorkflowStep {
+  id                String   @id @default(cuid())
+  workflowId        String
+  stepNumber        Int      // Order of the step (1, 2, 3, ...)
+  name              String   // e.g., "Manager Approval", "Finance Review"
+  description       String?
+  
+  // Approval assignment - can be by role or specific user
+  assigneeRole      UserRole? // If set, any user with this role can approve
+  assigneeId        String?   // If set, specific user must approve
+  isRequired        Boolean   @default(true) // Can this step be skipped?
+  canReject         Boolean   @default(true)  // Can this step reject the document?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  workflow ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  assignee User?            @relation("WorkflowStepAssignee", fields: [assigneeId], references: [id])
+  approvals Approval[]
+
+  @@unique([workflowId, stepNumber])
+  @@map("workflow_steps")
+}
+
+// ============================================
+// DOCUMENT SYSTEM
+// ============================================
+
+// Generic document model - stores any form submission
+model Document {
+  id              String         @id @default(cuid())
+  formTemplateId  String
+  documentNumber  String?        @unique // Auto-generated document number
+  title           String
+  status          DocumentStatus @default(DRAFT)
+  currentStep     Int?           // Current workflow step (null if no workflow)
+  
+  // Form data stored as JSON
+  // Structure matches the form template fields
+  data            Json
+
+  // Metadata
+  createdById     String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  submittedAt     DateTime?
+  completedAt     DateTime?
+
+  // Relations
+  formTemplate      FormTemplate        @relation(fields: [formTemplateId], references: [id])
+  creator           User                @relation("DocumentCreator", fields: [createdById], references: [id])
+  approvals         Approval[]
+  versions          DocumentVersion[]
+  attachments       FileAttachment[]
+  parentRelations   DocumentRelationship[] @relation("ParentDocument")
+  childRelations    DocumentRelationship[] @relation("ChildDocument")
+
+  @@index([formTemplateId])
+  @@index([createdById])
+  @@index([status])
+  @@index([createdAt])
+  @@map("documents")
+}
+
+enum DocumentStatus {
+  DRAFT       // Being created, not submitted
+  PENDING     // Submitted, awaiting approval
+  APPROVED    // All approvals completed
+  REJECTED    // Rejected at some step
+  CANCELLED   // Cancelled by creator
+}
+
+// ============================================
+// APPROVAL & SIGNATURE SYSTEM
+// ============================================
+
+// Tracks each approval/signature in the workflow
+model Approval {
+  id            String         @id @default(cuid())
+  documentId    String
+  workflowStepId String
+  approverId    String?        // Nullable: set when user is assigned or when approved
+  
+  status        ApprovalStatus @default(PENDING)
+  comments      String?        // Approval/rejection comments
+  signatureData String?        // Base64 encoded signature image or signature hash
+  
+  // Timestamps
+  createdAt     DateTime       @default(now())
+  approvedAt    DateTime?
+  rejectedAt    DateTime?
+
+  // Relations
+  document     Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  workflowStep WorkflowStep   @relation(fields: [workflowStepId], references: [id])
+  approver     User?           @relation(fields: [approverId], references: [id])
+
+  @@unique([documentId, workflowStepId]) // One approval per step per document
+  @@index([documentId])
+  @@index([approverId])
+  @@index([status])
+  @@map("approvals")
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================
+// DOCUMENT VERSIONING & AUDIT TRAIL
+// ============================================
+
+// Tracks document changes for audit purposes
+model DocumentVersion {
+  id          String   @id @default(cuid())
+  documentId  String
+  version     Int      // Version number (1, 2, 3, ...)
+  data        Json     // Snapshot of document data at this version
+  status      DocumentStatus
+  changedBy   String   // User ID who made the change
+  changeNote  String?  // Optional note about the change
+  createdAt   DateTime @default(now())
+
+  // Relations
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, version])
+  @@index([documentId])
+  @@map("document_versions")
+}
+
+// ============================================
+// FILE ATTACHMENTS
+// ============================================
+
+// References to files stored in Supabase Storage
+model FileAttachment {
+  id          String   @id @default(cuid())
+  documentId  String
+  fileName    String
+  filePath    String   // Path in Supabase Storage
+  fileSize    Int      // Size in bytes
+  mimeType    String
+  uploadedBy  String   // User ID
+  createdAt   DateTime @default(now())
+
+  // Relations
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@map("file_attachments")
+}
+
+// ============================================
+// DOCUMENT RELATIONSHIPS
+// ============================================
+
+// Links documents together (e.g., Clearance references Request)
+model DocumentRelationship {
+  id            String   @id @default(cuid())
+  parentDocId   String   // The source document
+  childDocId    String   // The linked document
+  relationshipType String // e.g., "clearance_of", "revision_of", "related_to"
+  metadata      Json?    // Additional relationship data
+  createdAt     DateTime @default(now())
+
+  // Relations
+  parentDoc Document @relation("ParentDocument", fields: [parentDocId], references: [id], onDelete: Cascade)
+  childDoc  Document @relation("ChildDocument", fields: [childDocId], references: [id], onDelete: Cascade)
+
+  @@unique([parentDocId, childDocId, relationshipType])
+  @@index([parentDocId])
+  @@index([childDocId])
+  @@map("document_relationships")
+}

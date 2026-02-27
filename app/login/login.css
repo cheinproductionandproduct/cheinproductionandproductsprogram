@@ -1,0 +1,154 @@
+/* ===== LOGIN PAGE STYLES ===== */
+
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f0f0;
+  padding: 20px;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.login-card {
+  background: #fff;
+  border: 1px solid #d0d0d0;
+  border-radius: 12px;
+  padding: 40px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-logo {
+  max-width: 140px;
+  height: auto;
+  margin-bottom: 12px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.login-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 4px;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.login-subtitle {
+  font-size: 11px;
+  color: #555;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #222;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #000;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #fff;
+  color: #222;
+  transition: all 0.18s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #c0392b;
+  ring: 1px;
+  ring-color: #c0392b;
+  box-shadow: 0 0 0 1px #c0392b;
+}
+
+.form-input::placeholder {
+  color: #999;
+}
+
+.login-error {
+  background: #fee;
+  border: 1px solid #c0392b;
+  border-radius: 6px;
+  padding: 12px;
+  color: #c0392b;
+  font-size: 13px;
+  text-align: center;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+}
+
+.login-button {
+  width: 100%;
+  padding: 14px;
+  background: #c0392b;
+  color: #fff;
+  border: 1px solid #000;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+  margin-top: 8px;
+}
+
+.login-button:hover:not(:disabled) {
+  background: #a93226;
+}
+
+.login-button:disabled {
+  background: #999;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.login-footer {
+  margin-top: 24px;
+  text-align: center;
+  padding-top: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.login-footer-text {
+  font-size: 12px;
+  color: #666;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.login-link {
+  color: #c0392b;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.login-link:hover {
+  text-decoration: underline;
+}
+
