@@ -8,7 +8,7 @@ import { UserRole } from '@prisma/client'
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser()
@@ -24,7 +24,7 @@ export async function DELETE(
       )
     }
 
-    const jobId = params.id
+    const { id: jobId } = await params
 
     // Check if job exists
     const job = await (prisma as any).job.findUnique({
