@@ -172,3 +172,23 @@ export function getClosestDistributionDateAfter(requestDateIso: string): string 
   }
   return closest
 }
+
+/**
+ * Get the next distribution Friday after the given date.
+ * If the given date is a Friday, returns the NEXT Friday (not the same one).
+ * YYYY-MM-DD in, YYYY-MM-DD out.
+ */
+export function getNextDistributionFriday(requestDateIso: string): string {
+  if (!requestDateIso || requestDateIso.length !== 10) return ''
+  const all = getDistributionDatesForDisplay()
+  if (all.length === 0) return ''
+  const requestTime = new Date(requestDateIso + 'T12:00:00').getTime()
+  
+  // Find the next Friday AFTER the request date (not including the request date itself)
+  const nextFriday = all.find((opt) => {
+    const optTime = new Date(opt.value + 'T12:00:00').getTime()
+    return optTime > requestTime
+  })
+  
+  return nextFriday ? nextFriday.value : all[all.length - 1].value
+}

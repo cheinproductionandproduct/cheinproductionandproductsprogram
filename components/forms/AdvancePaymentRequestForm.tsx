@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { numberToThaiText, formatNumber } from '@/lib/utils/thai-number'
 import { formatDateDMY, parseDateDMY } from '@/lib/utils/date-format'
-import { isValidDistributionDate, isAtLeast7DaysBefore, getDateMoneyNeededOptions, getClosestDistributionDateAfter, getClosestClearanceDueDate } from '@/lib/utils/distribution-dates'
+import { isValidDistributionDate, isAtLeast7DaysBefore, getDateMoneyNeededOptions, getClosestDistributionDateAfter, getClosestClearanceDueDate, getNextDistributionFriday, getDistributionDatesForDisplay } from '@/lib/utils/distribution-dates'
 import type { FormField } from '@/types/database'
 import { SignatureCanvas } from '@/components/signature/SignatureCanvas'
 import { useUser } from '@/hooks/use-user'
@@ -96,6 +96,7 @@ export function AdvancePaymentRequestForm({
   const datePickerRef = useRef<HTMLInputElement>(null)
   const signatureDateRefs = useRef<Record<string, HTMLInputElement | null>>({})
   const dateMoneyNeededOptions = getDateMoneyNeededOptions()
+  const dateOptions = getDistributionDatesForDisplay() // All Fridays for วันที่ dropdown
   const [users, setUsers] = useState<any[]>([])
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [jobs, setJobs] = useState<{ id: string; name: string; code: string | null }[]>([])
@@ -198,11 +199,11 @@ export function AdvancePaymentRequestForm({
   let schema = z.object({
     ...schemaFields,
     jobId: z.string().optional(),
-    urgent: z.string().optional(),
+    urgent: z.boolean().optional(),
   })
-  // วันที่ต้องใช้เงิน: when Urgent=Yes use วันที่; otherwise must be distribution Friday and 7 days ahead
+  // วันที่ต้องใช้เงิน: when Urgent=true use current date; otherwise must be distribution Friday and 7 days ahead
   schema = schema.superRefine((data: any, ctx) => {
-    if (data.urgent === 'yes') return // Skip validation when urgent — วันที่ต้องใช้เงิน = วันที่
+    if (data.urgent === true) return // Skip validation when urgent is checked — both dates use current date
     const d = data.dateMoneyNeeded
     if (!d || typeof d !== 'string' || d.length < 10) return
     if (!isValidDistributionDate(d)) {
@@ -229,8 +230,9 @@ export function AdvancePaymentRequestForm({
     resolver: zodResolver(schema),
     defaultValues: {
       ...defaultValues,
-      date: defaultValues.date || new Date().toISOString().split('T')[0],
-      dateMoneyNeeded: defaultValues.dateMoneyNeeded || getClosestDistributionDateAfter(defaultValues.date || new Date().toISOString().split('T')[0]),
+      urgent: defaultValues.urgent === true || defaultValues.urgent === 'yes' ? true : false,
+      date: defaultValues.date || dateOptions[0]?.value || new Date().toISOString().split('T')[0],
+      dateMoneyNeeded: defaultValues.dateMoneyNeeded || getNextDistributionFriday(defaultValues.date || dateOptions[0]?.value || new Date().toISOString().split('T')[0]),
       items: initialItems,
       totalAmount: initialItems.total || 0,
       requesterName: defaultValues.requesterName || currentUser?.fullName || currentUser?.email || '',
@@ -269,17 +271,20 @@ export function AdvancePaymentRequestForm({
     }
   }, [requesterName, setValue])
 
-  // Auto-set วันที่ต้องใช้เงิน from วันที่: Urgent=Yes → same as วันที่; otherwise → closest distribution Friday on or after วันที่
+  // Auto-set dates based on urgent: Urgent=checked → use current date for both; otherwise → NEXT distribution Friday after วันที่
   const urgent = watch('urgent')
   const dateRequest = watch('date')
   useEffect(() => {
-    if (!dateRequest || getDateISO(dateRequest) === '') return
-    const requestIso = getDateISO(dateRequest) || dateRequest
-    if (urgent === 'yes') {
-      setValue('dateMoneyNeeded', requestIso, { shouldValidate: true })
-    } else {
-      const closest = getClosestDistributionDateAfter(requestIso)
-      if (closest) setValue('dateMoneyNeeded', closest, { shouldValidate: true })
+    if (urgent === true) {
+      // When urgent is checked, set both dates to current date
+      const today = new Date().toISOString().split('T')[0]
+      setValue('date', today, { shouldValidate: true })
+      setValue('dateMoneyNeeded', today, { shouldValidate: true })
+    } else if (dateRequest && getDateISO(dateRequest) !== '') {
+      // When urgent is not checked, use selected Friday and push dateMoneyNeeded to next Friday
+      const requestIso = getDateISO(dateRequest) || dateRequest
+      const nextFriday = getNextDistributionFriday(requestIso)
+      if (nextFriday) setValue('dateMoneyNeeded', nextFriday, { shouldValidate: true })
     }
   }, [urgent, dateRequest, setValue])
 
@@ -443,11 +448,25 @@ export function AdvancePaymentRequestForm({
 
   const addFrequentItem = (description: string) => {
     const currentItems = getCurrentItems()
-    const newId = String(Date.now())
-    const newItems = [...currentItems, { id: newId, description, details: '', amount: 0 }]
-    const newTotal = newItems.reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0)
-    setValue('items', { items: newItems, total: newTotal }, { shouldValidate: true })
-    setValue('totalAmount', newTotal, { shouldValidate: true })
+    
+    // Check if there's an empty first item (default row with no description)
+    const firstItem = currentItems[0]
+    if (firstItem && (!firstItem.description || firstItem.description.trim() === '')) {
+      // Replace the first empty item with the frequent item
+      const updated = currentItems.map((item: any, index: number) =>
+        index === 0 ? { ...item, description, details: '', amount: 0 } : item
+      )
+      const newTotal = updated.reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0)
+      setValue('items', { items: updated, total: newTotal }, { shouldValidate: true })
+      setValue('totalAmount', newTotal, { shouldValidate: true })
+    } else {
+      // If first item is not empty, add as new item
+      const newId = String(Date.now())
+      const newItems = [...currentItems, { id: newId, description, details: '', amount: 0 }]
+      const newTotal = newItems.reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0)
+      setValue('items', { items: newItems, total: newTotal }, { shouldValidate: true })
+      setValue('totalAmount', newTotal, { shouldValidate: true })
+    }
   }
 
   return (
@@ -492,50 +511,46 @@ export function AdvancePaymentRequestForm({
           <div className="form-row form-row--dates-urgent">
             <div className="form-field-group form-field-date">
               <label className="form-label">วันที่ <span className="text-red-600">*</span></label>
-              <div className="date-input-with-picker">
+              {urgent === true ? (
                 <input
                   type="text"
-                  placeholder="dd/mm/yyyy"
-                  value={getDateDisplay(watch('date'))}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    const parsed = parseDateDMY(v)
-                    setValue('date', parsed || v, { shouldValidate: true })
-                  }}
                   className="form-input"
+                  value={getDateDisplay(watch('date'))}
+                  readOnly
+                  disabled
+                  style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
                 />
-                <span className="date-picker-trigger-wrap">
-                  <span className="date-picker-trigger" aria-hidden>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                  </span>
-                  <input
-                    ref={datePickerRef}
-                    type="date"
-                    className="date-picker-overlay"
-                    aria-label="เปิดปฏิทิน"
-                    value={getDateISO(watch('date'))}
-                    onChange={(e) => setValue('date', e.target.value, { shouldValidate: true })}
-                  />
-                </span>
-              </div>
+              ) : (
+                <select
+                  className="form-select"
+                  value={getDateISO(watch('date')) || ''}
+                  onChange={(e) => setValue('date', e.target.value, { shouldValidate: true })}
+                >
+                  <option value="">-- เลือกวันที่ (ศุกร์เท่านั้น) --</option>
+                  {dateOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              )}
               {errors.date?.message && <p className="form-error">{errors.date.message as string}</p>}
             </div>
             <div className="form-field-group form-field-date">
               <label className="form-label">วันที่ต้องใช้เงิน <span className="text-red-600">*</span></label>
-              {urgent === 'yes' ? (
+              {urgent === true ? (
                 <>
-                  <p className="form-hint" lang="th">เร่งด่วน — ใช้วันที่เดียวกับวันที่ขอเบิก</p>
+                  <p className="form-hint" lang="th">เร่งด่วน — ใช้วันที่ปัจจุบัน</p>
                   <input
                     type="text"
                     className="form-input"
-                    value={getDateDisplay(watch('date'))}
+                    value={getDateDisplay(watch('dateMoneyNeeded'))}
                     readOnly
                     disabled
+                    style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
                   />
                 </>
               ) : (
                 <>
-                  <p className="form-hint" lang="th">จ่ายทุกวันศุกร์ — ต้องส่งเอกสารล่วงหน้าอย่างน้อย 7 วัน</p>
+                  <p className="form-hint" lang="th">จ่ายทุกวันศุกร์ — ต้องส่งเอกสารล่วงหน้าอย่างน้อย 7 วัน (วันศุกร์ถัดไปหลังวันที่)</p>
                   <select
                     className="form-select"
                     value={getDateISO(watch('dateMoneyNeeded')) || ''}
@@ -559,17 +574,37 @@ export function AdvancePaymentRequestForm({
               {errors.dateMoneyNeeded?.message && <p className="form-error">{errors.dateMoneyNeeded.message as string}</p>}
             </div>
             <div className="form-urgent-clearance-row">
-              <div className="form-urgent-box">
+              <div className="form-urgent-box" style={{ flex: 1 }}>
                 <label className="form-label">เร่งด่วน (Urgent)</label>
-                <select
+                <label 
                   className="form-select"
-                  value={watch('urgent') || ''}
-                  onChange={(e) => setValue('urgent', e.target.value)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    cursor: 'pointer',
+                    backgroundColor: watch('urgent') === true ? '#fef2f2' : '#ffffff',
+                  }}
                 >
-                  <option value="">-- เลือก --</option>
-                  <option value="no">ไม่ (No)</option>
-                  <option value="yes">ใช่ (Yes)</option>
-                </select>
+                  <input
+                    type="checkbox"
+                    checked={watch('urgent') === true}
+                    onChange={(e) => setValue('urgent', e.target.checked, { shouldValidate: true })}
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      cursor: 'pointer',
+                      accentColor: '#dc2626',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span style={{ 
+                    color: watch('urgent') === true ? '#dc2626' : 'inherit',
+                    fontWeight: watch('urgent') === true ? '600' : 'normal',
+                  }}>
+                    เร่งด่วน
+                  </span>
+                </label>
               </div>
               <div className="form-field-group form-clearance-field">
                 <label className="form-label">กำหนดวันเคลียร์</label>
@@ -584,7 +619,7 @@ export function AdvancePaymentRequestForm({
             </div>
           </div>
           <p className="form-hint form-clearance-hint" lang="th" style={{ marginTop: 4, marginBottom: 0 }}>
-            กำหนดวันเคลียร์: {urgent === 'yes' ? 'วันที่ + 15 วัน' : 'วันที่ต้องใช้เงิน + 15 วัน'}
+            กำหนดวันเคลียร์: {urgent === true ? 'วันที่ + 15 วัน' : 'วันที่ต้องใช้เงิน + 15 วัน'}
           </p>
         </div>
 
