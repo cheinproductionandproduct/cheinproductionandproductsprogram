@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { Document, User, DocumentStatus } from '@prisma/client'
 import { formatDateDMY } from '@/lib/utils/date-format'
+import { SignatureModal } from './SignatureModal'
 
 interface DocumentDetailProps {
   document: any
@@ -13,6 +14,7 @@ interface DocumentDetailProps {
 
 export function DocumentDetail({ document, currentUser }: DocumentDetailProps) {
   const [loading, setLoading] = useState(false)
+  const [showSignModal, setShowSignModal] = useState(false)
   const router = useRouter()
 
   const getStatusBadge = (status: DocumentStatus) => {
@@ -122,6 +124,13 @@ export function DocumentDetail({ document, currentUser }: DocumentDetailProps) {
   const canEdit = document.status === 'DRAFT' && document.createdById === currentUser.id
   const canSubmit = document.status === 'DRAFT' && document.createdById === currentUser.id
   const canDelete = document.status === 'DRAFT' && document.createdById === currentUser.id
+  
+  // Find if current user has a pending approval
+  const pendingApproval = document.approvals?.find(
+    (approval: any) => 
+      approval.status === 'PENDING' && 
+      approval.approverId === currentUser.id
+  )
 
   return (
     <div className="space-y-6">
@@ -181,6 +190,14 @@ export function DocumentDetail({ document, currentUser }: DocumentDetailProps) {
                   <line x1="14" y1="11" x2="14" y2="17" />
                 </svg>
                 Delete
+              </button>
+            )}
+            {pendingApproval && (
+              <button
+                onClick={() => setShowSignModal(true)}
+                className="rounded-md bg-red-600 border-2 border-black px-4 py-2 text-sm text-white transition-colors hover:bg-red-700"
+              >
+                Sign
               </button>
             )}
             <button
@@ -434,6 +451,17 @@ export function DocumentDetail({ document, currentUser }: DocumentDetailProps) {
             ))}
           </div>
         </div>
+      )}
+      
+      {/* Signature Modal for Signing */}
+      {showSignModal && pendingApproval && (
+        <SignatureModal
+          approval={pendingApproval}
+          onClose={() => {
+            setShowSignModal(false)
+            router.refresh()
+          }}
+        />
       )}
     </div>
   )

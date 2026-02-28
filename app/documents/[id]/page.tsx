@@ -8,6 +8,7 @@ import '../../dashboard/dashboard.css'
 import { useUser } from '@/hooks/use-user'
 import { formatDateDMY } from '@/lib/utils/date-format'
 import { PrintableDocumentForm } from '@/components/documents/PrintableDocumentForm'
+import { SignatureModal } from '@/components/documents/SignatureModal'
 import { getCachedDocument, setCachedDocument, clearCachedDocument } from '@/lib/documents/document-cache'
 
 function mergeSignaturesFromApprovals(doc: any) {
@@ -83,6 +84,7 @@ export default function DocumentDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [showSignModal, setShowSignModal] = useState(false)
   const didFetch = useRef(false)
   const lastFetchedId = useRef<string | null>(null)
 
@@ -189,6 +191,22 @@ export default function DocumentDetailPage() {
     }
   }
 
+  // Find if current user has a pending approval
+  const pendingApproval = currentUser && doc?.approvals?.find(
+    (approval: any) => 
+      approval.status === 'PENDING' && 
+      approval.approverId === currentUser.id
+  )
+  
+  // Debug logging
+  useEffect(() => {
+    if (currentUser && doc?.approvals) {
+      console.log('[DocumentDetailPage] Current user ID:', currentUser.id)
+      console.log('[DocumentDetailPage] All approvals:', doc.approvals)
+      console.log('[DocumentDetailPage] Pending approval found:', pendingApproval)
+    }
+  }, [currentUser, doc?.approvals, pendingApproval])
+
   if (userLoading || loading) {
     return (
       <DashboardLayout>
@@ -279,6 +297,15 @@ export default function DocumentDetailPage() {
                   สร้างใบเคลียร์เงินทดรองจ่าย (ADC)
                 </Link>
               )}
+            {pendingApproval && (
+              <button
+                type="button"
+                onClick={() => setShowSignModal(true)}
+                className="doc-btn-primary"
+              >
+                ลงนาม (Sign)
+              </button>
+            )}
             <button type="button" onClick={() => window.print()} className="doc-btn-secondary">
               พิมพ์ / บันทึกเป็น PDF
             </button>
@@ -290,6 +317,34 @@ export default function DocumentDetailPage() {
             <PrintableDocumentForm document={doc} assignedUsers={assignedUsers} />
           </div>
         </section>
+        
+        {/* Signature Modal for Signing */}
+        {showSignModal && pendingApproval && (
+          <SignatureModal
+            approval={pendingApproval}
+            onClose={() => {
+              setShowSignModal(false)
+              // Refresh the document after signing
+              didFetch.current = false
+              lastFetchedId.current = null
+              setLoading(true)
+              fetch(`/api/documents/${id}`)
+                .then((r) => r.json())
+                .then((data) => {
+                  if (data.document) {
+                    mergeSignaturesFromApprovals(data.document)
+                    setDoc(data.document)
+                    setCachedDocument(id, data.document, assignedUsers)
+                  }
+                  setLoading(false)
+                })
+                .catch((err) => {
+                  console.error('Error refreshing document:', err)
+                  setLoading(false)
+                })
+            }}
+          />
+        )}
       </div>
     </DashboardLayout>
   )

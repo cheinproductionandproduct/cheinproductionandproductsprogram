@@ -258,15 +258,8 @@ export function ApprovalCard({ approval, onUpdate }: ApprovalCardProps) {
         </div>
         <div className="doc-card-side doc-card-side--buttons">
           <Link href={`/documents/${approval.documentId}`} className="form-button list-page-btn">
-            View
+            View &amp; Sign
           </Link>
-          <button
-            type="button"
-            onClick={() => setShowModal(true)}
-            className="form-button list-page-btn"
-          >
-            Review &amp; Sign
-          </button>
         </div>
       </div>
 
