@@ -108,13 +108,21 @@ async function createJob(data: { name: string; description: string | null }) {
 }
 
 /**
- * POST /api/jobs - Create a new job
+ * POST /api/jobs - Create a new job (Manager/Admin only)
  */
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check if user is manager or admin
+    if (user.role !== 'MANAGER' && user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Forbidden: Only managers can create jobs' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()

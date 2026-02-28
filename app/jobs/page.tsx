@@ -112,17 +112,19 @@ export default function JobListPage() {
               รายการงาน สำหรับเลือกใช้ในใบเบิกเงินทดรองจ่าย
             </p>
           </div>
-          <button
-            type="button"
-            onClick={openCreateModal}
-            className="job-create-btn"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            Create Job
-          </button>
+          {canManageJobs && (
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="job-create-btn"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Create Job
+            </button>
+          )}
         </header>
 
         <section className="list-content">
@@ -138,14 +140,16 @@ export default function JobListPage() {
             <div className="list-panel">
               <div className="list-empty">
                 <p className="list-empty-text">ยังไม่มีรายการงาน</p>
-                <button
-                  type="button"
-                  onClick={openCreateModal}
-                  className="form-button form-button-submit"
-                  style={{ marginTop: 12 }}
-                >
-                  สร้างงานแรก
-                </button>
+                {canManageJobs && (
+                  <button
+                    type="button"
+                    onClick={openCreateModal}
+                    className="form-button form-button-submit"
+                    style={{ marginTop: 12 }}
+                  >
+                    สร้างงานแรก
+                  </button>
+                )}
               </div>
             </div>
           )}
