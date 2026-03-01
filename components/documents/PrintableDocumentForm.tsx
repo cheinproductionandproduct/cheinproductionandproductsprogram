@@ -160,19 +160,20 @@ export function PrintableDocumentFormAPR({ document, assignedUsers }: { document
   )
 }
 
-/* ----- ADC: ใบเคลียร์เงินทดรองจ่าย - replicates paper form design ----- */
+/* ----- ADC: ใบเคลียร์เงินทดรองจ่าย - displays form data for comparison (amount vs actual amount) ----- */
 export function PrintableDocumentFormADC({ document, assignedUsers }: { document: any; assignedUsers: any }) {
   const data = (document?.data || {}) as any
   const sig = data.signatures || {}
   const items = (data.expenseItems?.items || []) as any[]
-  const rows = items.filter((item: any) => item.description || item.amount || item.actualAmount)
-  const totalExpenses = data.totalExpenses ?? items.reduce((s: number, i: any) => s + (Number(i.actualAmount ?? i.amount) || 0), 0)
-  const advanceAmount = data.advanceAmount ?? 0
-  const amountToReturn = data.amountToReturn ?? 0
-  const additionalAmount = data.additionalAmount ?? 0
+  const rows = items.filter((item: any) => item.description || item.amount != null || item.actualAmount != null)
+  const sumAmount = rows.reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0)
+  const totalActual = data.totalExpenses ?? rows.reduce((s: number, i: any) => s + (Number(i.actualAmount ?? i.amount) || 0), 0)
+  const advanceAmount = Number(data.advanceAmount) ?? 0
+  const amountToReturn = Number(data.amountToReturn) ?? 0
+  const additionalAmount = Number(data.additionalAmount) ?? 0
 
   const fmtAmt = (v: any) =>
-    v != null && v !== '' && Number(v) !== 0
+    v != null && v !== '' && !Number.isNaN(Number(v))
       ? Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       : ''
 
@@ -192,7 +193,7 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
         </div>
       </div>
 
-      {/* Title box: ใบเคลียร์เงินทดรองจ่าย + CRE, วันที่, วันที่ต้องใช้เงิน on right */}
+      {/* Title box: ใบเคลียร์เงินทดรองจ่าย + CRE, วันที่ทำเอกสาร, วันที่เคลียร์ทดลองจ่าย */}
       <div className="adv-title-box">
         <h2 className="adv-title-text">ใบเคลียร์เงินทดรองจ่าย</h2>
         <div className="adv-title-meta">
@@ -203,17 +204,17 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
             </span>
           </div>
           <div className="adv-meta-line">
-            <span>วันที่</span>
+            <span>วันที่ทำเอกสาร</span>
             <span className="adv-meta-val">{data.date ? formatDateDMY(data.date) : '..../..../....'}</span>
           </div>
           <div className="adv-meta-line">
-            <span>วันที่ต้องใช้เงิน</span>
+            <span>วันที่เคลียร์ทดลองจ่าย</span>
             <span className="adv-meta-val">{data.dateMoneyNeeded ? formatDateDMY(data.dateMoneyNeeded) : '..../..../....'}</span>
           </div>
         </div>
       </div>
 
-      {/* Requester + reference + work summary (order matches paper: name only, then position|dept, then reference, then summary) */}
+      {/* Requester + reference + work summary + job (from form) */}
       <div className="adv-info">
         <div className="adv-info-row">
           <div className="adv-info-cell adv-info-cell--full">
@@ -231,6 +232,14 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
             <span className="adv-info-val">{data.department || ''}</span>
           </div>
         </div>
+        {(data.jobName || data.jobCode) && (
+          <div className="adv-info-row">
+            <div className="adv-info-cell adv-info-cell--full">
+              <span className="adv-info-label">งาน (Job):</span>
+              <span className="adv-info-val">{[data.jobCode, data.jobName].filter(Boolean).join(' – ')}</span>
+            </div>
+          </div>
+        )}
         <div className="adv-info-row">
           <div className="adv-info-cell adv-info-cell--full">
             <span className="adv-info-label">อ้างอิงเลขที่ใบเบิกเงินทดรองจ่าย:</span>
@@ -243,44 +252,47 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
         </div>
       </div>
 
-      {/* Items table: ลำดับ | รายการ | รายละเอียด | จำนวนเงิน(บาท) */}
+      {/* Items table: ลำดับ | รายการ | จำนวนเงิน(บาท) | จำนวนเงินที่ใช้จริง (บาท) — match form for comparison */}
       <table className="adc-tbl">
         <thead>
           <tr>
             <th className="adc-tbl-no">ลำดับ</th>
             <th className="adc-tbl-desc">รายการ</th>
-            <th className="adc-tbl-detail">รายละเอียด</th>
             <th className="adc-tbl-amt">จำนวนเงิน(บาท)</th>
+            <th className="adc-tbl-amt">จำนวนเงินที่ใช้จริง (บาท)</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((item: any, n: number) => (
-            <tr key={n}>
+            <tr key={item.id || n}>
               <td className="adc-tbl-no">{n + 1}</td>
               <td className="adc-tbl-desc">{item.description || ''}</td>
-              <td className="adc-tbl-detail">{item.details || ''}</td>
+              <td className="adc-tbl-amt">{fmtAmt(item.amount)}</td>
               <td className="adc-tbl-amt">{fmtAmt(item.actualAmount ?? item.amount)}</td>
             </tr>
           ))}
           <tr className="adc-tbl-total">
-            <td className="adc-tbl-no" colSpan={3}>รวม</td>
-            <td className="adc-tbl-amt">{fmtAmt(totalExpenses)}</td>
+            <td className="adc-tbl-no">รวม</td>
+            <td className="adc-tbl-desc" />
+            <td className="adc-tbl-amt">{fmtAmt(sumAmount)}</td>
+            <td className="adc-tbl-amt">{fmtAmt(totalActual)}</td>
           </tr>
           <tr className="adc-tbl-summary">
-            <td colSpan={3} className="adc-tbl-summary-label">รวมค่าใช้จ่าย</td>
-            <td className="adc-tbl-amt">{fmtAmt(totalExpenses)}</td>
+            <td colSpan={2} className="adc-tbl-summary-label">รวมค่าใช้จ่าย</td>
+            <td className="adc-tbl-amt">{fmtAmt(sumAmount)}</td>
+            <td className="adc-tbl-amt">{fmtAmt(totalActual)}</td>
           </tr>
           <tr className="adc-tbl-summary">
-            <td colSpan={3} className="adc-tbl-summary-label">(หัก) จำนวนที่เบิกทดรอง</td>
-            <td className="adc-tbl-amt">{fmtAmt(advanceAmount)}</td>
+            <td colSpan={2} className="adc-tbl-summary-label">(หัก) จำนวนที่เบิกทดรอง</td>
+            <td className="adc-tbl-amt" colSpan={2}>{fmtAmt(advanceAmount)}</td>
           </tr>
           <tr className="adc-tbl-summary">
-            <td colSpan={3} className="adc-tbl-summary-label">จำนวนที่เหลือส่งคืน</td>
-            <td className="adc-tbl-amt">{fmtAmt(amountToReturn)}</td>
+            <td colSpan={2} className="adc-tbl-summary-label">จำนวนที่เหลือส่งคืน</td>
+            <td className="adc-tbl-amt" colSpan={2}>{fmtAmt(amountToReturn)}</td>
           </tr>
           <tr className="adc-tbl-summary adc-tbl-summary-last">
-            <td colSpan={3} className="adc-tbl-summary-label">จำนวนที่เบิกเพิ่ม</td>
-            <td className="adc-tbl-amt">{fmtAmt(additionalAmount)}</td>
+            <td colSpan={2} className="adc-tbl-summary-label">จำนวนที่เบิกเพิ่ม</td>
+            <td className="adc-tbl-amt" colSpan={2}>{fmtAmt(additionalAmount)}</td>
           </tr>
         </tbody>
       </table>

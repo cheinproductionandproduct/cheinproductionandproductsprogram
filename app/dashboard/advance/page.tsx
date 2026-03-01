@@ -1,189 +1,140 @@
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { AdvancePaymentRequestForm } from '@/components/forms/AdvancePaymentRequestForm';
-import type { FormField } from '@/types/database';
-import { formatDateDMY } from '@/lib/utils/date-format';
-import '../dashboard.css';
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { formatNumber } from '@/lib/utils/thai-number'
+import '../dashboard.css'
 
-export default function AdvancePaymentRequestPage() {
-  const [fields, setFields] = useState<FormField[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [documentNumber, setDocumentNumber] = useState<string>('');
-  const router = useRouter();
+export default function AdvanceDashboardPage() {
+  const [loading, setLoading] = useState(true)
+  const [totalAmount, setTotalAmount] = useState<number>(0)
+  const [documentCount, setDocumentCount] = useState(0)
+  const [recentDocs, setRecentDocs] = useState<any[]>([])
+  const [aprTemplateId, setAprTemplateId] = useState<string>('')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchTemplateAndNumber() {
+    let cancelled = false
+    async function load() {
       try {
-        // Fetch template and document number in parallel
-        const [templateResponse, numberResponse] = await Promise.all([
-          fetch('/api/form-templates'),
-          fetch('/api/documents/generate-number?formTemplateSlug=advance-payment-request'),
-        ]);
-        
-        if (!templateResponse.ok) {
-          const errorData = await templateResponse.json().catch(() => ({}));
-          throw new Error(errorData.message || `Failed to fetch templates: ${templateResponse.status} ${templateResponse.statusText}`);
+        setLoading(true)
+        setError(null)
+        const res = await fetch('/api/form-templates')
+        if (cancelled) return
+        if (!res.ok) throw new Error('Failed to load templates')
+        const { templates } = await res.json()
+        const aprTemplate = templates?.find((t: any) => t.slug === 'advance-payment-request')
+        if (!aprTemplate) {
+          setTotalAmount(0)
+          setDocumentCount(0)
+          setRecentDocs([])
+          return
         }
-        
-        const data = await templateResponse.json();
-        const templates = data.templates || [];
-        
-        if (templates.length === 0) {
-          throw new Error('No templates found in database');
-        }
-        
-        const template = templates.find((t: any) => t.slug === 'advance-payment-request');
-        
-        if (!template) {
-          throw new Error('Template "advance-payment-request" not found. Available templates: ' + templates.map((t: any) => t.slug).join(', '));
-        }
-
-        const formConfig = template.fields as { fields: FormField[] };
-        setFields(formConfig.fields || []);
-
-        // Fetch document number
-        if (numberResponse.ok) {
-          const numberData = await numberResponse.json();
-          if (numberData.documentNumber) {
-            setDocumentNumber(numberData.documentNumber);
+        setAprTemplateId(aprTemplate.id)
+        const docRes = await fetch(
+          `/api/documents?formTemplateId=${encodeURIComponent(aprTemplate.id)}&limit=500&sortBy=createdAt&sortOrder=desc`
+        )
+        if (cancelled) return
+        if (!docRes.ok) throw new Error('Failed to load documents')
+        const { documents } = await docRes.json()
+        const list = Array.isArray(documents) ? documents : []
+        setDocumentCount(list.length)
+        let sum = 0
+        for (const doc of list) {
+          const d = doc?.data
+          if (d && typeof d === 'object') {
+            if (typeof d.totalAmount === 'number' && !Number.isNaN(d.totalAmount)) sum += d.totalAmount
+            else if (d.items && typeof d.items.total === 'number' && !Number.isNaN(d.items.total)) sum += d.items.total
           }
-        } else {
-          console.warn('Failed to fetch document number, will continue without it');
         }
-      } catch (err: any) {
-        console.error('Error fetching template:', err);
-        setError(err.message || 'Failed to load form');
+        setTotalAmount(sum)
+        setRecentDocs(list.slice(0, 10))
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || 'โหลดไม่สำเร็จ')
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false)
       }
     }
-
-    fetchTemplateAndNumber();
-  }, []);
-
-  const handleSubmit = async (data: Record<string, any>) => {
-    setSubmitting(true);
-    setError(null);
-
-    // Prevent stuck loading: clear after 12s if request or response body hangs
-    const timeoutId = setTimeout(() => {
-      setSubmitting(false);
-      setError((e) => (e ? e : 'การบันทึกใช้เวลานาน กรุณาตรวจสอบรายการเอกสารหรือลองใหม่'));
-    }, 12_000);
-
-    try {
-      const response = await fetch('/api/form-templates');
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to fetch template');
-      }
-
-      const { templates } = await response.json();
-      const template = templates.find((t: any) => t.slug === 'advance-payment-request');
-
-      if (!template) {
-        throw new Error('Template not found');
-      }
-
-      const createResponse = await fetch('/api/documents', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          formTemplateId: template.id,
-          title: `${template.name} - ${formatDateDMY(new Date())}`,
-          data,
-          status: 'DRAFT',
-          userAssignments: data.userAssignments || {},
-        }),
-      });
-
-      // Clear loading as soon as we have a response (don't wait for .json() so we never get stuck)
-      setSubmitting(false);
-      clearTimeout(timeoutId);
-
-      const result = await createResponse.json().catch(() => ({}));
-
-      if (!createResponse.ok) {
-        throw new Error(result.message || result.error || 'Failed to create document');
-      }
-
-      const docId = result?.document?.id;
-      if (docId) {
-        router.push(`/documents/${docId}`);
-      } else {
-        // Server may have created the doc (Prisma ran) but response body was missing/bad
-        setError('เอกสารอาจสร้างแล้ว กรุณาตรวจสอบรายการเอกสาร');
-      }
-    } catch (err: any) {
-      console.error('[AdvancePaymentRequestPage] Error in handleSubmit:', err);
-      setError(err?.message || 'เกิดข้อผิดพลาดในการบันทึก');
-    } finally {
-      clearTimeout(timeoutId);
-      setSubmitting(false);
-    }
-  };
+    load()
+    return () => { cancelled = true }
+  }, [])
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="list-page">
         <div className="list-loading">โหลด...</div>
       </div>
-    );
+    )
   }
 
-  if (error && !fields.length) {
+  if (error) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-8">
-        <div className="max-w-2xl">
-          <div className="bg-red-50 border-2 border-red-600 rounded-lg p-6 mb-4">
-            <h2 className="text-xl font-bold text-red-800 mb-2">โหลดฟอร์มไม่สำเร็จ</h2>
-            <p className="text-red-700 mb-4">{error}</p>
-            <div className="text-sm text-gray-700 space-y-2">
-              <p><strong>Possible solutions:</strong></p>
-              <ul className="list-disc list-inside space-y-1 ml-4">
-                <li>Make sure you are logged in</li>
-                <li>Run the database seed: <code className="bg-gray-200 px-2 py-1 rounded">npm run db:seed</code></li>
-                <li>Check that the form template exists in the database</li>
-              </ul>
-            </div>
-          </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            Retry
-          </button>
-        </div>
+      <div className="list-page">
+        <div className="list-error">{error}</div>
+        <Link href="/dashboard" className="form-button" style={{ marginTop: 12 }}>กลับไปแดชบอร์ด</Link>
       </div>
-    );
+    )
   }
 
   return (
-    <div
-      className="min-h-screen bg-white"
-      style={{ fontFamily: '"Sarabun", "Inter", system-ui, sans-serif' }}
-    >
-      <AdvancePaymentRequestForm
-        fields={fields}
-        onSubmit={handleSubmit}
-        defaultValues={{
-          advNumber: documentNumber,
-        }}
-        loading={submitting}
-      />
-      {error && (
-        <div className="fixed bottom-4 right-4 bg-red-600 text-white px-6 py-3 rounded shadow-lg">
-          {error}
+    <div className="list-page">
+      <header className="list-header">
+        <h1 className="page-title">ใบเบิกเงินทดรองจ่าย (APR)</h1>
+        <p className="page-subtitle" lang="th">
+          สรุปจำนวนเงินที่คุณขอเบิกแล้ว และรายการเอกสาร
+        </p>
+      </header>
+
+      <div className="apr-dashboard-summary">
+        <div className="apr-dashboard-card apr-dashboard-card--total">
+          <div className="apr-dashboard-card-label">จำนวนเงินที่ขอเบิกแล้วทั้งหมด</div>
+          <div className="apr-dashboard-card-value">{formatNumber(totalAmount)} <span className="apr-dashboard-unit">บาท</span></div>
+          <div className="apr-dashboard-card-meta">จากเอกสาร {documentCount} รายการ</div>
+        </div>
+        <Link href="/dashboard/advance/new" className="apr-dashboard-card apr-dashboard-card--action">
+          <span className="apr-dashboard-card-action-label">สร้างใบเบิกใหม่</span>
+          <span className="apr-dashboard-card-action-hint">+ เพิ่มรายการเบิกเงินทดรองจ่าย</span>
+        </Link>
+      </div>
+
+      {recentDocs.length > 0 && (
+        <section className="list-content" style={{ marginTop: 24 }}>
+          <h2 className="form-section-title" style={{ marginBottom: 12 }}>รายการเอกสารล่าสุด</h2>
+          <div className="list-panel">
+            <ul className="apr-dashboard-doc-list">
+              {recentDocs.map((doc: any) => {
+                const amt = typeof doc?.data?.totalAmount === 'number' ? doc.data.totalAmount : doc?.data?.items?.total
+                const amountStr = typeof amt === 'number' && !Number.isNaN(amt) ? formatNumber(amt) + ' บาท' : '—'
+                return (
+                  <li key={doc.id} className="apr-dashboard-doc-item">
+                    <Link href={`/documents/${doc.id}`} className="apr-dashboard-doc-link">
+                      <span className="apr-dashboard-doc-number">{doc.documentNumber || doc.id}</span>
+                      <span className="apr-dashboard-doc-amount">{amountStr}</span>
+                      <span className="apr-dashboard-doc-status">{doc.status}</span>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+            {aprTemplateId && (
+              <p className="form-hint" style={{ marginTop: 12 }}>
+                <Link href={`/documents?formTemplateId=${encodeURIComponent(aprTemplateId)}`}>ดูรายการเอกสารทั้งหมด →</Link>
+              </p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {documentCount === 0 && (
+        <div className="list-panel" style={{ marginTop: 24 }}>
+          <div className="list-empty">
+            <p className="list-empty-text">ยังไม่มีใบเบิกเงินทดรองจ่าย</p>
+            <Link href="/dashboard/advance/new" className="form-button form-button-submit" style={{ marginTop: 12 }}>
+              สร้างใบเบิกแรก
+            </Link>
+          </div>
         </div>
       )}
     </div>
-  );
+  )
 }
-
-

@@ -85,6 +85,7 @@ export default function DocumentDetailPage() {
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showSignModal, setShowSignModal] = useState(false)
+  const [exportingPdf, setExportingPdf] = useState(false)
   const didFetch = useRef(false)
   const lastFetchedId = useRef<string | null>(null)
 
@@ -188,6 +189,33 @@ export default function DocumentDetailPage() {
     } catch (err: any) {
       alert(err.message || 'Failed to delete document')
       setDeleting(false)
+    }
+  }
+
+  const handleSaveAsPdf = async () => {
+    if (!id) return
+    setExportingPdf(true)
+    try {
+      const res = await fetch(`/api/documents/${id}/export/pdf`)
+      if (!res.ok) throw new Error('Failed to export PDF')
+      const blob = await res.blob()
+      const contentDisposition = res.headers.get('Content-Disposition')
+      let filename = doc?.documentNumber || id
+      const match = contentDisposition?.match(/filename="?([^";\n]+)"?/)
+      if (match) filename = match[1].replace(/\.pdf$/i, '')
+      if (!filename.toLowerCase().endsWith('.pdf')) filename += '.pdf'
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (e: any) {
+      alert(e?.message || 'ไม่สามารถบันทึก PDF ได้')
+    } finally {
+      setExportingPdf(false)
     }
   }
 
@@ -307,7 +335,16 @@ export default function DocumentDetailPage() {
               </button>
             )}
             <button type="button" onClick={() => window.print()} className="doc-btn-secondary">
-              พิมพ์ / บันทึกเป็น PDF
+              พิมพ์
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveAsPdf}
+              disabled={exportingPdf}
+              className="doc-btn-secondary"
+              title="บันทึกเป็น PDF โดยใช้เลขที่เอกสารเป็นชื่อไฟล์"
+            >
+              {exportingPdf ? 'กำลังสร้าง PDF...' : 'บันทึกเป็น PDF'}
             </button>
           </div>
         </div>

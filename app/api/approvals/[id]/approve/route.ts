@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth/middleware-helpers'
-import { approveDocumentStep } from '@/lib/approvals/approval-service'
+import { approveDocumentStep, getPendingApprovals } from '@/lib/approvals/approval-service'
 import { canApprove } from '@/lib/auth/permissions'
 import { UserRole } from '@prisma/client'
 
 /**
- * POST /api/approvals/[id]/approve - Approve a document step
+ * POST /api/approvals/[id]/approve - Approve a document step.
+ * One signature applies to all pending approvals for this user (same sign goes to all).
  */
 export async function POST(
   request: NextRequest,
@@ -17,8 +18,6 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user has permission to approve documents
-    // Only ADMIN, MANAGER, and APPROVER can sign documents (not EMPLOYEE)
     if (!canApprove(user.role as UserRole)) {
       return NextResponse.json(
         { error: 'Forbidden', message: 'Only managers and approvers can sign documents' },
@@ -37,14 +36,29 @@ export async function POST(
       )
     }
 
-    const approval = await approveDocumentStep(
-      id,
-      user.id,
-      signatureData,
-      comments
-    )
+    const pendingList = await getPendingApprovals(user.id, user.role)
+    if (!pendingList.some((a) => a.id === id)) {
+      return NextResponse.json(
+        { error: 'Approval not found or not pending for you' },
+        { status: 400 }
+      )
+    }
 
-    return NextResponse.json({ approval, success: true })
+    const approvedIds: string[] = []
+    for (const a of pendingList) {
+      try {
+        await approveDocumentStep(a.id, user.id, signatureData, comments)
+        approvedIds.push(a.id)
+      } catch (e: any) {
+        console.error('Error applying signature to approval', a.id, e.message)
+      }
+    }
+
+    return NextResponse.json({
+      approval: { id },
+      approvedIds,
+      success: true,
+    })
   } catch (error: any) {
     console.error('Error approving document:', error)
     return NextResponse.json(

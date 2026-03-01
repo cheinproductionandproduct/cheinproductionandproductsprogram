@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import type { DocumentStatus } from '@prisma/client'
 import '@/app/dashboard/dashboard.css'
 import { formatDateDMY } from '@/lib/utils/date-format'
+import { formatNumber } from '@/lib/utils/thai-number'
 
 interface DocumentListProps {
   initialPage?: number
@@ -89,6 +90,17 @@ export function DocumentList({
       CANCELLED: 'bg-white text-black border border-black',
     }
     return badges[status] || badges.DRAFT
+  }
+
+  /** Get total amount from document data (APR: totalAmount/items.total, APC: totalExpenses/advanceAmount) */
+  const getDocumentAmount = (doc: any): number | null => {
+    const d = doc?.data
+    if (!d || typeof d !== 'object') return null
+    if (typeof d.totalAmount === 'number' && !Number.isNaN(d.totalAmount)) return d.totalAmount
+    if (d.items && typeof d.items.total === 'number' && !Number.isNaN(d.items.total)) return d.items.total
+    if (typeof d.totalExpenses === 'number' && !Number.isNaN(d.totalExpenses)) return d.totalExpenses
+    if (typeof d.advanceAmount === 'number' && !Number.isNaN(d.advanceAmount)) return d.advanceAmount
+    return null
   }
 
   return (
@@ -198,6 +210,12 @@ export function DocumentList({
                     Created by {doc.creator.fullName || doc.creator.email} •{' '}
                     {formatDateDMY(doc.createdAt)}
                   </p>
+                  {getDocumentAmount(doc) != null && (
+                    <p className="doc-card-meta doc-card-amount">
+                      <span className="doc-card-amount-label">จำนวนเงินรวม</span>{' '}
+                      <span className="doc-card-amount-value">{formatNumber(getDocumentAmount(doc)!)} บาท</span>
+                    </p>
+                  )}
                 </div>
                 <div className="doc-card-side">
                   <p className="doc-card-stat">

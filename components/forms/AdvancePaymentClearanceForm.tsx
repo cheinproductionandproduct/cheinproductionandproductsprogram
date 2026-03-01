@@ -15,7 +15,8 @@ interface AdvancePaymentClearanceFormProps {
   loading?: boolean
 }
 
-const emptyExpenseItems = { items: [] as { id: string; description: string; amount: number; actualAmount: number }[], total: 0 }
+type ExpenseItem = { id: string; description: string; amount: number; actualAmount: number; fromApr?: boolean; parentId?: string | null }
+const emptyExpenseItems = { items: [] as ExpenseItem[], total: 0 }
 
 export function AdvancePaymentClearanceForm({
   creNumber,
@@ -207,7 +208,7 @@ export function AdvancePaymentClearanceForm({
     if (d.jobId) setValue('jobId', d.jobId)
     if (d.jobName) setValue('jobName', d.jobName)
     if (d.jobCode) setValue('jobCode', d.jobCode)
-    // Populate expense list from APR items (รายการ from APR → รายการค่าใช้จ่าย in ADC)
+    // Populate expense list from APR items (รายการ from APR → รายการค่าใช้จ่าย in ADC); mark as fromApr so they cannot be edited/deleted
     const aprItems = d.items?.items
     if (aprItems && Array.isArray(aprItems) && aprItems.length > 0) {
       const mapped = aprItems.map((item: any, i: number) => ({
@@ -215,6 +216,8 @@ export function AdvancePaymentClearanceForm({
         description: [item.description, item.details].filter(Boolean).join(' — ') || '',
         amount: Number(item.amount) || 0,
         actualAmount: Number(item.amount) || 0, // default จำนวนเงินที่ใช้จริง to APR amount
+        fromApr: true,
+        parentId: null,
       }))
       const totalActual = mapped.reduce((s: number, i: any) => s + (Number(i.actualAmount) || 0), 0)
       setValue('expenseItems', { items: mapped, total: totalActual }, { shouldValidate: true })
@@ -279,6 +282,9 @@ export function AdvancePaymentClearanceForm({
   }, [totalActual, advanceAmount, setValue])
 
   const updateExpenseItem = (index: number, field: 'description' | 'amount' | 'actualAmount', value: string | number) => {
+    const item = items[index]
+    // APR-exported rows: only actualAmount can be edited
+    if (item?.fromApr && (field === 'description' || field === 'amount')) return
     const next = items.map((item: any, i: number) =>
       i === index ? { ...item, [field]: value } : item
     )
@@ -287,13 +293,28 @@ export function AdvancePaymentClearanceForm({
   }
 
   const addExpenseRow = () => {
-    const next = [...items, { id: `e-${Date.now()}`, description: '', amount: 0, actualAmount: 0 }]
+    const next = [...items, { id: `e-${Date.now()}`, description: '', amount: 0, actualAmount: 0, fromApr: false, parentId: null }]
     const total = next.reduce((s: number, i: any) => s + (((Number(i.actualAmount) ?? Number(i.amount)) || 0)), 0)
     setValue('expenseItems', { items: next, total }, { shouldValidate: true })
   }
 
   const addFrequentItem = (description: string) => {
-    const next = [...items, { id: `e-${Date.now()}`, description, amount: 0, actualAmount: 0 }]
+    const next = [...items, { id: `e-${Date.now()}`, description, amount: 0, actualAmount: 0, fromApr: false, parentId: null }]
+    const total = next.reduce((s: number, i: any) => s + (((Number(i.actualAmount) ?? Number(i.amount)) || 0)), 0)
+    setValue('expenseItems', { items: next, total }, { shouldValidate: true })
+  }
+
+  /** Add a sub-item under a row (e.g. 1.1, 1.2 under row 1). Insert after last child of parent. */
+  const addSubItem = (parentId: string) => {
+    const parentIdx = items.findIndex((i: any) => i.id === parentId)
+    if (parentIdx === -1) return
+    let insertIdx = parentIdx + 1
+    for (let i = parentIdx + 1; i < items.length; i++) {
+      if (items[i].parentId === parentId) insertIdx = i + 1
+      else break
+    }
+    const newItem = { id: `e-${Date.now()}`, description: '', amount: 0, actualAmount: 0, fromApr: false, parentId }
+    const next = [...items.slice(0, insertIdx), newItem, ...items.slice(insertIdx)]
     const total = next.reduce((s: number, i: any) => s + (((Number(i.actualAmount) ?? Number(i.amount)) || 0)), 0)
     setValue('expenseItems', { items: next, total }, { shouldValidate: true })
   }
@@ -311,10 +332,38 @@ export function AdvancePaymentClearanceForm({
   }
 
   const removeExpenseRow = (index: number) => {
-    const next = items.filter((_: any, i: number) => i !== index)
+    const item = items[index]
+    // Do not allow deleting rows that came from APR
+    if (item?.fromApr) return
+    // Remove this row and any sub-items (children)
+    const next = items.filter((i: any, iIdx: number) => iIdx !== index && i.parentId !== item.id)
     const total = next.reduce((s: number, i: any) => s + (((Number(i.actualAmount) ?? Number(i.amount)) || 0)), 0)
     setValue('expenseItems', { items: next, total }, { shouldValidate: true })
   }
+
+  /** Build display order: each parent followed by its children. Returns { item, flatIndex, displayNumber }. */
+  const orderedRows = (() => {
+    const roots = items.filter((i: any) => !i.parentId)
+    const ordered: { item: any; flatIndex: number; displayNumber: string }[] = []
+    let topLevelNum = 0
+    const parentNum: Record<string, string> = {}
+    const subCount: Record<string, number> = {}
+    roots.forEach((root: any) => {
+      const rootIdx = items.findIndex((i: any) => i.id === root.id)
+      topLevelNum++
+      const num = String(topLevelNum)
+      parentNum[root.id] = num
+      ordered.push({ item: root, flatIndex: rootIdx, displayNumber: num })
+      const children = items.filter((i: any) => i.parentId === root.id)
+      children.forEach((child: any) => {
+        const childIdx = items.findIndex((i: any) => i.id === child.id)
+        const sub = (subCount[root.id] || 0) + 1
+        subCount[root.id] = sub
+        ordered.push({ item: child, flatIndex: childIdx, displayNumber: `${num}.${sub}` })
+      })
+    })
+    return ordered
+  })()
 
   const handleFormSubmit = async (data: Record<string, any>) => {
     setError(null)
@@ -368,7 +417,7 @@ export function AdvancePaymentClearanceForm({
                 ))
               )}
             </select>
-            <p className="form-hint" lang="th">เมื่อเลือกแล้ว ข้อมูลผู้ขอเบิก วันที่ต้องใช้เงิน และจำนวนที่เบิกทดรอง จะถูกนำมาจาก APR</p>
+            <p className="form-hint" lang="th">เมื่อเลือกแล้ว ข้อมูลผู้ขอเบิก วันที่เคลียร์ทดลองจ่าย และจำนวนที่เบิกทดรอง จะถูกนำมาจาก APR</p>
           </div>
         </div>
 
@@ -381,15 +430,15 @@ export function AdvancePaymentClearanceForm({
               <input className="form-input" value={(watch('creNumber') || '').replace(/^(CRE[\s\-]*)+/i, '')} readOnly disabled />
             </div>
             <div className="form-field-group form-field-date">
-              <label className="form-label">วันที่ <span className="text-red-600">*</span></label>
+              <label className="form-label">วันที่ทำเอกสาร <span className="text-red-600">*</span></label>
               <input
                 type="date"
                 className="form-input"
-                {...register('date', { required: 'กรุณาระบุวันที่' })}
+                {...register('date', { required: 'กรุณาระบุวันที่ทำเอกสาร' })}
               />
             </div>
             <div className="form-field-group">
-              <label className="form-label">วันที่ต้องใช้เงิน</label>
+              <label className="form-label">วันที่เคลียร์ทดลองจ่าย</label>
               <input
                 className="form-input"
                 value={getDateDisplay(watch('dateMoneyNeeded'))}
@@ -468,7 +517,7 @@ export function AdvancePaymentClearanceForm({
               + เพิ่มรายการ
             </button>
           </div>
-          <p className="form-hint" lang="th">แก้ไขได้ — กรอกจำนวนเงินที่ใช้จริงในแต่ละรายการ</p>
+          <p className="form-hint" lang="th">แก้ไขได้ — กรอกจำนวนเงินที่ใช้จริงในแต่ละรายการ • กด «รายการย่อย» เพื่อเพิ่ม 1.1, 1.2 ภายใต้รายการนั้น</p>
           <div className="frequent-items">
             <span className="frequent-items-label">รายการที่ใช้บ่อย:</span>
             <button type="button" onClick={() => addFrequentItem('ค่าน้ำมัน')} className="frequent-item-btn">ค่าน้ำมัน</button>
@@ -503,52 +552,77 @@ export function AdvancePaymentClearanceForm({
                     </td>
                   </tr>
                 ) : (
-                  items.map((item: any, index: number) => (
-                    <tr key={item.id}>
-                      <td className="items-table-td items-table-td-number">{index + 1}</td>
-                      <td className="items-table-td">
-                        <input
-                          type="text"
-                          className="items-table-input"
-                          value={item.description || ''}
-                          onChange={(e) => updateExpenseItem(index, 'description', e.target.value)}
-                          placeholder="รายการ"
-                        />
-                        {items.length > 1 && (
-                          <button type="button" onClick={() => removeExpenseRow(index)} className="items-table-delete" title="ลบ">
-                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="3 6 5 6 21 6" />
-                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                        <line x1="10" y1="11" x2="10" y2="17" />
-                                        <line x1="14" y1="11" x2="14" y2="17" />
-                                      </svg>
-                                    </button>
-                        )}
-                      </td>
-                      <td className="items-table-td items-table-td-amount">
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          className="items-table-input items-table-input-amount"
-                          value={item.amount ?? ''}
-                          onChange={(e) => updateExpenseItem(index, 'amount', parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                        />
-                      </td>
-                      <td className="items-table-td items-table-td-amount">
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          className="items-table-input items-table-input-amount"
-                          value={item.actualAmount ?? item.amount ?? ''}
-                          onChange={(e) => updateExpenseItem(index, 'actualAmount', parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                        />
-                      </td>
-                    </tr>
-                  ))
+                  orderedRows.map(({ item, flatIndex, displayNumber }) => {
+                    const fromApr = !!item.fromApr
+                    const isTopLevel = !item.parentId
+                    return (
+                      <tr key={item.id}>
+                        <td className="items-table-td items-table-td-number">{displayNumber}</td>
+                        <td className="items-table-td items-table-td-desc">
+                          <div className="items-table-desc-row">
+                            {fromApr ? (
+                              <span className="items-table-text items-table-desc-main">{item.description || '—'}</span>
+                            ) : (
+                              <input
+                                type="text"
+                                className="items-table-input items-table-desc-main"
+                                value={item.description || ''}
+                                onChange={(e) => updateExpenseItem(flatIndex, 'description', e.target.value)}
+                                placeholder="รายการ"
+                              />
+                            )}
+                            {isTopLevel && (
+                              <button
+                                type="button"
+                                onClick={() => addSubItem(item.id)}
+                                className="form-button form-button-small"
+                                style={{ fontSize: 12, flexShrink: 0 }}
+                                title="เพิ่มรายการย่อย (เช่น 1.1, 1.2)"
+                              >
+                                + รายการย่อย
+                              </button>
+                            )}
+                            {!fromApr && (
+                              <button type="button" onClick={() => removeExpenseRow(flatIndex)} className="items-table-delete" title="ลบ">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="3 6 5 6 21 6" />
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                  <line x1="10" y1="11" x2="10" y2="17" />
+                                  <line x1="14" y1="11" x2="14" y2="17" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="items-table-td items-table-td-amount">
+                          {fromApr ? (
+                            <span className="items-table-total-amount">{formatNumber(Number(item.amount) || 0)}</span>
+                          ) : (
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              className="items-table-input items-table-input-amount"
+                              value={item.amount ?? ''}
+                              onChange={(e) => updateExpenseItem(flatIndex, 'amount', parseFloat(e.target.value) || 0)}
+                              placeholder="0"
+                            />
+                          )}
+                        </td>
+                        <td className="items-table-td items-table-td-amount">
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            className="items-table-input items-table-input-amount"
+                            value={item.actualAmount ?? item.amount ?? ''}
+                            onChange={(e) => updateExpenseItem(flatIndex, 'actualAmount', parseFloat(e.target.value) || 0)}
+                            placeholder="0"
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
                 <tr className="items-table-total-row">
                   <td className="items-table-td items-table-td-number">รวม</td>
