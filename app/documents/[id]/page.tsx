@@ -88,6 +88,7 @@ export default function DocumentDetailPage() {
   const [exportingPdf, setExportingPdf] = useState(false)
   const didFetch = useRef(false)
   const lastFetchedId = useRef<string | null>(null)
+  const printWrapperRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -193,25 +194,46 @@ export default function DocumentDetailPage() {
   }
 
   const handleSaveAsPdf = async () => {
-    if (!id) return
+    const wrapper = printWrapperRef.current
+    if (!wrapper) {
+      alert('ไม่พบพื้นที่เอกสารสำหรับสร้าง PDF')
+      return
+    }
     setExportingPdf(true)
     try {
-      const res = await fetch(`/api/documents/${id}/export/pdf`)
-      if (!res.ok) throw new Error('Failed to export PDF')
-      const blob = await res.blob()
-      const contentDisposition = res.headers.get('Content-Disposition')
-      let filename = doc?.documentNumber || id
-      const match = contentDisposition?.match(/filename="?([^";\n]+)"?/)
-      if (match) filename = match[1].replace(/\.pdf$/i, '')
-      if (!filename.toLowerCase().endsWith('.pdf')) filename += '.pdf'
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      const html2canvas = (await import('html2canvas')).default
+      const { jsPDF } = await import('jspdf')
+
+      const canvas = await html2canvas(wrapper, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      })
+
+      const imgW = canvas.width
+      const imgH = canvas.height
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      // canvas at scale 2 → 1 canvas px = 0.5 CSS px
+      const pxToMm = (25.4 / 96) / 2
+      const imgWmm = imgW * pxToMm
+      const imgHmm = imgH * pxToMm
+      const scale = pageW / imgWmm
+      const scaledH = imgHmm * scale
+      // Avoid extra blank page from small overflow (rounding or extra wrapper space)
+      const numPages = scaledH <= pageH + 2 ? 1 : Math.ceil(scaledH / pageH)
+
+      const dataUrl = canvas.toDataURL('image/png')
+      for (let i = 0; i < numPages; i++) {
+        if (i > 0) pdf.addPage()
+        pdf.addImage(dataUrl, 'PNG', 0, -i * pageH, pageW, scaledH)
+      }
+
+      const filename = (doc?.documentNumber || id).toString().replace(/\.pdf$/i, '') + '.pdf'
+      pdf.save(filename)
     } catch (e: any) {
       alert(e?.message || 'ไม่สามารถบันทึก PDF ได้')
     } finally {
@@ -278,8 +300,8 @@ export default function DocumentDetailPage() {
 
   return (
     <DashboardLayout>
-      <div className="list-page">
-        <header className="list-header">
+      <div className="list-page doc-view-page">
+        <header className="list-header doc-view-top-bar">
           <h1 className="page-title">{doc.title}</h1>
           <p className="page-subtitle">
             สถานะ: {doc.status} • สร้างเมื่อ: {formatDateDMY(doc.createdAt)}
@@ -350,7 +372,7 @@ export default function DocumentDetailPage() {
         </div>
 
         <section className="list-content">
-          <div className="document-print-wrapper">
+          <div className="document-print-wrapper" ref={printWrapperRef}>
             <PrintableDocumentForm document={doc} assignedUsers={assignedUsers} />
           </div>
         </section>

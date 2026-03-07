@@ -77,6 +77,14 @@ export function PrintableDocumentFormAPR({ document, assignedUsers }: { document
             <span className="adv-info-val">{data.department || ''}</span>
           </div>
         </div>
+        {(data.jobName || data.jobCode) && (
+          <div className="adv-info-row">
+            <div className="adv-info-cell adv-info-cell--full">
+              <span className="adv-info-label">งาน (Job):</span>
+              <span className="adv-info-val">{[data.jobCode, data.jobName].filter(Boolean).join(' – ')}</span>
+            </div>
+          </div>
+        )}
         <div className="adv-info-row adv-info-row--col">
           <span className="adv-info-label">วัตถุประสงค์การเบิกเงินทดรองจ่าย:</span>
           <div className="adv-purpose">{data.purpose || ''}</div>

@@ -84,6 +84,14 @@ export function getDistributionDatesForDisplay(): { value: string; label: string
   return result.sort((a, b) => a.value.localeCompare(b.value))
 }
 
+/** Same as getDistributionDatesForDisplay but only dates that are today or in the future (past dates removed). */
+export function getDistributionDatesFromToday(): { value: string; label: string }[] {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todayIso = today.toISOString().slice(0, 10)
+  return getDistributionDatesForDisplay().filter((opt) => opt.value >= todayIso)
+}
+
 /** Options for วันที่ต้องใช้เงิน dropdown: only dates ≥7 days ahead, closest first (d/m/y labels) */
 export function getDateMoneyNeededOptions(): { value: string; label: string }[] {
   const all = getDistributionDatesForDisplay()

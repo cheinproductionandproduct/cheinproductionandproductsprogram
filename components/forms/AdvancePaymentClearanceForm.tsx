@@ -368,14 +368,16 @@ export function AdvancePaymentClearanceForm({
   const handleFormSubmit = async (data: Record<string, any>) => {
     setError(null)
     try {
+      if (!data.jobId || !String(data.jobId).trim()) {
+        setError('กรุณาเลือกงาน (Job)')
+        return
+      }
       data.totalExpenses = totalActual
       data.expenseItems = { items: data.expenseItems?.items || items, total: totalActual }
-      if (data.jobId) {
-        const j = jobs.find((j) => j.id === data.jobId)
-        if (j) {
-          data.jobName = j.name
-          data.jobCode = j.code
-        }
+      const j = jobs.find((job) => job.id === data.jobId)
+      if (j) {
+        data.jobName = j.name
+        data.jobCode = j.code
       }
       data.signatures = signatures
       data.requesterSignatureName = currentUser?.fullName || currentUser?.email || data.requesterSignatureName || data.requesterName || ''
@@ -453,7 +455,7 @@ export function AdvancePaymentClearanceForm({
               <input className="form-input" value={watch('advReference') || ''} readOnly disabled />
             </div>
             <div className="form-field-group">
-              <label className="form-label">งาน (Job)</label>
+              <label className="form-label">งาน (Job) <span className="text-red-600">*</span></label>
               <select
                 className="form-select"
                 value={watch('jobId') || ''}
@@ -466,6 +468,7 @@ export function AdvancePaymentClearanceForm({
                     setValue('jobCode', j.code || '')
                   }
                 }}
+                required
               >
                 <option value="">-- เลือกงาน --</option>
                 {loadingJobs ? (
@@ -523,7 +526,6 @@ export function AdvancePaymentClearanceForm({
             <button type="button" onClick={() => addFrequentItem('ค่าน้ำมัน')} className="frequent-item-btn">ค่าน้ำมัน</button>
             <button type="button" onClick={() => addFrequentItem('ค่าที่จอดรถ')} className="frequent-item-btn">ค่าที่จอดรถ</button>
             <button type="button" onClick={() => addFrequentItem('ค่าทางด่วน')} className="frequent-item-btn">ค่าทางด่วน</button>
-            <button type="button" onClick={() => addFrequentItem('ค่าเดินทาง')} className="frequent-item-btn">ค่าเดินทาง</button>
             <button type="button" onClick={() => addFrequentItem('ซื้อสดหน้างาน')} className="frequent-item-btn">ซื้อสดหน้างาน</button>
             <button type="button" onClick={() => addFrequentItem('ค่าอาหารและเครื่องดื่ม')} className="frequent-item-btn">ค่าอาหารและเครื่องดื่ม</button>
             <button type="button" onClick={() => addFrequentItem('ค่ารับรอง')} className="frequent-item-btn">ค่ารับรอง</button>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import '../dashboard.css'
 import { useUser } from '@/hooks/use-user'
@@ -9,6 +9,8 @@ import { UserRole } from '@prisma/client'
 import { useRouter } from 'next/navigation'
 import { formatDateDMY } from '@/lib/utils/date-format'
 import { getClosestClearanceDueDate } from '@/lib/utils/distribution-dates'
+
+const LINE_OFFICIAL_URL = process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL || ''
 
 type ClearanceStatus = 'cleared' | 'pending_clearance' | 'not_cleared'
 type FilterStatus = 'all' | 'due' | 'past_due'
@@ -89,6 +91,36 @@ export default function AdvanceRegisterPage() {
     return true
   })
 
+  /** Items that are past due (for LINE follow-up) — from current page only */
+  const pastDueItems = useMemo(
+    () => items.filter((item) => isPastClearanceDate(item.apr, item.clearanceStatus)),
+    [items]
+  )
+
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'ok' | 'fail'>('idle')
+
+  const getPastDueSummaryText = () => {
+    const lines = ['รายการพ้นกำหนดเคลียร์เงินทดรอง (Advance Payment Clearance):', '']
+    pastDueItems.forEach((item) => {
+      const advNumber = item.apr.documentNumber || item.apr.id
+      const name = item.apr.creator?.fullName || item.apr.creator?.email || '—'
+      const due = getRepaymentDate(item)
+      lines.push(`${advNumber} — ${name} — ครบกำหนด ${due}`)
+    })
+    return lines.join('\n')
+  }
+
+  const handleCopyForLine = async () => {
+    try {
+      await navigator.clipboard.writeText(getPastDueSummaryText())
+      setCopyStatus('ok')
+      setTimeout(() => setCopyStatus('idle'), 2000)
+    } catch {
+      setCopyStatus('fail')
+      setTimeout(() => setCopyStatus('idle'), 2000)
+    }
+  }
+
   /** Repayment due date: from fixed clearance list (closest to approval + 15 days) or clearance doc date when cleared */
   const getRepaymentDate = (item: RegisterItem) => {
     if (item.clearanceStatus === 'cleared' && item.clearanceDocument?.data?.date)
@@ -166,6 +198,29 @@ export default function AdvanceRegisterPage() {
                     พ้นกำหนด
                   </button>
                 </div>
+                {pastDueItems.length > 0 && LINE_OFFICIAL_URL && (
+                  <div className="adv-reg-line-panel" lang="th">
+                    <span className="adv-reg-line-label">ติดตามรายการพ้นกำหนดผ่าน LINE Official Account:</span>
+                    <div className="adv-reg-line-actions">
+                      <a
+                        href={LINE_OFFICIAL_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="form-button adv-reg-line-btn adv-reg-line-btn--primary"
+                      >
+                        เปิด LINE
+                      </a>
+                      <button
+                        type="button"
+                        className="form-button adv-reg-line-btn adv-reg-line-btn--secondary"
+                        onClick={handleCopyForLine}
+                        title="คัดลอกรายการพ้นกำหนดไปวางในแชท LINE"
+                      >
+                        {copyStatus === 'ok' ? 'คัดลอกแล้ว' : copyStatus === 'fail' ? 'คัดลอกไม่สำเร็จ' : 'คัดลอกรายการสำหรับส่ง LINE'}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div className="adv-reg-table-wrap">
                   {filteredItems.length === 0 ? (
                     <p className="adv-reg-empty-filter" lang="th">

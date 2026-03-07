@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { numberToThaiText, formatNumber } from '@/lib/utils/thai-number'
 import { formatDateDMY, parseDateDMY } from '@/lib/utils/date-format'
-import { isValidDistributionDate, isAtLeast7DaysBefore, getDateMoneyNeededOptions, getClosestDistributionDateAfter, getClosestClearanceDueDate, getNextDistributionFriday, getDistributionDatesForDisplay } from '@/lib/utils/distribution-dates'
+import { isValidDistributionDate, isAtLeast7DaysBefore, getDateMoneyNeededOptions, getClosestDistributionDateAfter, getClosestClearanceDueDate, getNextDistributionFriday, getDistributionDatesForDisplay, getDistributionDatesFromToday } from '@/lib/utils/distribution-dates'
 import type { FormField } from '@/types/database'
 import { SignatureCanvas } from '@/components/signature/SignatureCanvas'
 import { useUser } from '@/hooks/use-user'
@@ -96,7 +96,7 @@ export function AdvancePaymentRequestForm({
   const datePickerRef = useRef<HTMLInputElement>(null)
   const signatureDateRefs = useRef<Record<string, HTMLInputElement | null>>({})
   const dateMoneyNeededOptions = getDateMoneyNeededOptions()
-  const dateOptions = getDistributionDatesForDisplay() // All Fridays for วันที่ dropdown
+  const dateOptions = getDistributionDatesFromToday() // วันที่: only today and future Fridays (past dates removed)
   const [users, setUsers] = useState<any[]>([])
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [jobs, setJobs] = useState<{ id: string; name: string; code: string | null }[]>([])
@@ -195,10 +195,10 @@ export function AdvancePaymentRequestForm({
         : z.string().optional()
     }
   })
-  // Add optional jobId and urgent for APR
+  // Job is required so every document has a job selected
   let schema = z.object({
     ...schemaFields,
-    jobId: z.string().optional(),
+    jobId: z.string().min(1, 'กรุณาเลือกงาน (Job)'),
     urgent: z.boolean().optional(),
   })
   // วันที่ต้องใช้เงิน: when Urgent=true use current date; otherwise must be distribution Friday and 7 days ahead
@@ -231,8 +231,12 @@ export function AdvancePaymentRequestForm({
     defaultValues: {
       ...defaultValues,
       urgent: defaultValues.urgent === true || defaultValues.urgent === 'yes' ? true : false,
-      date: defaultValues.date || dateOptions[0]?.value || new Date().toISOString().split('T')[0],
-      dateMoneyNeeded: defaultValues.dateMoneyNeeded || getNextDistributionFriday(defaultValues.date || dateOptions[0]?.value || new Date().toISOString().split('T')[0]),
+      date: (defaultValues.date && dateOptions.some((o) => o.value === defaultValues.date))
+        ? defaultValues.date
+        : (dateOptions[0]?.value || new Date().toISOString().split('T')[0]),
+      dateMoneyNeeded: (defaultValues.dateMoneyNeeded && dateMoneyNeededOptions.some((o) => o.value === defaultValues.dateMoneyNeeded))
+        ? defaultValues.dateMoneyNeeded
+        : getNextDistributionFriday(defaultValues.date || dateOptions[0]?.value || new Date().toISOString().split('T')[0]),
       items: initialItems,
       totalAmount: initialItems.total || 0,
       requesterName: defaultValues.requesterName || currentUser?.fullName || currentUser?.email || '',
@@ -489,7 +493,7 @@ export function AdvancePaymentRequestForm({
               disabled={true}
             />
             <div className="form-field-group">
-              <label className="form-label">งาน (Job)</label>
+              <label className="form-label">งาน (Job) <span className="text-red-600">*</span></label>
               <select
                 className="form-select"
                 value={watch('jobId') || ''}
@@ -506,6 +510,7 @@ export function AdvancePaymentRequestForm({
                   ))
                 )}
               </select>
+              {errors.jobId?.message && <p className="form-error">{errors.jobId.message as string}</p>}
             </div>
           </div>
           <div className="form-row form-row--dates-urgent">
@@ -714,13 +719,6 @@ export function AdvancePaymentRequestForm({
                       className="frequent-item-btn"
                     >
                       ค่าทางด่วน
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => addFrequentItem('ค่าเดินทาง')}
-                      className="frequent-item-btn"
-                    >
-                      ค่าเดินทาง
                     </button>
                     <button
                       type="button"

@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { formatNumber } from '@/lib/utils/thai-number'
+import { useUser } from '@/hooks/use-user'
 import '../dashboard.css'
 
 export default function AdvanceDashboardPage() {
+  const { user: currentUser, loading: userLoading } = useUser()
   const [loading, setLoading] = useState(true)
   const [totalAmount, setTotalAmount] = useState<number>(0)
   const [documentCount, setDocumentCount] = useState(0)
@@ -14,6 +16,10 @@ export default function AdvanceDashboardPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!currentUser?.id) {
+      setLoading(false)
+      return
+    }
     let cancelled = false
     async function load() {
       try {
@@ -31,9 +37,14 @@ export default function AdvanceDashboardPage() {
           return
         }
         setAprTemplateId(aprTemplate.id)
-        const docRes = await fetch(
-          `/api/documents?formTemplateId=${encodeURIComponent(aprTemplate.id)}&limit=500&sortBy=createdAt&sortOrder=desc`
-        )
+        const params = new URLSearchParams({
+          formTemplateId: aprTemplate.id,
+          limit: '500',
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+          createdById: currentUser.id,
+        })
+        const docRes = await fetch(`/api/documents?${params}`)
         if (cancelled) return
         if (!docRes.ok) throw new Error('Failed to load documents')
         const { documents } = await docRes.json()
@@ -57,9 +68,9 @@ export default function AdvanceDashboardPage() {
     }
     load()
     return () => { cancelled = true }
-  }, [])
+  }, [currentUser?.id])
 
-  if (loading) {
+  if (userLoading || loading) {
     return (
       <div className="list-page">
         <div className="list-loading">โหลด...</div>

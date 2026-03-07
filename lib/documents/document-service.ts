@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { DocumentStatus } from '@prisma/client'
 import type { FormTemplateConfig } from '@/types/database'
+import { getClosestClearanceDueDate } from '@/lib/utils/distribution-dates'
 
 /**
  * Generate document number based on form template settings
@@ -368,6 +369,163 @@ export async function getAdvanceRegister(options?: { page?: number; limit?: numb
       totalPages: Math.ceil(total / limit),
     },
   }
+}
+
+/** Same shape as getAdvanceRegister items, with dueDateIso for past-due only */
+export type PastDueRegisterItem = {
+  apr: Awaited<ReturnType<typeof getAdvanceRegister>>['items'][0]['apr']
+  clearanceDocument: { id: string; documentNumber: string | null; status: DocumentStatus; data: any } | null
+  clearanceStatus: 'cleared' | 'pending_clearance' | 'not_cleared'
+  dueDateIso: string
+}
+
+/**
+ * Get all advance register items that are past clearance due date (not yet cleared).
+ * Used for LINE Friday 8 AM reminder (who hasn't cleared advance).
+ */
+export async function getPastDueAdvanceRegister(options?: { limit?: number }): Promise<PastDueRegisterItem[]> {
+  const limit = options?.limit ?? 500
+  const [aprTemplate, adcTemplate] = await Promise.all([
+    prisma.formTemplate.findUnique({ where: { slug: 'advance-payment-request' }, select: { id: true } }),
+    prisma.formTemplate.findUnique({ where: { slug: 'advance-payment-clearance' }, select: { id: true } }),
+  ])
+  if (!aprTemplate || !adcTemplate) return []
+
+  const aprDocuments = await prisma.document.findMany({
+    where: { formTemplateId: aprTemplate.id, status: 'APPROVED' },
+    take: limit,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      creator: { select: { id: true, fullName: true, email: true } },
+      formTemplate: { select: { slug: true, name: true } },
+    },
+  })
+
+  const now = new Date()
+  const pastDue: PastDueRegisterItem[] = []
+
+  for (const apr of aprDocuments) {
+    const docNumber = apr.documentNumber || ''
+    const clearanceDocs = await prisma.document.findMany({
+      where: {
+        formTemplateId: adcTemplate.id,
+        data: { path: ['advReference'], equals: docNumber },
+      },
+      select: { id: true, documentNumber: true, status: true, data: true },
+      orderBy: { createdAt: 'desc' },
+    })
+    const rawClearance = clearanceDocs[0] || null
+    const clearanceDoc = rawClearance
+      ? { id: rawClearance.id, documentNumber: rawClearance.documentNumber, status: rawClearance.status, data: rawClearance.data }
+      : null
+    const clearanceStatus: 'cleared' | 'pending_clearance' | 'not_cleared' =
+      clearanceDoc?.status === 'APPROVED' ? 'cleared' : clearanceDoc ? 'pending_clearance' : 'not_cleared'
+
+    if (clearanceStatus === 'cleared') continue
+    const completedAt = apr.completedAt ? String(apr.completedAt).slice(0, 10) : ''
+    if (!completedAt) continue
+    const dueIso = getClosestClearanceDueDate(completedAt)
+    if (!dueIso) continue
+    const dueDate = new Date(dueIso + 'T23:59:59')
+    if (now <= dueDate) continue
+
+    pastDue.push({
+      apr,
+      clearanceDocument: clearanceDoc,
+      clearanceStatus,
+      dueDateIso: dueIso,
+    })
+  }
+
+  return pastDue
+}
+
+export type UnclearedRegisterItem = PastDueRegisterItem
+
+/**
+ * Get uncleared APR items whose clearance due date is either:
+ * - today, or
+ * - two weeks (14 days) after the due date.
+ * Used for twice-per-month LINE reminders (due day and follow-up).
+ */
+export async function getUnclearedForReminder(options?: {
+  limit?: number
+  todayIso?: string
+}): Promise<UnclearedRegisterItem[]> {
+  const limit = options?.limit ?? 500
+  const todayIso =
+    options?.todayIso && options.todayIso.length === 10
+      ? options.todayIso
+      : new Date().toISOString().slice(0, 10)
+
+  const [aprTemplate, adcTemplate] = await Promise.all([
+    prisma.formTemplate.findUnique({ where: { slug: 'advance-payment-request' }, select: { id: true } }),
+    prisma.formTemplate.findUnique({ where: { slug: 'advance-payment-clearance' }, select: { id: true } }),
+  ])
+  if (!aprTemplate || !adcTemplate) return []
+
+  const aprDocuments = await prisma.document.findMany({
+    where: { formTemplateId: aprTemplate.id, status: 'APPROVED' },
+    take: limit,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      creator: { select: { id: true, fullName: true, email: true } },
+      formTemplate: { select: { slug: true, name: true } },
+    },
+  })
+
+  const addDays = (iso: string, days: number) => {
+    const d = new Date(iso + 'T12:00:00')
+    if (Number.isNaN(d.getTime())) return ''
+    d.setDate(d.getDate() + days)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+
+  const result: UnclearedRegisterItem[] = []
+
+  for (const apr of aprDocuments) {
+    const docNumber = apr.documentNumber || ''
+    const clearanceDocs = await prisma.document.findMany({
+      where: {
+        formTemplateId: adcTemplate.id,
+        data: { path: ['advReference'], equals: docNumber },
+      },
+      select: { id: true, documentNumber: true, status: true, data: true },
+      orderBy: { createdAt: 'desc' },
+    })
+    const rawClearance = clearanceDocs[0] || null
+    const clearanceDoc = rawClearance
+      ? { id: rawClearance.id, documentNumber: rawClearance.documentNumber, status: rawClearance.status, data: rawClearance.data }
+      : null
+    const clearanceStatus: 'cleared' | 'pending_clearance' | 'not_cleared' =
+      clearanceDoc?.status === 'APPROVED'
+        ? 'cleared'
+        : clearanceDoc
+          ? 'pending_clearance'
+          : 'not_cleared'
+
+    if (clearanceStatus === 'cleared') continue
+
+    const completedAt = apr.completedAt ? String(apr.completedAt).slice(0, 10) : ''
+    if (!completedAt) continue
+    const dueIso = getClosestClearanceDueDate(completedAt)
+    if (!dueIso) continue
+
+    const followupIso = addDays(dueIso, 14)
+    if (todayIso !== dueIso && todayIso !== followupIso) continue
+
+    result.push({
+      apr,
+      clearanceDocument: clearanceDoc,
+      clearanceStatus,
+      dueDateIso: dueIso,
+    })
+  }
+
+  return result
 }
 
 /**
