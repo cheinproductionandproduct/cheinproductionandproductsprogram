@@ -43,6 +43,16 @@ export default function DashboardPage() {
         )}
       </div>
 
+      <div className="card-row card-row-bottom">
+        <div className="card">
+          <div className="card-image"></div>
+          <div className="card-label">ใบเบิกใบคุมการใช้รถ</div>
+          <Link href="/dashboard/vehicle">
+            <button className="enter-btn">Enter</button>
+          </Link>
+        </div>
+      </div>
+
       {/* hidden until ready */}
       <div className="card-row card-row-bottom" style={{ display: 'none' }}>
         <div className="card">

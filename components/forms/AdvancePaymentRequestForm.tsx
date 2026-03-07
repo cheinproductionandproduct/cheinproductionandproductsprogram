@@ -215,8 +215,29 @@ export function AdvancePaymentRequestForm({
     }
   })
 
-  // Initialize default items if not provided
-  const initialItems = defaultValues.items || { items: [{ id: '1', description: '', details: '', amount: 0 }], total: 0 }
+  // Initialize default items: support both { items: [], total } and plain array from saved document
+  const rawItems = defaultValues.items
+  let initialItems: { items: Array<{ id: string; description?: string; details?: string; amount?: number }>; total: number }
+  if (Array.isArray(rawItems)) {
+    const items = rawItems.map((it: any, i: number) => ({
+      id: it.id != null ? String(it.id) : String(i + 1),
+      description: it.description ?? '',
+      details: it.details ?? '',
+      amount: Number(it.amount) || 0,
+    }))
+    initialItems = { items, total: items.reduce((s, i) => s + (Number(i.amount) || 0), 0) }
+  } else if (rawItems && typeof rawItems === 'object' && Array.isArray(rawItems.items)) {
+    const items = (rawItems.items as any[]).map((it: any, i: number) => ({
+      id: it.id != null ? String(it.id) : String(i + 1),
+      description: it.description ?? '',
+      details: it.details ?? '',
+      amount: Number(it.amount) || 0,
+    }))
+    const total = typeof rawItems.total === 'number' && !Number.isNaN(rawItems.total) ? rawItems.total : items.reduce((s, i) => s + (Number(i.amount) || 0), 0)
+    initialItems = { items, total }
+  } else {
+    initialItems = { items: [{ id: '1', description: '', details: '', amount: 0 }], total: 0 }
+  }
 
   const {
     register,
@@ -821,7 +842,7 @@ export function AdvancePaymentRequestForm({
                                 <td className="items-table-td items-table-td-amount">
                                   <input
                                     type="number"
-                                    value={item.amount || ''}
+                                    value={item.amount !== undefined && item.amount !== null && item.amount !== '' ? Number(item.amount) : ''}
                                     onChange={(e) => updateItem(item.id, 'amount', parseFloat(e.target.value) || 0)}
                                     min="0"
                                     step="0.01"
