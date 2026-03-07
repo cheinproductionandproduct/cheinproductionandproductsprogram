@@ -22,7 +22,7 @@ export default function AdvanceDashboardPage() {
       return
     }
     let cancelled = false
-    async function load() {
+    async function load(uid: string) {
       try {
         setLoading(true)
         setError(null)
@@ -43,7 +43,7 @@ export default function AdvanceDashboardPage() {
           limit: '500',
           sortBy: 'createdAt',
           sortOrder: 'desc',
-          createdById: userId as string,
+          createdById: uid,
         })
         const docRes = await fetch(`/api/documents?${params}`)
         if (cancelled) return
@@ -67,7 +67,7 @@ export default function AdvanceDashboardPage() {
         if (!cancelled) setLoading(false)
       }
     }
-    load()
+    load(userId)
     return () => { cancelled = true }
   }, [currentUser?.id])
 
