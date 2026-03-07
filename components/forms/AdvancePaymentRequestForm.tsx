@@ -227,7 +227,7 @@ export function AdvancePaymentRequestForm({
     getValues,
     formState: { errors },
   } = useForm<Record<string, any>>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       ...defaultValues,
       urgent: defaultValues.urgent === true || defaultValues.urgent === 'yes' ? true : false,

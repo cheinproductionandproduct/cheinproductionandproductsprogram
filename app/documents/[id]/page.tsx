@@ -202,7 +202,7 @@ export default function DocumentDetailPage() {
     setExportingPdf(true)
     try {
       const html2canvas = (await import('html2canvas')).default
-      const { jsPDF } = await import('jspdf')
+      const jsPDF = (await import('jspdf')).default
 
       const canvas = await html2canvas(wrapper, {
         scale: 2,

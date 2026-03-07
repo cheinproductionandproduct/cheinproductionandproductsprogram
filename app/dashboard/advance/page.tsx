@@ -16,7 +16,8 @@ export default function AdvanceDashboardPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!currentUser?.id) {
+    const userId = currentUser?.id
+    if (!userId) {
       setLoading(false)
       return
     }
@@ -42,7 +43,7 @@ export default function AdvanceDashboardPage() {
           limit: '500',
           sortBy: 'createdAt',
           sortOrder: 'desc',
-          createdById: currentUser.id,
+          createdById: userId as string,
         })
         const docRes = await fetch(`/api/documents?${params}`)
         if (cancelled) return
