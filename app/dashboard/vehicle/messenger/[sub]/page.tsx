@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { MESSENGER_SUB_LABELS } from '@/lib/vehicle-categories'
 import { useRouter } from 'next/navigation'
-import { PlaceAutocompleteInput } from '@/components/vehicle/PlaceAutocompleteInput'
 import '../../../dashboard.css'
 
 type PlaceResult = { address: string; placeId?: string; lat?: number; lng?: number }
@@ -99,7 +98,7 @@ export default function MessengerRequestPage() {
       <header className="list-header">
         <h1 className="page-title">Messenger — {serviceLabel}</h1>
         <p className="page-subtitle" lang="th">
-          จุดรับ และจุดปลายทาง (ค้นหาสถานที่จาก Google Map)
+          จุดรับ และจุดปลายทาง
         </p>
       </header>
 
@@ -150,13 +149,10 @@ export default function MessengerRequestPage() {
             />
           </div>
           <div className="form-field-group">
-            <label className="form-label">สถานที่ (Location) — ค้นหาจาก Google Map</label>
-            <PlaceAutocompleteInput
-              value={startLocation}
-              onChange={handleStartLocationChange}
-              placeholder="พิมพ์ค้นหาที่อยู่หรือสถานที่"
-              className="form-input"
-            />
+            <label className="form-label">สถานที่ (Location)</label>
+            <input type="text" className="form-input" value={startLocation}
+              onChange={e => handleStartLocationChange({ address: e.target.value })}
+              placeholder="พิมพ์ที่อยู่หรือสถานที่" />
           </div>
         </div>
 
@@ -192,13 +188,10 @@ export default function MessengerRequestPage() {
             />
           </div>
           <div className="form-field-group">
-            <label className="form-label">สถานที่ (Location) — ค้นหาจาก Google Map</label>
-            <PlaceAutocompleteInput
-              value={destLocation}
-              onChange={handleDestLocationChange}
-              placeholder="พิมพ์ค้นหาที่อยู่หรือสถานที่"
-              className="form-input"
-            />
+            <label className="form-label">สถานที่ (Location)</label>
+            <input type="text" className="form-input" value={destLocation}
+              onChange={e => handleDestLocationChange({ address: e.target.value })}
+              placeholder="พิมพ์ที่อยู่หรือสถานที่" />
           </div>
         </div>
 
