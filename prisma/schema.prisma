@@ -345,7 +345,7 @@ enum BoqDocumentStatus {
 
 model BoqDocument {
   id               String            @id @default(cuid())
-  jobId            String
+  jobId            String?
   title            String            @default("")
   status           BoqDocumentStatus @default(DRAFT)
   showMaterial     Boolean           @default(true)
@@ -354,11 +354,11 @@ model BoqDocument {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
-  job     Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job     Job?      @relation(fields: [jobId], references: [id], onDelete: SetNull)
   creator User      @relation("BoqDocumentCreator", fields: [createdById], references: [id])
   lines   BoqLine[]
 
-  @@unique([jobId])
+  @@index([jobId])
   @@index([createdById])
   @@index([status])
   @@map("boq_documents")

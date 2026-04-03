@@ -333,6 +333,7 @@
 .boq-list-row td { padding: 12px 16px; }
 
 .boq-list-job { font-weight: 600; color: #1a1a1a; }
+.boq-list-subtitle { display: block; font-size: 12px; font-weight: 400; color: #888; margin-top: 2px; }
 .boq-list-date { color: #666; font-size: 13px; }
 
 .boq-list-action { text-align: right; }

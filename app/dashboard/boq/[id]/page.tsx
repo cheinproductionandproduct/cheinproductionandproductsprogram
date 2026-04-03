@@ -142,7 +142,7 @@ export default function BoqEditorPage() {
       .then(r => r.json())
       .then(d => {
         if (d.boq) {
-          setJobName(d.boq.job?.name ?? '')
+          setJobName(d.boq.job?.name || d.boq.title || '')
           setBoqExists(true)
           setGroups((d.boq.data as Group[])?.length ? d.boq.data as Group[] : [emptyGroup()])
           setShowMaterialColumns(d.boq.showMaterial ?? true)
@@ -233,7 +233,7 @@ export default function BoqEditorPage() {
       <header className="list-header">
         <div>
           <h1 className="page-title">BOQ</h1>
-          <p className="page-subtitle" lang="th">{jobName || 'Bill of Quantities'}</p>
+          <p className="page-subtitle" lang="th">{jobName || 'Bill of Quantities — ไม่ระบุงาน'}</p>
         </div>
         {!canEdit && <span className="boq-readonly-badge">ดูเท่านั้น</span>}
         {canEdit && !isEditing && boqExists && <span className="boq-saved-badge">บันทึกแล้ว</span>}

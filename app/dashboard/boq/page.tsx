@@ -12,8 +12,9 @@ const EDITOR_EMAIL = 'bee@cheinproduction.co.th'
 type Job = { id: string; name: string; code: string | null }
 type BoqRow = {
   id: string
-  jobId: string
-  job: Job
+  jobId: string | null
+  title: string
+  job: Job | null
   status: string
   updatedAt: string
   createdAt: string
@@ -29,11 +30,9 @@ export default function BoqDashboard() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [selectedJobId, setSelectedJobId] = useState('')
+  const [boqTitle, setBoqTitle] = useState('')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
-
-  const existingJobIds = new Set(boqs.map(b => b.jobId))
-  const availableJobs = jobs.filter(j => !existingJobIds.has(j.id))
 
   const fetchData = async () => {
     setLoading(true)
@@ -55,15 +54,26 @@ export default function BoqDashboard() {
 
   useEffect(() => { fetchData() }, [])
 
+  const openModal = () => {
+    setShowModal(true)
+    setSelectedJobId('')
+    setBoqTitle('')
+    setCreateError(null)
+  }
+
   const handleCreate = async () => {
-    if (!selectedJobId) return
     setCreating(true)
     setCreateError(null)
     try {
       const res = await fetch('/api/boq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: selectedJobId, data: [], showMaterial: true }),
+        body: JSON.stringify({
+          jobId: selectedJobId || null,
+          title: boqTitle.trim(),
+          data: [],
+          showMaterial: true,
+        }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'สร้างไม่สำเร็จ')
@@ -73,6 +83,8 @@ export default function BoqDashboard() {
       setCreating(false)
     }
   }
+
+  const boqDisplayName = (b: BoqRow) => b.job?.name || b.title || '— ไม่ระบุชื่อ —'
 
   const fmt = (iso: string) =>
     new Date(iso).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -85,11 +97,7 @@ export default function BoqDashboard() {
           <p className="page-subtitle" lang="th">Bill of Quantities — รายการ BOQ ทั้งหมด</p>
         </div>
         {canEdit && (
-          <button
-            type="button"
-            className="boq-create-btn"
-            onClick={() => { setShowModal(true); setSelectedJobId(''); setCreateError(null) }}
-          >
+          <button type="button" className="boq-create-btn" onClick={openModal}>
             + สร้าง BOQ ใหม่
           </button>
         )}
@@ -112,7 +120,7 @@ export default function BoqDashboard() {
           <table className="boq-list-table">
             <thead>
               <tr>
-                <th>งาน (Job)</th>
+                <th>ชื่อ / งาน</th>
                 <th>อัปเดตล่าสุด</th>
                 <th>สร้างเมื่อ</th>
                 <th></th>
@@ -121,7 +129,10 @@ export default function BoqDashboard() {
             <tbody>
               {boqs.map(b => (
                 <tr key={b.id} className="boq-list-row" onClick={() => router.push(`/dashboard/boq/${b.id}`)}>
-                  <td className="boq-list-job">{b.job.name}</td>
+                  <td className="boq-list-job">
+                    {boqDisplayName(b)}
+                    {b.job && b.title && <span className="boq-list-subtitle">{b.title}</span>}
+                  </td>
                   <td className="boq-list-date">{fmt(b.updatedAt)}</td>
                   <td className="boq-list-date">{fmt(b.createdAt)}</td>
                   <td className="boq-list-action">
@@ -139,22 +150,32 @@ export default function BoqDashboard() {
         <div className="boq-modal-overlay" onClick={() => setShowModal(false)}>
           <div className="boq-modal" onClick={e => e.stopPropagation()}>
             <h2 className="boq-modal-title">สร้าง BOQ ใหม่</h2>
-            <label className="boq-modal-label">เลือกงาน</label>
+
+            <label className="boq-modal-label">ชื่อ BOQ (ถ้าไม่ระบุงาน)</label>
+            <input
+              type="text"
+              className="boq-job-select"
+              value={boqTitle}
+              onChange={e => setBoqTitle(e.target.value)}
+              placeholder="เช่น งานก่อสร้างอาคาร A"
+              style={{ width: '100%', marginBottom: 16 }}
+            />
+
+            <label className="boq-modal-label">งาน (Job) — ไม่บังคับ</label>
             <select
               className="boq-job-select"
               value={selectedJobId}
               onChange={e => setSelectedJobId(e.target.value)}
               style={{ width: '100%', marginBottom: 16 }}
             >
-              <option value="">— เลือกงาน —</option>
-              {availableJobs.map(j => (
+              <option value="">— ไม่ระบุงาน —</option>
+              {jobs.map(j => (
                 <option key={j.id} value={j.id}>{j.name}</option>
               ))}
             </select>
-            {availableJobs.length === 0 && (
-              <p className="boq-modal-note">ทุกงานมี BOQ แล้ว</p>
-            )}
-            {createError && <p className="boq-save-error">{createError}</p>}
+
+            {createError && <p className="boq-save-error" style={{ marginBottom: 12 }}>{createError}</p>}
+
             <div className="boq-modal-actions">
               <button type="button" className="boq-modal-cancel" onClick={() => setShowModal(false)}>
                 ยกเลิก
@@ -163,7 +184,8 @@ export default function BoqDashboard() {
                 type="button"
                 className="boq-save-btn"
                 onClick={handleCreate}
-                disabled={!selectedJobId || creating || availableJobs.length === 0}
+                disabled={creating || (!selectedJobId && !boqTitle.trim())}
+                title={!selectedJobId && !boqTitle.trim() ? 'กรุณาระบุชื่อหรือเลือกงาน' : ''}
               >
                 {creating ? 'กำลังสร้าง...' : 'สร้าง BOQ'}
               </button>

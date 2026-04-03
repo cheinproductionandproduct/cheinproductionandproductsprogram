@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const jobId = searchParams.get('jobId')
 
     if (jobId) {
-      const boq = await (prisma as any).boqDocument.findUnique({
+      const boq = await (prisma as any).boqDocument.findFirst({
         where: { jobId },
       })
       return NextResponse.json({ boq: boq ?? null })
@@ -44,12 +44,12 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
-    const { jobId, data, showMaterial } = body
-    if (!jobId) return NextResponse.json({ error: 'jobId is required' }, { status: 400 })
+    const { jobId, title, data, showMaterial } = body
 
     const boq = await (prisma as any).boqDocument.create({
       data: {
-        jobId,
+        jobId: jobId || null,
+        title: title || '',
         data: data ?? [],
         showMaterial: showMaterial ?? true,
         createdById: user.id,
