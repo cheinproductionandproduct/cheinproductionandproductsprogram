@@ -179,6 +179,7 @@ export default function BoqEditorPage() {
     setGroups(p => p.map(g => g.id!==gid?g:{...g,sections:g.sections.map(s=>s.id!==sid?s:{...s,subRows:s.subRows.map(r=>r.id===rid?{...r,[field]:val}:r)})}))
 
   /* totals */
+  const totalItems      = groups.reduce((s,g) => s + g.sections.reduce((ss,sec) => ss + sec.subRows.length, 0), 0)
   const grandTotal      = groups.reduce((s,g) => s+calcGrpTotal(g,showMat), 0)
   const overhead        = grandTotal * (overheadPct || 0) / 100
   const subtotalBeforeDiscount = grandTotal + overhead
@@ -430,7 +431,7 @@ export default function BoqEditorPage() {
           </tbody>
 
           <tfoot>
-            <SummaryRow label="รวมรายการ" amount={fmt(grandTotal)} highlight={false}/>
+            <SummaryRow label={`รวมรายการ ${totalItems} ข้อ`} amount={fmt(grandTotal)} highlight={true}/>
             <SummaryRow
               label={
                 editing ? (
@@ -452,33 +453,45 @@ export default function BoqEditorPage() {
               label={
                 <span className="boq-summary-editable-label">
                   ส่วนลดพิเศษ
-                  {editing && (
+                  {(editing || !editing) && (
                     <span className="boq-discount-type-toggle">
                       <button
                         type="button"
                         className={`boq-dtype-btn${discountType==='amount'?' boq-dtype-btn--active':''}`}
-                        onClick={() => setDiscountType('amount')}
+                        onClick={() => editing && setDiscountType('amount')}
+                        style={!editing ? { pointerEvents: 'none' } : undefined}
                       >฿</button>
                       <button
                         type="button"
                         className={`boq-dtype-btn${discountType==='pct'?' boq-dtype-btn--active':''}`}
-                        onClick={() => setDiscountType('pct')}
+                        onClick={() => editing && setDiscountType('pct')}
+                        style={!editing ? { pointerEvents: 'none' } : undefined}
                       >%</button>
                     </span>
                   )}
-                  {!editing && discountType==='pct' && ` (${Number(discount)||0}%)`}
+                  {/* when % mode and editing, show the % input in the label */}
+                  {editing && discountType === 'pct' && (
+                    <input
+                      type="number" min={0} max={100} step={0.01}
+                      className="boq-summary-pct-input"
+                      value={discount}
+                      onChange={e => setDiscount(e.target.value === '' ? '' : parseFloat(e.target.value)||0)}
+                      placeholder="0"
+                    />
+                  )}
+                  {!editing && discountType==='pct' && ` ${Number(discount)||0}%`}
                 </span>
               }
               amount={fmt(discountAmt)}
               highlight={false}
               editNode={
-                editing ? (
+                editing && discountType === 'amount' ? (
                   <input
                     type="number" min={0} step={0.01}
                     className="boq-summary-discount-input"
                     value={discount}
                     onChange={e => setDiscount(e.target.value === '' ? '' : parseFloat(e.target.value)||0)}
-                    placeholder={discountType==='pct' ? '0' : '0.00'}
+                    placeholder="0.00"
                   />
                 ) : undefined
               }
