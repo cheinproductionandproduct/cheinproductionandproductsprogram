@@ -434,7 +434,7 @@ export default function BoqEditorPage() {
           </tbody>
 
           <tfoot>
-            <SummaryRow label={`รวมรายการ 1 - ${totalItems} ข้อ`} amount={fmt(grandTotal)} highlight={true}/>
+            <SummaryRow label={`รวมรายการ ข้อ 1 - ${totalItems}`} amount={fmt(grandTotal)} highlight={true}/>
             <SummaryRow
               label={
                 editing ? (
@@ -444,7 +444,7 @@ export default function BoqEditorPage() {
                       type="text" inputMode="decimal"
                       className="boq-summary-pct-input"
                       value={overheadPct}
-                      onChange={e => { const v=e.target.value.replace(/[^0-9.]/g,''); setOverheadPct(parseFloat(v)||0) }}
+                      onChange={e => setOverheadPct(parseFloat(e.target.value)||0)}
                     />
                     &nbsp;%
                   </span>
@@ -476,7 +476,7 @@ export default function BoqEditorPage() {
                       type="text" inputMode="decimal"
                       className="boq-summary-pct-input"
                       value={discount}
-                      onChange={e => setDiscount(e.target.value.replace(/[^0-9.]/g,''))}
+                      onChange={e => setDiscount(e.target.value)}
                       placeholder="0"
                     />
                   )}
@@ -491,7 +491,7 @@ export default function BoqEditorPage() {
                     type="text" inputMode="decimal"
                     className="boq-summary-discount-input"
                     value={discount}
-                    onChange={e => setDiscount(e.target.value.replace(/[^0-9.]/g,''))}
+                    onChange={e => setDiscount(e.target.value)}
                     placeholder="0.00"
                   />
                 ) : undefined
