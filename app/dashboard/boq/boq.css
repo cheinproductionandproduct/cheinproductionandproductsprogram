@@ -452,6 +452,20 @@
   font-style: italic;
 }
 
+.boq-editor-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.boq-meta-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* ── Read-only badge ─────────────────────────── */
 .boq-readonly-badge {
   display: inline-flex;

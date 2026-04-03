@@ -124,6 +124,9 @@ export default function BoqEditorPage() {
   const canEdit = user?.email === EDITOR_EMAIL
 
   const [jobName, setJobName] = useState('')
+  const [jobId, setJobId] = useState<string>('')
+  const [boqTitle, setBoqTitle] = useState('')
+  const [jobs, setJobs] = useState<{ id: string; name: string }[]>([])
   const [boqExists, setBoqExists] = useState(false)
   const [groups, setGroups] = useState<Group[]>([emptyGroup()])
   const [showMaterialColumns, setShowMaterialColumns] = useState(true)
@@ -134,14 +137,19 @@ export default function BoqEditorPage() {
 
   const editing = canEdit && isEditing
 
-  /* load BOQ */
+  /* load BOQ + jobs list */
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    fetch(`/api/boq/${id}`)
-      .then(r => r.json())
-      .then(d => {
+    Promise.all([
+      fetch(`/api/boq/${id}`).then(r => r.json()),
+      fetch('/api/jobs').then(r => r.json()),
+    ])
+      .then(([d, jd]) => {
+        setJobs(jd.jobs ?? [])
         if (d.boq) {
+          setJobId(d.boq.jobId ?? '')
+          setBoqTitle(d.boq.title ?? '')
           setJobName(d.boq.job?.name || d.boq.title || '')
           setBoqExists(true)
           setGroups((d.boq.data as Group[])?.length ? d.boq.data as Group[] : [emptyGroup()])
@@ -163,9 +171,16 @@ export default function BoqEditorPage() {
       const res = await fetch(`/api/boq/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: groups, showMaterial: showMaterialColumns }),
+        body: JSON.stringify({
+          data: groups,
+          showMaterial: showMaterialColumns,
+          jobId: jobId || null,
+          title: boqTitle,
+        }),
       })
       if (!res.ok) throw new Error()
+      const d = await res.json()
+      setJobName(d.boq?.job?.name || d.boq?.title || '')
       setIsEditing(false)
     } catch {
       setSaveError('บันทึกไม่สำเร็จ กรุณาลองใหม่')
@@ -243,7 +258,38 @@ export default function BoqEditorPage() {
         <Link href="/dashboard/boq" className="form-button boq-back-btn">
           ← กลับรายการ BOQ
         </Link>
-        <span className="boq-job-chip">{jobName}</span>
+
+        {editing ? (
+          <div className="boq-editor-meta">
+            <div className="boq-meta-field">
+              <label className="boq-job-label">ชื่อ BOQ</label>
+              <input
+                type="text"
+                className="boq-job-select"
+                value={boqTitle}
+                onChange={e => setBoqTitle(e.target.value)}
+                placeholder="ชื่อ BOQ (ถ้าไม่ระบุงาน)"
+                style={{ minWidth: 180 }}
+              />
+            </div>
+            <div className="boq-meta-field">
+              <label className="boq-job-label">งาน (Job)</label>
+              <select
+                className="boq-job-select"
+                value={jobId}
+                onChange={e => setJobId(e.target.value)}
+                style={{ minWidth: 200 }}
+              >
+                <option value="">— ไม่ระบุงาน —</option>
+                {jobs.map(j => (
+                  <option key={j.id} value={j.id}>{j.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        ) : (
+          jobName && <span className="boq-job-chip">{jobName}</span>
+        )}
       </div>
 
       <div className="boq-table-wrapper">

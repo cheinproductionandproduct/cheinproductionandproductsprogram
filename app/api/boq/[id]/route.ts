@@ -44,16 +44,18 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
-    const { data, showMaterial, title } = body
+    const { data, showMaterial, title, jobId } = body
 
     const boq = await (prisma as any).boqDocument.update({
       where: { id },
       data: {
         ...(title !== undefined && { title }),
+        ...(jobId !== undefined && { jobId: jobId || null }),
         data: data ?? [],
         showMaterial: showMaterial ?? true,
         updatedAt: new Date(),
       },
+      include: { job: { select: { id: true, name: true, code: true } } },
     })
 
     return NextResponse.json({ boq })
