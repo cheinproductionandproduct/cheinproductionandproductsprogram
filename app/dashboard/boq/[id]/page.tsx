@@ -452,7 +452,7 @@ export default function BoqEditorPage() {
               }
               amount={fmt(overhead)} highlight={false}
             />
-            <SummaryRow label="ราคารวมบวกค่าดำเนินการ" amount={fmt(subtotalBeforeDiscount)} highlight={false}/>
+            <SummaryRow label="ราคารวมค่าดำเนินการ" amount={fmt(subtotalBeforeDiscount)} highlight={false}/>
             <SummaryRow
               label={
                 <span className="boq-summary-editable-label">
