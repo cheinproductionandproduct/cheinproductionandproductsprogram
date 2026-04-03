@@ -90,6 +90,7 @@ export default function BoqEditorPage() {
   const [groups, setGroups]     = useState<Group[]>([emptyGroup()])
   const [showMat, setShowMat]   = useState(true)
   const [overheadPct, setOverheadPct]         = useState(12)
+  const [vatPct, setVatPct]                   = useState(7)
   const [discount, setDiscount]               = useState<number|''>(0)
   const [discountType, setDiscountType]       = useState<'pct'|'amount'>('amount')
   const [isEditing, setIsEditing] = useState(false)
@@ -131,11 +132,12 @@ export default function BoqEditorPage() {
           setJobName(d.boq.job?.name || d.boq.title || '')
           setBoqExists(true)
           // support both old format (array) and new format ({ groups, overheadPct, discount })
-          const raw = d.boq.data as (Group[] | { groups: Group[]; overheadPct?: number; discount?: number; discountType?: 'pct'|'amount' }) | null
+          const raw = d.boq.data as (Group[] | { groups: Group[]; overheadPct?: number; vatPct?: number; discount?: number; discountType?: 'pct'|'amount' }) | null
           const isWrapped = raw && !Array.isArray(raw)
           setGroups(isWrapped ? (raw.groups?.length ? raw.groups : [emptyGroup()]) : (Array.isArray(raw) && raw.length ? raw : [emptyGroup()]))
           if (isWrapped) {
             setOverheadPct(raw.overheadPct ?? 12)
+            setVatPct(raw.vatPct ?? 7)
             setDiscount(raw.discount ?? 0)
             setDiscountType(raw.discountType ?? 'amount')
           }
@@ -154,7 +156,7 @@ export default function BoqEditorPage() {
       const res = await fetch(`/api/boq/${id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          data: { groups, overheadPct, discount: Number(discount)||0, discountType },
+          data: { groups, overheadPct, vatPct, discount: Number(discount)||0, discountType },
           showMaterial: showMat, jobId: jobId||null, title: boqTitle,
         }),
       })
@@ -187,7 +189,7 @@ export default function BoqEditorPage() {
     ? subtotalBeforeDiscount * (Number(discount) || 0) / 100
     : (Number(discount) || 0)
   const afterDiscount   = subtotalBeforeDiscount - discountAmt
-  const vat             = afterDiscount * 0.07
+  const vat             = afterDiscount * (vatPct || 0) / 100
   const totalWithVat    = afterDiscount + vat
   let globalSecIdx   = 0
 
@@ -497,7 +499,23 @@ export default function BoqEditorPage() {
               }
             />
             <SummaryRow label="ราคารวมหลังหักส่วนลด" amount={fmt(afterDiscount)} highlight={true}/>
-            <SummaryRow label="ภาษีมูลค่าเพิ่ม 7%" amount={fmt(vat)} highlight={false}/>
+            <SummaryRow
+              label={
+                editing ? (
+                  <span className="boq-summary-editable-label">
+                    ภาษีมูลค่าเพิ่ม&nbsp;
+                    <input
+                      type="number" min={0} max={100} step={0.01}
+                      className="boq-summary-pct-input"
+                      value={vatPct}
+                      onChange={e => setVatPct(parseFloat(e.target.value)||0)}
+                    />
+                    &nbsp;%
+                  </span>
+                ) : `ภาษีมูลค่าเพิ่ม ${vatPct}%`
+              }
+              amount={fmt(vat)} highlight={false}
+            />
             <SummaryRow label="ราคารวมภาษีมูลค่าเพิ่ม" amount={fmt(totalWithVat)} highlight={false}/>
           </tfoot>
         </table>
