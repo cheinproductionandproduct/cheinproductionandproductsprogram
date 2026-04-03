@@ -8,14 +8,16 @@ import { getCurrentUser } from '@/lib/auth/middleware-helpers'
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    const { id } = await params
+
     const boq = await (prisma as any).boqDocument.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { job: { select: { id: true, name: true, code: true } } },
     })
 
@@ -34,17 +36,18 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    const { id } = await params
     const body = await request.json()
     const { data, showMaterial } = body
 
     const boq = await (prisma as any).boqDocument.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         data: data ?? [],
         showMaterial: showMaterial ?? true,
