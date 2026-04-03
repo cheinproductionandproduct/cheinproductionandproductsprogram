@@ -72,11 +72,11 @@
 }
 
 .boq-th-no     { width: 60px; }
-.boq-th-desc   { min-width: 320px; width: 35%; }
-.boq-th-qty    { width: 70px; }
-.boq-th-unit   { width: 60px; }
+.boq-th-desc   { min-width: 380px; width: 42%; }
+.boq-th-qty    { width: 64px; }
+.boq-th-unit   { width: 48px; }
 .boq-th-note   { width: 80px; min-width: 80px; }
-.boq-th-total  { width: 110px; }
+.boq-th-total  { width: 92px; }
 .boq-th-action { width: 80px; }
 
 /* ID reference sub-cols: keep short */
@@ -96,7 +96,7 @@
 }
 
 .boq-td-num  { text-align: right; }
-.boq-td-desc { min-width: 220px; }
+.boq-td-desc { min-width: 300px; }
 .boq-td-note { min-width: 80px; }
 
 .boq-td-total {
@@ -233,10 +233,18 @@
   font-size: 14px;
 }
 
+/* Full-bar background on every cell (fixes white gaps on ลำดับที่ / จำนวน / หน่วย / blanks) */
+.boq-summary-row > .boq-td {
+  background: #e6e6e6;
+  font-weight: 700;
+}
+.boq-summary-row--highlight > .boq-td {
+  background: #f4ef00;
+}
+
 .boq-summary-label,
 .boq-summary-dash,
 .boq-summary-amount {
-  background: #e6e6e6;
   font-weight: 700;
 }
 
@@ -253,10 +261,6 @@
 .boq-summary-amount {
   text-align: right;
   font-size: 14px;
-}
-
-.boq-summary-label--highlight {
-  background: #f4ef00;
 }
 
 .boq-summary-editable-label {
@@ -397,6 +401,28 @@
 .boq-list-action { text-align: right; }
 .boq-open-link { color: #1565c0; font-weight: 600; font-size: 13px; }
 
+.boq-list-delete-btn {
+  margin-left: 10px;
+  padding: 4px 10px;
+  background: #fff0f0;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+  border-radius: 5px;
+  font-family: 'Sarabun', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.boq-list-delete-btn:hover:not(:disabled) {
+  background: #ffe0e0;
+}
+
+.boq-list-delete-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* ── Modal ───────────────────────────────────── */
 .boq-modal-overlay {
   position: fixed;
@@ -471,6 +497,27 @@
   flex-shrink: 0;
 }
 
+.boq-delete-btn {
+  padding: 8px 18px;
+  background: #fff0f0;
+  color: #b71c1c;
+  border: 1px solid #ef9a9a;
+  border-radius: 6px;
+  font-family: 'Sarabun', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.boq-delete-btn:hover:not(:disabled) {
+  background: #ffe0e0;
+}
+
+.boq-delete-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .boq-job-selector {
   display: flex;
   align-items: center;
@@ -524,42 +571,6 @@
   gap: 6px;
 }
 
-/* ── Freeze columns (sticky) ─────────────────── */
-.boq-sticky {
-  position: sticky;
-  z-index: 2;
-}
-.boq-th.boq-sticky {
-  z-index: 3;
-  background: #d9d9d9;
-}
-.boq-th-sub.boq-sticky {
-  background: #e8e8e8;
-}
-.boq-td.boq-sticky {
-  background: #fff;
-}
-.boq-td-no.boq-sticky {
-  background: #f5f5f5;
-}
-.boq-row:nth-child(even) .boq-td.boq-sticky {
-  background: #fafafa;
-}
-.boq-group-header-row .boq-td.boq-sticky {
-  background: #b0bec5;
-}
-.boq-section-header-row .boq-td.boq-sticky {
-  background: #e8e8e8;
-}
-.boq-th-ref-collapsed {
-  width: 24px !important;
-  min-width: 24px;
-  max-width: 24px;
-  padding: 2px !important;
-  text-align: center;
-}
-
-/* ── Column resize handle ────────────────────── */
 .boq-th { position: relative; }
 
 .boq-col-resize {

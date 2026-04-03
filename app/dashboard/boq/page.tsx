@@ -4,10 +4,10 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/hooks/use-user'
+import { UserRole } from '@prisma/client'
+import { canCreateBoq, canDeleteBoq } from '@/lib/auth/permissions'
 import '../dashboard.css'
 import './boq.css'
-
-const EDITOR_EMAIL = 'bee@cheinproduction.co.th'
 
 type Job = { id: string; name: string; code: string | null }
 type BoqRow = {
@@ -23,7 +23,8 @@ type BoqRow = {
 export default function BoqDashboard() {
   const router = useRouter()
   const { user } = useUser()
-  const canEdit = user?.email === EDITOR_EMAIL
+  const canCreate = canCreateBoq(user?.role as UserRole | null | undefined)
+  const canDelete = canDeleteBoq(user?.email)
 
   const [boqs, setBoqs] = useState<BoqRow[]>([])
   const [jobs, setJobs] = useState<Job[]>([])
@@ -33,6 +34,8 @@ export default function BoqDashboard() {
   const [boqTitle, setBoqTitle] = useState('')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [confirm, setConfirm] = useState<{ msg: string; fn: () => void } | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const fetchData = async () => {
     setLoading(true)
@@ -59,6 +62,26 @@ export default function BoqDashboard() {
     setSelectedJobId('')
     setBoqTitle('')
     setCreateError(null)
+  }
+
+  const askConfirm = (msg: string, fn: () => void) => setConfirm({ msg, fn })
+
+  const handleDelete = (boq: BoqRow) => {
+    askConfirm(`ลบ BOQ "${boqDisplayName(boq)}" ?`, () => {
+      askConfirm(`ยืนยันอีกครั้ง: ลบ BOQ "${boqDisplayName(boq)}" ถาวร ?`, async () => {
+        setDeletingId(boq.id)
+        try {
+          const res = await fetch(`/api/boq/${boq.id}`, { method: 'DELETE' })
+          const d = await res.json().catch(() => ({}))
+          if (!res.ok) throw new Error(d.error || 'ลบไม่สำเร็จ')
+          await fetchData()
+        } catch (err) {
+          setCreateError(err instanceof Error ? err.message : 'ลบไม่สำเร็จ')
+        } finally {
+          setDeletingId(null)
+        }
+      })
+    })
   }
 
   const handleCreate = async () => {
@@ -96,7 +119,7 @@ export default function BoqDashboard() {
           <h1 className="page-title">BOQ</h1>
           <p className="page-subtitle" lang="th">Bill of Quantities — รายการ BOQ ทั้งหมด</p>
         </div>
-        {canEdit && (
+        {canCreate && (
           <button type="button" className="boq-create-btn" onClick={openModal}>
             + สร้าง BOQ ใหม่
           </button>
@@ -113,7 +136,7 @@ export default function BoqDashboard() {
         <p style={{ color: '#888', padding: '24px 0' }}>กำลังโหลด...</p>
       ) : boqs.length === 0 ? (
         <div className="boq-empty">
-          <p>ยังไม่มี BOQ — {canEdit ? 'กด "+ สร้าง BOQ ใหม่" เพื่อเริ่ม' : 'ติดต่อผู้ดูแลระบบ'}</p>
+          <p>ยังไม่มี BOQ — {canCreate ? 'กด "+ สร้าง BOQ ใหม่" เพื่อเริ่ม' : 'ติดต่อผู้ดูแลระบบ'}</p>
         </div>
       ) : (
         <div className="boq-list-table-wrapper">
@@ -137,6 +160,16 @@ export default function BoqDashboard() {
                   <td className="boq-list-date">{fmt(b.createdAt)}</td>
                   <td className="boq-list-action">
                     <span className="boq-open-link">เปิด →</span>
+                    {canDelete && (
+                      <button
+                        type="button"
+                        className="boq-list-delete-btn"
+                        onClick={(e) => { e.stopPropagation(); handleDelete(b) }}
+                        disabled={deletingId === b.id}
+                      >
+                        {deletingId === b.id ? 'กำลังลบ...' : 'ลบ'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -188,6 +221,22 @@ export default function BoqDashboard() {
                 title={!selectedJobId && !boqTitle.trim() ? 'กรุณาระบุชื่อหรือเลือกงาน' : ''}
               >
                 {creating ? 'กำลังสร้าง...' : 'สร้าง BOQ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirm && (
+        <div className="boq-modal-overlay" onClick={() => setConfirm(null)}>
+          <div className="boq-modal boq-confirm-modal" onClick={e => e.stopPropagation()}>
+            <p className="boq-confirm-msg">{confirm.msg}</p>
+            <div className="boq-modal-actions">
+              <button type="button" className="boq-modal-cancel" onClick={() => setConfirm(null)}>
+                ยกเลิก
+              </button>
+              <button type="button" className="boq-confirm-ok" onClick={() => { confirm.fn(); setConfirm(null) }}>
+                ยืนยัน
               </button>
             </div>
           </div>

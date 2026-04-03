@@ -66,6 +66,23 @@ export function canCreateDocuments(userRole: UserRole | null | undefined): boole
   return !!userRole
 }
 
+const BOQ_DELETE_EMAIL = 'bee@cheinproduction.co.th'
+const BOQ_BLOCKED_EDIT_EMAIL = 'itti@cheinproduction.co.th'
+
+export function canCreateBoq(userRole: UserRole | null | undefined): boolean {
+  return hasRole(userRole, UserRole.MANAGER)
+}
+
+export function canEditBoq(email: string | null | undefined): boolean {
+  if (!email) return false
+  return email.trim().toLowerCase() !== BOQ_BLOCKED_EDIT_EMAIL
+}
+
+export function canDeleteBoq(email: string | null | undefined): boolean {
+  if (!email) return false
+  return email.trim().toLowerCase() === BOQ_DELETE_EMAIL
+}
+
 /** Email allowed to set โอนแล้ว (transfer date) on advance register / APC */
 export const ADVANCE_REGISTER_TRANSFER_EMAIL = 'bee@cheinproductionandproducts.co.th'
 

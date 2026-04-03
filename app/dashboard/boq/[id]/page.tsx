@@ -4,10 +4,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useUser } from '@/hooks/use-user'
+import { canDeleteBoq, canEditBoq } from '@/lib/auth/permissions'
 import '../../dashboard.css'
 import '../boq.css'
-
-const EDITOR_EMAIL = 'bee@cheinproduction.co.th'
 
 /* ── Types ─────────────────────────────────────────────── */
 type SubRow = {
@@ -30,7 +29,7 @@ const calcGrpTotal = (g: Group, mat = true) => g.sections.flatMap(s => s.subRows
 const fmt = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 /* ── Default column widths ─────────────────────────────── */
-const DEFAULT_WIDTHS = { no: 60, refPage: 60, refCode: 60, desc: 300, qty: 80, unit: 60, matPrice: 95, matAmt: 95, laborPrice: 95, laborAmt: 95, total: 110, note: 90, action: 82 }
+const DEFAULT_WIDTHS = { no: 60, refPage: 60, refCode: 60, desc: 380, qty: 64, unit: 48, matPrice: 95, matAmt: 95, laborPrice: 95, laborAmt: 95, total: 92, note: 90, action: 82 }
 type ColKey = keyof typeof DEFAULT_WIDTHS
 
 /* ── NumInput ─────────────────────────────────────────── */
@@ -101,7 +100,8 @@ export default function BoqEditorPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { user } = useUser()
-  const canEdit = user?.email === EDITOR_EMAIL
+  const canEdit = canEditBoq(user?.email)
+  const canDelete = canDeleteBoq(user?.email)
 
   const [jobName, setJobName]   = useState('')
   const [jobId, setJobId]       = useState('')
@@ -110,7 +110,6 @@ export default function BoqEditorPage() {
   const [boqExists, setBoqExists] = useState(false)
   const [groups, setGroups]     = useState<Group[]>([emptyGroup()])
   const [showMat, setShowMat]   = useState(true)
-  const [showRef, setShowRef]   = useState(true)
   const [overheadPct, setOverheadPct]         = useState(12)
   const [vatPct, setVatPct]                   = useState(7)
   const [discount, setDiscount]               = useState<number|''>(0)
@@ -118,6 +117,7 @@ export default function BoqEditorPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [saveError, setSaveError] = useState<string|null>(null)
   const [confirm, setConfirm]   = useState<{ msg: string; fn: () => void }|null>(null)
 
@@ -141,6 +141,24 @@ export default function BoqEditorPage() {
   const editing = canEdit && isEditing
 
   const askConfirm = (msg: string, fn: () => void) => setConfirm({ msg, fn })
+
+  const handleDeleteBoq = () => {
+    askConfirm(`ลบ BOQ "${jobName || boqTitle || 'ไม่ระบุชื่อ'}" ?`, () => {
+      askConfirm(`ยืนยันอีกครั้ง: ลบ BOQ นี้ถาวร ?`, async () => {
+        setDeleting(true)
+        setSaveError(null)
+        try {
+          const res = await fetch(`/api/boq/${id}`, { method: 'DELETE' })
+          const d = await res.json().catch(() => ({}))
+          if (!res.ok) throw new Error(d.error || 'ลบไม่สำเร็จ')
+          router.push('/dashboard/boq')
+        } catch (err) {
+          setSaveError(err instanceof Error ? err.message : 'ลบไม่สำเร็จ')
+          setDeleting(false)
+        }
+      })
+    })
+  }
 
   /* load */
   useEffect(() => {
@@ -217,19 +235,9 @@ export default function BoqEditorPage() {
   let globalSecIdx   = 0
 
   /* colSpan helpers */
-  const refCols        = showRef ? 2 : 1  // 2 cols or 1 narrow toggle col
-  const totalCols      = 9 + refCols + (showMat ? 2 : 0)
-  const secTitleSpan   = totalCols - 2 - refCols  // -no -action -refArea
-  const grpTitleSpan   = totalCols - 2             // -no -action
-
-  /* Sticky freeze — left offsets */
-  const COLLAPSED_REF_W = 24
-  const refWidth   = showRef ? colW.refPage + colW.refCode : COLLAPSED_REF_W
-  const descLeft   = colW.no + refWidth
-  const qtyLeft    = descLeft + colW.desc
-  const unitLeft   = qtyLeft + colW.qty
-  const sth  = (l: number) => ({ position: 'sticky' as const, left: l, zIndex: 3 })
-  const std  = (l: number) => ({ position: 'sticky' as const, left: l, zIndex: 2 })
+  const totalCols      = showMat ? 13 : 11
+  const secTitleSpan   = totalCols - 4
+  const grpTitleSpan   = totalCols - 2
 
   /* Resize handle element */
   const RH = ({ col }: { col: ColKey }) => (
@@ -268,17 +276,24 @@ export default function BoqEditorPage() {
         ) : (
           jobName && <span className="boq-job-chip">{jobName}</span>
         )}
+        {canDelete && (
+          <button
+            type="button"
+            className="boq-delete-btn"
+            onClick={handleDeleteBoq}
+            disabled={deleting}
+          >
+            {deleting ? 'กำลังลบ...' : 'ลบ BOQ'}
+          </button>
+        )}
       </div>
 
       <div className="boq-table-wrapper">
         <table className="boq-table" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: colW.no }} />
-            {showRef ? (
-              <><col style={{ width: colW.refPage }} /><col style={{ width: colW.refCode }} /></>
-            ) : (
-              <col style={{ width: COLLAPSED_REF_W }} />
-            )}
+            <col style={{ width: colW.refPage }} />
+            <col style={{ width: colW.refCode }} />
             <col style={{ width: colW.desc }} />
             <col style={{ width: colW.qty }} />
             <col style={{ width: colW.unit }} />
@@ -292,20 +307,11 @@ export default function BoqEditorPage() {
 
           <thead>
             <tr>
-              <th rowSpan={2} className="boq-th boq-th-no boq-sticky" style={sth(0)}>ลำดับที่<RH col="no"/></th>
-              {showRef ? (
-                <th colSpan={2} className="boq-th boq-th-has-toggle boq-sticky" style={sth(colW.no)}>
-                  <button type="button" className="boq-material-toggle-btn" onClick={() => setShowRef(false)} title="ซ่อนอ้างอิง ID">−</button>
-                  อ้างอิง ID
-                </th>
-              ) : (
-                <th rowSpan={2} className="boq-th boq-th-has-toggle boq-sticky boq-th-ref-collapsed" style={sth(colW.no)}>
-                  <button type="button" className="boq-material-toggle-btn" onClick={() => setShowRef(true)} title="แสดงอ้างอิง ID">+</button>
-                </th>
-              )}
-              <th rowSpan={2} className="boq-th boq-th-desc boq-sticky" style={sth(descLeft)}>รายการ<RH col="desc"/></th>
-              <th rowSpan={2} className="boq-th boq-th-qty boq-sticky" style={sth(qtyLeft)}>จำนวน<RH col="qty"/></th>
-              <th rowSpan={2} className="boq-th boq-th-unit boq-sticky" style={sth(unitLeft)}>หน่วย<RH col="unit"/></th>
+              <th rowSpan={2} className="boq-th boq-th-no">ลำดับที่<RH col="no"/></th>
+              <th colSpan={2} className="boq-th">อ้างอิง ID</th>
+              <th rowSpan={2} className="boq-th boq-th-desc">รายการ<RH col="desc"/></th>
+              <th rowSpan={2} className="boq-th boq-th-qty">จำนวน<RH col="qty"/></th>
+              <th rowSpan={2} className="boq-th boq-th-unit">หน่วย<RH col="unit"/></th>
               {showMat && (
                 <th colSpan={2} className="boq-th boq-th-has-toggle">
                   <button type="button" className="boq-material-toggle-btn" onClick={() => setShowMat(false)} title="ซ่อนค่าวัสดุ">−</button>
@@ -321,12 +327,8 @@ export default function BoqEditorPage() {
               <th rowSpan={2} className="boq-th boq-th-action"><RH col="action"/></th>
             </tr>
             <tr>
-              {showRef && (
-                <>
-                  <th className="boq-th boq-th-sub boq-sticky" style={sth(colW.no)}>เลขหน้า<RH col="refPage"/></th>
-                  <th className="boq-th boq-th-sub boq-sticky" style={sth(colW.no + colW.refPage)}>รหัส<RH col="refCode"/></th>
-                </>
-              )}
+              <th className="boq-th boq-th-sub">เลขหน้า<RH col="refPage"/></th>
+              <th className="boq-th boq-th-sub">รหัส<RH col="refCode"/></th>
               {showMat && (<>
                 <th className="boq-th boq-th-sub">ราคาต่อหน่วย<RH col="matPrice"/></th>
                 <th className="boq-th boq-th-sub">จำนวนเงิน<RH col="matAmt"/></th>
@@ -345,7 +347,7 @@ export default function BoqEditorPage() {
               return (
                 <React.Fragment key={group.id}>
                   <tr className="boq-group-header-row">
-                    <td className="boq-td boq-td-group-no boq-sticky" style={std(0)}>{groupIdx + 1}</td>
+                    <td className="boq-td boq-td-group-no">{groupIdx + 1}</td>
                     <td colSpan={grpTitleSpan} className="boq-td boq-td-group-title-cell">
                       <input className="boq-input boq-input-group-title" value={group.title} readOnly={!editing}
                         onChange={e => editing && updGrpTitle(group.id, e.target.value)}
@@ -377,12 +379,8 @@ export default function BoqEditorPage() {
                     return (
                       <React.Fragment key={section.id}>
                         <tr className="boq-section-header-row">
-                          <td className="boq-td boq-td-no boq-td-section-no boq-sticky" style={std(0)}>{globalNum}</td>
-                          {showRef ? (
-                            <><td className="boq-td boq-sticky" style={std(colW.no)}/><td className="boq-td boq-sticky" style={std(colW.no + colW.refPage)}/></>
-                          ) : (
-                            <td className="boq-td boq-sticky" style={std(colW.no)}/>
-                          )}
+                          <td className="boq-td boq-td-no boq-td-section-no">{globalNum}</td>
+                          <td className="boq-td"/><td className="boq-td"/>
                           <td colSpan={secTitleSpan} className="boq-td boq-td-section-title-cell">
                             <input className="boq-input boq-input-section-title" value={section.title} readOnly={!editing}
                               onChange={e => editing && updSecTitle(group.id, section.id, e.target.value)}
@@ -393,24 +391,18 @@ export default function BoqEditorPage() {
 
                         {section.subRows.map((sr, srIdx) => (
                           <tr key={sr.id} className="boq-row">
-                            <td className="boq-td boq-td-no boq-td-sub-no boq-sticky" style={std(0)}>{globalNum}.{srIdx+1}</td>
-                            {showRef ? (
-                              <>
-                                <td className="boq-td boq-sticky" style={std(colW.no)}><input className="boq-input" value={sr.refPage} readOnly={!editing} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'refPage',e.target.value)}/></td>
-                                <td className="boq-td boq-sticky" style={std(colW.no + colW.refPage)}><input className="boq-input" value={sr.refCode} readOnly={!editing} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'refCode',e.target.value)}/></td>
-                              </>
-                            ) : (
-                              <td className="boq-td boq-sticky" style={std(colW.no)}/>
-                            )}
-                            <td className="boq-td boq-td-desc boq-sticky" style={std(descLeft)}>
+                            <td className="boq-td boq-td-no boq-td-sub-no">{globalNum}.{srIdx+1}</td>
+                            <td className="boq-td"><input className="boq-input" value={sr.refPage} readOnly={!editing} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'refPage',e.target.value)}/></td>
+                            <td className="boq-td"><input className="boq-input" value={sr.refCode} readOnly={!editing} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'refCode',e.target.value)}/></td>
+                            <td className="boq-td boq-td-desc">
                               <AutoTextarea className="boq-input boq-textarea" value={sr.description} readOnly={!editing}
                                 onChange={v => editing && updSubRow(group.id,section.id,sr.id,'description',v)}
                                 placeholder={editing ? `รายการที่ ${globalNum}.${srIdx+1}` : ''} />
                             </td>
-                            <td className="boq-td boq-td-num boq-sticky" style={std(qtyLeft)}>
+                            <td className="boq-td boq-td-num">
                               <NumInput className="boq-input boq-input-num" value={sr.quantity} readOnly={!editing} onChange={v=>editing&&updSubRow(group.id,section.id,sr.id,'quantity',v)}/>
                             </td>
-                            <td className="boq-td boq-sticky" style={std(unitLeft)}><input className="boq-input boq-input-sm" value={sr.unit} readOnly={!editing} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'unit',e.target.value)}/></td>
+                            <td className="boq-td"><input className="boq-input boq-input-sm" value={sr.unit} readOnly={!editing} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'unit',e.target.value)}/></td>
                             {showMat && (
                               <>
                                 <td className="boq-td boq-td-num">

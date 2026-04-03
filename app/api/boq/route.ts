@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/middleware-helpers'
+import { canCreateBoq } from '@/lib/auth/permissions'
 
 /**
  * GET /api/boq           – list all BOQ documents (with job name)
@@ -42,6 +43,9 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!canCreateBoq(user.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const body = await request.json()
     const { jobId, title, data, showMaterial } = body

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/middleware-helpers'
+import { canDeleteBoq, canEditBoq } from '@/lib/auth/permissions'
 
 /**
  * GET /api/boq/[id]
@@ -41,6 +42,9 @@ export async function PUT(
   try {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!canEditBoq(user.email)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const { id } = await params
     const body = await request.json()
@@ -61,6 +65,30 @@ export async function PUT(
     return NextResponse.json({ boq })
   } catch (err: any) {
     console.error('PUT /api/boq/[id] error:', err)
+    return NextResponse.json({ error: err.message ?? 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getCurrentUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!canDeleteBoq(user.email)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const { id } = await params
+
+    await (prisma as any).boqDocument.delete({
+      where: { id },
+    })
+
+    return NextResponse.json({ ok: true })
+  } catch (err: any) {
+    console.error('DELETE /api/boq/[id] error:', err)
     return NextResponse.json({ error: err.message ?? 'Internal server error' }, { status: 500 })
   }
 }
