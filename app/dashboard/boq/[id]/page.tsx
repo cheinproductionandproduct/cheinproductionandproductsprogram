@@ -91,7 +91,7 @@ export default function BoqEditorPage() {
   const [showMat, setShowMat]   = useState(true)
   const [overheadPct, setOverheadPct]         = useState(12)
   const [vatPct, setVatPct]                   = useState(7)
-  const [discount, setDiscount]               = useState<number|''>(0)
+  const [discount, setDiscount]               = useState<string>('0')
   const [discountType, setDiscountType]       = useState<'pct'|'amount'>('amount')
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading]   = useState(true)
@@ -138,7 +138,7 @@ export default function BoqEditorPage() {
           if (isWrapped) {
             setOverheadPct(raw.overheadPct ?? 12)
             setVatPct(raw.vatPct ?? 7)
-            setDiscount(raw.discount ?? 0)
+            setDiscount(String(raw.discount ?? 0))
             setDiscountType(raw.discountType ?? 'amount')
           }
           setShowMat(d.boq.showMaterial ?? true)
@@ -156,7 +156,7 @@ export default function BoqEditorPage() {
       const res = await fetch(`/api/boq/${id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          data: { groups, overheadPct, vatPct, discount: Number(discount)||0, discountType },
+          data: { groups, overheadPct, vatPct, discount: parseFloat(discount)||0, discountType },
           showMaterial: showMat, jobId: jobId||null, title: boqTitle,
         }),
       })
@@ -185,9 +185,10 @@ export default function BoqEditorPage() {
   const grandTotal      = groups.reduce((s,g) => s+calcGrpTotal(g,showMat), 0)
   const overhead        = grandTotal * (overheadPct || 0) / 100
   const subtotalBeforeDiscount = grandTotal + overhead
+  const discountNum     = parseFloat(discount) || 0
   const discountAmt     = discountType === 'pct'
-    ? subtotalBeforeDiscount * (Number(discount) || 0) / 100
-    : (Number(discount) || 0)
+    ? subtotalBeforeDiscount * discountNum / 100
+    : discountNum
   const afterDiscount   = subtotalBeforeDiscount - discountAmt
   const vat             = afterDiscount * (vatPct || 0) / 100
   const totalWithVat    = afterDiscount + vat
@@ -433,17 +434,17 @@ export default function BoqEditorPage() {
           </tbody>
 
           <tfoot>
-            <SummaryRow label={`รวมรายการ ${totalItems} ข้อ`} amount={fmt(grandTotal)} highlight={true}/>
+            <SummaryRow label={`รวมรายการ 1 - ${totalItems} ข้อ`} amount={fmt(grandTotal)} highlight={true}/>
             <SummaryRow
               label={
                 editing ? (
                   <span className="boq-summary-editable-label">
                     ค่าดำเนินการ&nbsp;
                     <input
-                      type="number" min={0} max={100} step={0.01}
+                      type="text" inputMode="decimal"
                       className="boq-summary-pct-input"
                       value={overheadPct}
-                      onChange={e => setOverheadPct(parseFloat(e.target.value)||0)}
+                      onChange={e => { const v=e.target.value.replace(/[^0-9.]/g,''); setOverheadPct(parseFloat(v)||0) }}
                     />
                     &nbsp;%
                   </span>
@@ -451,37 +452,35 @@ export default function BoqEditorPage() {
               }
               amount={fmt(overhead)} highlight={false}
             />
+            <SummaryRow label="ราคารวมบวกค่าดำเนินการ" amount={fmt(subtotalBeforeDiscount)} highlight={false}/>
             <SummaryRow
               label={
                 <span className="boq-summary-editable-label">
                   ส่วนลดพิเศษ
-                  {(editing || !editing) && (
-                    <span className="boq-discount-type-toggle">
-                      <button
-                        type="button"
-                        className={`boq-dtype-btn${discountType==='amount'?' boq-dtype-btn--active':''}`}
-                        onClick={() => editing && setDiscountType('amount')}
-                        style={!editing ? { pointerEvents: 'none' } : undefined}
-                      >฿</button>
-                      <button
-                        type="button"
-                        className={`boq-dtype-btn${discountType==='pct'?' boq-dtype-btn--active':''}`}
-                        onClick={() => editing && setDiscountType('pct')}
-                        style={!editing ? { pointerEvents: 'none' } : undefined}
-                      >%</button>
-                    </span>
-                  )}
-                  {/* when % mode and editing, show the % input in the label */}
+                  <span className="boq-discount-type-toggle">
+                    <button
+                      type="button"
+                      className={`boq-dtype-btn${discountType==='amount'?' boq-dtype-btn--active':''}`}
+                      onClick={() => editing && setDiscountType('amount')}
+                      style={!editing ? { pointerEvents: 'none' } : undefined}
+                    >฿</button>
+                    <button
+                      type="button"
+                      className={`boq-dtype-btn${discountType==='pct'?' boq-dtype-btn--active':''}`}
+                      onClick={() => editing && setDiscountType('pct')}
+                      style={!editing ? { pointerEvents: 'none' } : undefined}
+                    >%</button>
+                  </span>
                   {editing && discountType === 'pct' && (
                     <input
-                      type="number" min={0} max={100} step={0.01}
+                      type="text" inputMode="decimal"
                       className="boq-summary-pct-input"
                       value={discount}
-                      onChange={e => setDiscount(e.target.value === '' ? '' : parseFloat(e.target.value)||0)}
+                      onChange={e => setDiscount(e.target.value.replace(/[^0-9.]/g,''))}
                       placeholder="0"
                     />
                   )}
-                  {!editing && discountType==='pct' && ` ${Number(discount)||0}%`}
+                  {!editing && discountType==='pct' && ` ${discountNum}%`}
                 </span>
               }
               amount={fmt(discountAmt)}
@@ -489,10 +488,10 @@ export default function BoqEditorPage() {
               editNode={
                 editing && discountType === 'amount' ? (
                   <input
-                    type="number" min={0} step={0.01}
+                    type="text" inputMode="decimal"
                     className="boq-summary-discount-input"
                     value={discount}
-                    onChange={e => setDiscount(e.target.value === '' ? '' : parseFloat(e.target.value)||0)}
+                    onChange={e => setDiscount(e.target.value.replace(/[^0-9.]/g,''))}
                     placeholder="0.00"
                   />
                 ) : undefined
