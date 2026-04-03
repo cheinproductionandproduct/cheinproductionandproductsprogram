@@ -60,6 +60,27 @@ function AutoTextarea({ value, onChange, placeholder, readOnly, className }: { v
   )
 }
 
+/* ── SummaryRow ───────────────────────────────────────── */
+function SummaryRow({
+  label, amount, highlight, editNode, showMat,
+}: { label: React.ReactNode; amount: string; highlight: boolean; editNode?: React.ReactNode; showMat: boolean }) {
+  const hl = highlight ? ' boq-summary-label--highlight' : ''
+  return (
+    <tr>
+      <td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/>
+      <td className={`boq-td boq-summary-label${hl}`}>{label}</td>
+      <td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/>
+      {showMat && <><td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/></>}
+      <td className={`boq-td${hl}`}/>
+      <td className={`boq-td boq-td-num boq-summary-dash${hl}`}>-</td>
+      <td className={`boq-td boq-td-num boq-summary-amount${hl}`}>
+        {editNode ?? amount}
+      </td>
+      <td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/>
+    </tr>
+  )
+}
+
 /* ── ConfirmModal ─────────────────────────────────────── */
 function ConfirmModal({ message, onConfirm, onCancel }: { message:string; onConfirm:()=>void; onCancel:()=>void }) {
   return (
@@ -198,26 +219,6 @@ export default function BoqEditorPage() {
   const totalCols      = showMat ? 13 : 11
   const secTitleSpan   = totalCols - 4
   const grpTitleSpan   = totalCols - 2
-
-  const SummaryRow = ({
-    label, amount, highlight, editNode,
-  }: { label: React.ReactNode; amount: string; highlight: boolean; editNode?: React.ReactNode }) => {
-    const hl = highlight ? ' boq-summary-label--highlight' : ''
-    return (
-      <tr>
-        <td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/>
-        <td className={`boq-td boq-summary-label${hl}`}>{label}</td>
-        <td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/>
-        {showMat && <><td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/></>}
-        <td className={`boq-td${hl}`}/>
-        <td className={`boq-td boq-td-num boq-summary-dash${hl}`}>-</td>
-        <td className={`boq-td boq-td-num boq-summary-amount${hl}`}>
-          {editNode ?? amount}
-        </td>
-        <td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/>
-      </tr>
-    )
-  }
 
   /* Resize handle element */
   const RH = ({ col }: { col: ColKey }) => (
@@ -427,14 +428,14 @@ export default function BoqEditorPage() {
                   })}
                   <SummaryRow
                     label={`รวม${group.title||`หมวดงานที่ ${groupIdx+1}`} ข้อ ${groupStartSec}${groupStartSec!==groupEndSec?`–${groupEndSec}`:''}`}
-                    amount={fmt(groupTotal)} highlight={false} />
+                    amount={fmt(groupTotal)} highlight={false} showMat={showMat} />
                 </React.Fragment>
               )
             })}
           </tbody>
 
           <tfoot>
-            <SummaryRow label={`รวมรายการ ข้อ 1 - ${totalItems}`} amount={fmt(grandTotal)} highlight={true}/>
+            <SummaryRow label={`รวมรายการ ข้อ 1 - ${totalItems}`} amount={fmt(grandTotal)} highlight={true} showMat={showMat}/>
             <SummaryRow
               label={
                 editing ? (
@@ -450,9 +451,9 @@ export default function BoqEditorPage() {
                   </span>
                 ) : `ค่าดำเนินการ ${overheadPct}%`
               }
-              amount={fmt(overhead)} highlight={false}
+              amount={fmt(overhead)} highlight={false} showMat={showMat}
             />
-            <SummaryRow label="ราคารวมค่าดำเนินการ" amount={fmt(subtotalBeforeDiscount)} highlight={false}/>
+            <SummaryRow label="ราคารวมค่าดำเนินการ" amount={fmt(subtotalBeforeDiscount)} highlight={false} showMat={showMat}/>
             <SummaryRow
               label={
                 <span className="boq-summary-editable-label">
@@ -482,7 +483,7 @@ export default function BoqEditorPage() {
                 </span>
               }
               amount={fmt(discountAmt)}
-              highlight={false}
+              highlight={false} showMat={showMat}
               editNode={
                 editing && discountType === 'amount' ? (
                   <NumInput
@@ -493,14 +494,14 @@ export default function BoqEditorPage() {
                 ) : undefined
               }
             />
-            <SummaryRow label="ราคารวมหลังหักส่วนลด" amount={fmt(afterDiscount)} highlight={true}/>
+            <SummaryRow label="ราคารวมหลังหักส่วนลด" amount={fmt(afterDiscount)} highlight={true} showMat={showMat}/>
             <SummaryRow
               label={
                 editing ? (
                   <span className="boq-summary-editable-label">
                     ภาษีมูลค่าเพิ่ม&nbsp;
                     <input
-                      type="number" min={0} max={100} step={0.01}
+                      type="text" inputMode="decimal"
                       className="boq-summary-pct-input"
                       value={vatPct}
                       onChange={e => setVatPct(parseFloat(e.target.value)||0)}
@@ -509,9 +510,9 @@ export default function BoqEditorPage() {
                   </span>
                 ) : `ภาษีมูลค่าเพิ่ม ${vatPct}%`
               }
-              amount={fmt(vat)} highlight={false}
+              amount={fmt(vat)} highlight={false} showMat={showMat}
             />
-            <SummaryRow label="ราคารวมภาษีมูลค่าเพิ่ม" amount={fmt(totalWithVat)} highlight={false}/>
+            <SummaryRow label="ราคารวมภาษีมูลค่าเพิ่ม" amount={fmt(totalWithVat)} highlight={false} showMat={showMat}/>
           </tfoot>
         </table>
       </div>
