@@ -524,6 +524,41 @@
   gap: 6px;
 }
 
+/* ── Freeze columns (sticky) ─────────────────── */
+.boq-sticky {
+  position: sticky;
+  z-index: 2;
+}
+.boq-th.boq-sticky {
+  z-index: 3;
+  background: #d9d9d9;
+}
+.boq-th-sub.boq-sticky {
+  background: #e8e8e8;
+}
+.boq-td.boq-sticky {
+  background: #fff;
+}
+.boq-td-no.boq-sticky {
+  background: #f5f5f5;
+}
+.boq-row:nth-child(even) .boq-td.boq-sticky {
+  background: #fafafa;
+}
+.boq-group-header-row .boq-td.boq-sticky {
+  background: #b0bec5;
+}
+.boq-section-header-row .boq-td.boq-sticky {
+  background: #e8e8e8;
+}
+.boq-th-ref-collapsed {
+  width: 24px !important;
+  min-width: 24px;
+  max-width: 24px;
+  padding: 2px !important;
+  text-align: center;
+}
+
 /* ── Column resize handle ────────────────────── */
 .boq-th { position: relative; }
 
