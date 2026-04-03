@@ -27,7 +27,7 @@ const calcMat  = (sr: SubRow) => (Number(sr.quantity)||0) * (Number(sr.materialP
 const calcLab  = (sr: SubRow) => (Number(sr.quantity)||0) * (Number(sr.laborPrice)||0)
 const calcRowTotal = (sr: SubRow, mat = true) => (mat ? calcMat(sr) : 0) + calcLab(sr)
 const calcGrpTotal = (g: Group, mat = true) => g.sections.flatMap(s => s.subRows).reduce((s, r) => s + calcRowTotal(r, mat), 0)
-const fmt = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2 })
+const fmt = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 /* ── Default column widths ─────────────────────────────── */
 const DEFAULT_WIDTHS = { no: 60, refPage: 60, refCode: 60, desc: 300, qty: 80, unit: 60, matPrice: 95, matAmt: 95, laborPrice: 95, laborAmt: 95, total: 110, note: 90, action: 82 }
