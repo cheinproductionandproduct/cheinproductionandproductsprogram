@@ -33,7 +33,7 @@ function DocumentsPageContent() {
           limit: '100',
           sortBy: 'createdAt',
           sortOrder: 'desc',
-          createdById: user.id,
+          createdById: user!.id,
         })
         const dRes = await fetch(`/api/documents?${params}`, { credentials: 'include' })
         if (!dRes.ok || cancelled) return
