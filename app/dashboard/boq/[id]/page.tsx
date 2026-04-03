@@ -89,6 +89,9 @@ export default function BoqEditorPage() {
   const [boqExists, setBoqExists] = useState(false)
   const [groups, setGroups]     = useState<Group[]>([emptyGroup()])
   const [showMat, setShowMat]   = useState(true)
+  const [overheadPct, setOverheadPct]         = useState(12)
+  const [discount, setDiscount]               = useState<number|''>(0)
+  const [discountType, setDiscountType]       = useState<'pct'|'amount'>('amount')
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
@@ -127,7 +130,15 @@ export default function BoqEditorPage() {
           setJobId(d.boq.jobId ?? ''); setBoqTitle(d.boq.title ?? '')
           setJobName(d.boq.job?.name || d.boq.title || '')
           setBoqExists(true)
-          setGroups((d.boq.data as Group[])?.length ? d.boq.data as Group[] : [emptyGroup()])
+          // support both old format (array) and new format ({ groups, overheadPct, discount })
+          const raw = d.boq.data as (Group[] | { groups: Group[]; overheadPct?: number; discount?: number; discountType?: 'pct'|'amount' }) | null
+          const isWrapped = raw && !Array.isArray(raw)
+          setGroups(isWrapped ? (raw.groups?.length ? raw.groups : [emptyGroup()]) : (Array.isArray(raw) && raw.length ? raw : [emptyGroup()]))
+          if (isWrapped) {
+            setOverheadPct(raw.overheadPct ?? 12)
+            setDiscount(raw.discount ?? 0)
+            setDiscountType(raw.discountType ?? 'amount')
+          }
           setShowMat(d.boq.showMaterial ?? true)
           setIsEditing(false)
         } else { router.replace('/dashboard/boq') }
@@ -142,7 +153,10 @@ export default function BoqEditorPage() {
     try {
       const res = await fetch(`/api/boq/${id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: groups, showMaterial: showMat, jobId: jobId||null, title: boqTitle }),
+        body: JSON.stringify({
+          data: { groups, overheadPct, discount: Number(discount)||0, discountType },
+          showMaterial: showMat, jobId: jobId||null, title: boqTitle,
+        }),
       })
       if (!res.ok) throw new Error()
       const d = await res.json()
@@ -165,11 +179,15 @@ export default function BoqEditorPage() {
     setGroups(p => p.map(g => g.id!==gid?g:{...g,sections:g.sections.map(s=>s.id!==sid?s:{...s,subRows:s.subRows.map(r=>r.id===rid?{...r,[field]:val}:r)})}))
 
   /* totals */
-  const grandTotal   = groups.reduce((s,g) => s+calcGrpTotal(g,showMat), 0)
-  const overhead     = grandTotal * 0.12
-  const subTotal     = grandTotal + overhead
-  const vat          = subTotal * 0.07
-  const totalWithVat = subTotal + vat
+  const grandTotal      = groups.reduce((s,g) => s+calcGrpTotal(g,showMat), 0)
+  const overhead        = grandTotal * (overheadPct || 0) / 100
+  const subtotalBeforeDiscount = grandTotal + overhead
+  const discountAmt     = discountType === 'pct'
+    ? subtotalBeforeDiscount * (Number(discount) || 0) / 100
+    : (Number(discount) || 0)
+  const afterDiscount   = subtotalBeforeDiscount - discountAmt
+  const vat             = afterDiscount * 0.07
+  const totalWithVat    = afterDiscount + vat
   let globalSecIdx   = 0
 
   /* colSpan helpers */
@@ -177,7 +195,9 @@ export default function BoqEditorPage() {
   const secTitleSpan   = totalCols - 4
   const grpTitleSpan   = totalCols - 2
 
-  const SummaryRow = ({ label, amount, highlight }: { label:string; amount:string; highlight:boolean }) => {
+  const SummaryRow = ({
+    label, amount, highlight, editNode,
+  }: { label: React.ReactNode; amount: string; highlight: boolean; editNode?: React.ReactNode }) => {
     const hl = highlight ? ' boq-summary-label--highlight' : ''
     return (
       <tr>
@@ -187,7 +207,9 @@ export default function BoqEditorPage() {
         {showMat && <><td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/></>}
         <td className={`boq-td${hl}`}/>
         <td className={`boq-td boq-td-num boq-summary-dash${hl}`}>-</td>
-        <td className={`boq-td boq-td-num boq-summary-amount${hl}`}>{amount}</td>
+        <td className={`boq-td boq-td-num boq-summary-amount${hl}`}>
+          {editNode ?? amount}
+        </td>
         <td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/>
       </tr>
     )
@@ -408,8 +430,60 @@ export default function BoqEditorPage() {
           </tbody>
 
           <tfoot>
-            <SummaryRow label="ค่าดำเนินงาน 12%" amount={fmt(overhead)} highlight={false}/>
-            <SummaryRow label="รวมราคาทั้งสิ้น" amount={fmt(subTotal)} highlight={true}/>
+            <SummaryRow label="รวมรายการ" amount={fmt(grandTotal)} highlight={false}/>
+            <SummaryRow
+              label={
+                editing ? (
+                  <span className="boq-summary-editable-label">
+                    ค่าดำเนินการ&nbsp;
+                    <input
+                      type="number" min={0} max={100} step={0.01}
+                      className="boq-summary-pct-input"
+                      value={overheadPct}
+                      onChange={e => setOverheadPct(parseFloat(e.target.value)||0)}
+                    />
+                    &nbsp;%
+                  </span>
+                ) : `ค่าดำเนินการ ${overheadPct}%`
+              }
+              amount={fmt(overhead)} highlight={false}
+            />
+            <SummaryRow
+              label={
+                <span className="boq-summary-editable-label">
+                  ส่วนลดพิเศษ
+                  {editing && (
+                    <span className="boq-discount-type-toggle">
+                      <button
+                        type="button"
+                        className={`boq-dtype-btn${discountType==='amount'?' boq-dtype-btn--active':''}`}
+                        onClick={() => setDiscountType('amount')}
+                      >฿</button>
+                      <button
+                        type="button"
+                        className={`boq-dtype-btn${discountType==='pct'?' boq-dtype-btn--active':''}`}
+                        onClick={() => setDiscountType('pct')}
+                      >%</button>
+                    </span>
+                  )}
+                  {!editing && discountType==='pct' && ` (${Number(discount)||0}%)`}
+                </span>
+              }
+              amount={fmt(discountAmt)}
+              highlight={false}
+              editNode={
+                editing ? (
+                  <input
+                    type="number" min={0} step={0.01}
+                    className="boq-summary-discount-input"
+                    value={discount}
+                    onChange={e => setDiscount(e.target.value === '' ? '' : parseFloat(e.target.value)||0)}
+                    placeholder={discountType==='pct' ? '0' : '0.00'}
+                  />
+                ) : undefined
+              }
+            />
+            <SummaryRow label="ราคารวมหลังหักส่วนลด" amount={fmt(afterDiscount)} highlight={true}/>
             <SummaryRow label="ภาษีมูลค่าเพิ่ม 7%" amount={fmt(vat)} highlight={false}/>
             <SummaryRow label="ราคารวมภาษีมูลค่าเพิ่ม" amount={fmt(totalWithVat)} highlight={false}/>
           </tfoot>
