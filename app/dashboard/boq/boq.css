@@ -466,6 +466,62 @@
   gap: 6px;
 }
 
+/* ── Column resize handle ────────────────────── */
+.boq-th { position: relative; }
+
+.boq-col-resize {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 2;
+  user-select: none;
+}
+.boq-col-resize:hover { background: rgba(80, 120, 255, 0.35); }
+
+/* ── Auto-expanding textarea ─────────────────── */
+.boq-textarea {
+  width: 100%;
+  min-height: 24px;
+  line-height: 1.4;
+  padding: 2px 4px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: 'Sarabun', system-ui, sans-serif;
+  font-size: 13px;
+  display: block;
+  vertical-align: top;
+}
+.boq-textarea:focus { background: #fff9e6; }
+
+/* ── Confirm modal ───────────────────────────── */
+.boq-confirm-modal {
+  max-width: 360px;
+  text-align: center;
+}
+.boq-confirm-msg {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 20px;
+}
+.boq-confirm-ok {
+  padding: 8px 22px;
+  background: #c62828;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Sarabun', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.boq-confirm-ok:hover { background: #b71c1c; }
+
 /* ── Read-only badge ─────────────────────────── */
 .boq-readonly-badge {
   display: inline-flex;

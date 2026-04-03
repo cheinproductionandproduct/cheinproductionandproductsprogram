@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useUser } from '@/hooks/use-user'
@@ -10,154 +10,127 @@ import '../boq.css'
 const EDITOR_EMAIL = 'bee@cheinproduction.co.th'
 
 /* ── Types ─────────────────────────────────────────────── */
-
 type SubRow = {
-  id: string
-  refPage: string
-  refCode: string
-  description: string
-  quantity: number | ''
-  unit: string
-  materialPrice: number | ''
-  laborPrice: number | ''
-  note: string
+  id: string; refPage: string; refCode: string; description: string
+  quantity: number | ''; unit: string; materialPrice: number | ''; laborPrice: number | ''; note: string
 }
+type Section = { id: string; title: string; subRows: SubRow[] }
+type Group   = { id: string; title: string; sections: Section[] }
 
-type Section = {
-  id: string
-  title: string
-  subRows: SubRow[]
-}
-
-type Group = {
-  id: string
-  title: string
-  sections: Section[]
-}
-
-/* ── Helpers ────────────────────────────────────────────── */
-
+/* ── Helpers ─────────────────────────────────────────────── */
 let _uid = 0
 const uid = () => String(++_uid)
-
-const emptySubRow = (): SubRow => ({
-  id: `sr-${uid()}`,
-  refPage: '',
-  refCode: '',
-  description: '',
-  quantity: '',
-  unit: '',
-  materialPrice: '',
-  laborPrice: '',
-  note: '',
-})
-
-const calcMaterialAmount = (sr: SubRow) =>
-  (Number(sr.quantity) || 0) * (Number(sr.materialPrice) || 0)
-
-const calcLaborAmount = (sr: SubRow) =>
-  (Number(sr.quantity) || 0) * (Number(sr.laborPrice) || 0)
-
-const emptySection = (): Section => {
-  const id = `sec-${uid()}`
-  return { id, title: '', subRows: [emptySubRow()] }
-}
-
-const emptyGroup = (): Group => ({
-  id: `grp-${uid()}`,
-  title: '',
-  sections: [emptySection()],
-})
-
-const calcSubRowTotal = (sr: SubRow, showMaterial = true) =>
-  (showMaterial ? calcMaterialAmount(sr) : 0) + calcLaborAmount(sr)
-
-const calcGroupTotal = (group: Group, showMaterial = true) =>
-  group.sections.flatMap(s => s.subRows).reduce((sum, sr) => sum + calcSubRowTotal(sr, showMaterial), 0)
-
+const emptySubRow = (): SubRow => ({ id: `sr-${uid()}`, refPage: '', refCode: '', description: '', quantity: '', unit: '', materialPrice: '', laborPrice: '', note: '' })
+const emptySection = (): Section => { const id = `sec-${uid()}`; return { id, title: '', subRows: [emptySubRow()] } }
+const emptyGroup   = (): Group   => ({ id: `grp-${uid()}`, title: '', sections: [emptySection()] })
+const calcMat  = (sr: SubRow) => (Number(sr.quantity)||0) * (Number(sr.materialPrice)||0)
+const calcLab  = (sr: SubRow) => (Number(sr.quantity)||0) * (Number(sr.laborPrice)||0)
+const calcRowTotal = (sr: SubRow, mat = true) => (mat ? calcMat(sr) : 0) + calcLab(sr)
+const calcGrpTotal = (g: Group, mat = true) => g.sections.flatMap(s => s.subRows).reduce((s, r) => s + calcRowTotal(r, mat), 0)
 const fmt = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2 })
 
-/* ── NumInput ────────────────────────────────────────────── */
-function NumInput({
-  value, onChange, className = '', readOnly = false,
-}: {
-  value: number | ''
-  onChange: (v: number | '') => void
-  className?: string
-  readOnly?: boolean
-}) {
-  const [localStr, setLocalStr] = useState<string | null>(null)
-  const display = localStr !== null ? localStr : (value === '' ? '' : fmt(value as number))
+/* ── Default column widths ─────────────────────────────── */
+const DEFAULT_WIDTHS = { no: 60, refPage: 60, refCode: 60, desc: 300, qty: 80, unit: 60, matPrice: 95, matAmt: 95, laborPrice: 95, laborAmt: 95, total: 110, note: 90, action: 82 }
+type ColKey = keyof typeof DEFAULT_WIDTHS
+
+/* ── NumInput ─────────────────────────────────────────── */
+function NumInput({ value, onChange, className = '', readOnly = false }: { value: number|''; onChange:(v:number|'')=>void; className?:string; readOnly?:boolean }) {
+  const [loc, setLoc] = useState<string|null>(null)
+  const display = loc !== null ? loc : (value==='' ? '' : fmt(value as number))
   return (
-    <input
-      className={className}
-      type="text"
-      inputMode="decimal"
-      value={display}
-      readOnly={readOnly}
-      onFocus={() => { if (!readOnly) setLocalStr(value === '' ? '' : String(value)) }}
-      onBlur={e => {
-        if (readOnly) return
-        const raw = e.target.value.replace(/,/g, '')
-        const n = parseFloat(raw)
-        onChange(raw === '' || isNaN(n) ? '' : n)
-        setLocalStr(null)
-      }}
-      onChange={e => {
-        if (readOnly) return
-        const raw = e.target.value
-        setLocalStr(raw)
-        const n = parseFloat(raw.replace(/,/g, ''))
-        if (raw === '' || raw === '-') onChange('')
-        else if (!isNaN(n)) onChange(n)
-      }}
+    <input className={className} type="text" inputMode="decimal" value={display} readOnly={readOnly}
+      onFocus={() => { if (!readOnly) setLoc(value==='' ? '' : String(value)) }}
+      onBlur={e => { if (readOnly) return; const n=parseFloat(e.target.value.replace(/,/g,'')); onChange(isNaN(n)||e.target.value==='' ? '' : n); setLoc(null) }}
+      onChange={e => { if (readOnly) return; setLoc(e.target.value); const n=parseFloat(e.target.value.replace(/,/g,'')); if (e.target.value===''||e.target.value==='-') onChange(''); else if (!isNaN(n)) onChange(n) }}
     />
   )
 }
 
-/* ── Page ────────────────────────────────────────────────── */
+/* ── AutoTextarea — expands vertically as text grows ──── */
+function AutoTextarea({ value, onChange, placeholder, readOnly, className }: { value:string; onChange:(v:string)=>void; placeholder?:string; readOnly?:boolean; className?:string }) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    if (ref.current) { ref.current.style.height = 'auto'; ref.current.style.height = ref.current.scrollHeight + 'px' }
+  }, [value])
+  return (
+    <textarea ref={ref} className={className} value={value} readOnly={readOnly} placeholder={placeholder} rows={1}
+      style={{ resize: 'none', overflow: 'hidden', boxSizing: 'border-box' }}
+      onChange={e => { onChange(e.target.value); if (ref.current) { ref.current.style.height='auto'; ref.current.style.height=ref.current.scrollHeight+'px' } }}
+    />
+  )
+}
 
+/* ── ConfirmModal ─────────────────────────────────────── */
+function ConfirmModal({ message, onConfirm, onCancel }: { message:string; onConfirm:()=>void; onCancel:()=>void }) {
+  return (
+    <div className="boq-modal-overlay" onClick={onCancel}>
+      <div className="boq-modal boq-confirm-modal" onClick={e => e.stopPropagation()}>
+        <p className="boq-confirm-msg">{message}</p>
+        <div className="boq-modal-actions">
+          <button type="button" className="boq-modal-cancel" onClick={onCancel}>ยกเลิก</button>
+          <button type="button" className="boq-confirm-ok" onClick={() => { onConfirm(); onCancel() }}>ยืนยันลบ</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Page ─────────────────────────────────────────────── */
 export default function BoqEditorPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { user } = useUser()
   const canEdit = user?.email === EDITOR_EMAIL
 
-  const [jobName, setJobName] = useState('')
-  const [jobId, setJobId] = useState<string>('')
+  const [jobName, setJobName]   = useState('')
+  const [jobId, setJobId]       = useState('')
   const [boqTitle, setBoqTitle] = useState('')
-  const [jobs, setJobs] = useState<{ id: string; name: string }[]>([])
+  const [jobs, setJobs]         = useState<{ id: string; name: string }[]>([])
   const [boqExists, setBoqExists] = useState(false)
-  const [groups, setGroups] = useState<Group[]>([emptyGroup()])
-  const [showMaterialColumns, setShowMaterialColumns] = useState(true)
+  const [groups, setGroups]     = useState<Group[]>([emptyGroup()])
+  const [showMat, setShowMat]   = useState(true)
   const [isEditing, setIsEditing] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [saving, setSaving]     = useState(false)
+  const [saveError, setSaveError] = useState<string|null>(null)
+  const [confirm, setConfirm]   = useState<{ msg: string; fn: () => void }|null>(null)
+
+  /* Column widths */
+  const [colW, setColW] = useState<typeof DEFAULT_WIDTHS>({ ...DEFAULT_WIDTHS })
+  const resizing = useRef<{ key: ColKey; startX: number; startW: number }|null>(null)
+
+  const startResize = useCallback((key: ColKey, e: React.MouseEvent) => {
+    e.preventDefault()
+    resizing.current = { key, startX: e.clientX, startW: colW[key] }
+    const onMove = (ev: MouseEvent) => {
+      if (!resizing.current) return
+      const { key: k, startX, startW } = resizing.current
+      setColW(p => ({ ...p, [k]: Math.max(40, startW + ev.clientX - startX) }))
+    }
+    const onUp = () => { resizing.current = null; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [colW])
 
   const editing = canEdit && isEditing
 
-  /* load BOQ + jobs list */
+  const askConfirm = (msg: string, fn: () => void) => setConfirm({ msg, fn })
+
+  /* load */
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    Promise.all([
-      fetch(`/api/boq/${id}`).then(r => r.json()),
-      fetch('/api/jobs').then(r => r.json()),
-    ])
+    Promise.all([fetch(`/api/boq/${id}`).then(r=>r.json()), fetch('/api/jobs').then(r=>r.json())])
       .then(([d, jd]) => {
         setJobs(jd.jobs ?? [])
         if (d.boq) {
-          setJobId(d.boq.jobId ?? '')
-          setBoqTitle(d.boq.title ?? '')
+          setJobId(d.boq.jobId ?? ''); setBoqTitle(d.boq.title ?? '')
           setJobName(d.boq.job?.name || d.boq.title || '')
           setBoqExists(true)
           setGroups((d.boq.data as Group[])?.length ? d.boq.data as Group[] : [emptyGroup()])
-          setShowMaterialColumns(d.boq.showMaterial ?? true)
+          setShowMat(d.boq.showMaterial ?? true)
           setIsEditing(false)
-        } else {
-          router.replace('/dashboard/boq')
-        }
+        } else { router.replace('/dashboard/boq') }
       })
       .catch(() => router.replace('/dashboard/boq'))
       .finally(() => setLoading(false))
@@ -165,83 +138,67 @@ export default function BoqEditorPage() {
 
   /* save */
   const handleSave = async () => {
-    setSaving(true)
-    setSaveError(null)
+    setSaving(true); setSaveError(null)
     try {
       const res = await fetch(`/api/boq/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          data: groups,
-          showMaterial: showMaterialColumns,
-          jobId: jobId || null,
-          title: boqTitle,
-        }),
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: groups, showMaterial: showMat, jobId: jobId||null, title: boqTitle }),
       })
       if (!res.ok) throw new Error()
       const d = await res.json()
       setJobName(d.boq?.job?.name || d.boq?.title || '')
       setIsEditing(false)
-    } catch {
-      setSaveError('บันทึกไม่สำเร็จ กรุณาลองใหม่')
-    } finally {
-      setSaving(false)
-    }
+    } catch { setSaveError('บันทึกไม่สำเร็จ กรุณาลองใหม่') }
+    finally { setSaving(false) }
   }
 
-  /* ── mutations ── */
-  const addGroup = () => setGroups(p => [...p, emptyGroup()])
-  const deleteGroup = (gid: string) => setGroups(p => { const f = p.filter(g => g.id !== gid); return f.length ? f : [emptyGroup()] })
-  const updateGroupTitle = (gid: string, t: string) => setGroups(p => p.map(g => g.id === gid ? { ...g, title: t } : g))
-  const addSection = (gid: string) => setGroups(p => p.map(g => g.id === gid ? { ...g, sections: [...g.sections, emptySection()] } : g))
-  const deleteSection = (gid: string, sid: string) => setGroups(p => p.map(g => { if (g.id !== gid) return g; const f = g.sections.filter(s => s.id !== sid); return { ...g, sections: f.length ? f : [emptySection()] } }))
-  const updateSectionTitle = (gid: string, sid: string, t: string) => setGroups(p => p.map(g => g.id !== gid ? g : { ...g, sections: g.sections.map(s => s.id === sid ? { ...s, title: t } : s) }))
-  const addSubRow = (gid: string, sid: string) => setGroups(p => p.map(g => g.id !== gid ? g : { ...g, sections: g.sections.map(s => s.id !== sid ? s : { ...s, subRows: [...s.subRows, emptySubRow()] }) }))
-  const deleteSubRow = (gid: string, sid: string, rid: string) => setGroups(p => p.map(g => g.id !== gid ? g : { ...g, sections: g.sections.map(s => { if (s.id !== sid) return s; const f = s.subRows.filter(r => r.id !== rid); return { ...s, subRows: f.length ? f : [emptySubRow()] } }) }))
-  const updateSubRow = (gid: string, sid: string, rid: string, field: keyof SubRow, val: string | number) =>
-    setGroups(p => p.map(g => g.id !== gid ? g : { ...g, sections: g.sections.map(s => s.id !== sid ? s : { ...s, subRows: s.subRows.map(r => r.id === rid ? { ...r, [field]: val } : r) }) }))
+  /* mutations */
+  const addGroup    = () => setGroups(p => [...p, emptyGroup()])
+  const delGroup    = (gid: string) => setGroups(p => { const f=p.filter(g=>g.id!==gid); return f.length?f:[emptyGroup()] })
+  const updGrpTitle = (gid: string, t: string) => setGroups(p => p.map(g => g.id===gid?{...g,title:t}:g))
+  const addSection  = (gid: string) => setGroups(p => p.map(g => g.id===gid?{...g,sections:[...g.sections,emptySection()]}:g))
+  const delSection  = (gid: string, sid: string) => setGroups(p => p.map(g => { if(g.id!==gid)return g; const f=g.sections.filter(s=>s.id!==sid); return{...g,sections:f.length?f:[emptySection()]} }))
+  const updSecTitle = (gid: string, sid: string, t: string) => setGroups(p => p.map(g => g.id!==gid?g:{...g,sections:g.sections.map(s=>s.id===sid?{...s,title:t}:s)}))
+  const addSubRow   = (gid: string, sid: string) => setGroups(p => p.map(g => g.id!==gid?g:{...g,sections:g.sections.map(s=>s.id!==sid?s:{...s,subRows:[...s.subRows,emptySubRow()]})}))
+  const delSubRow   = (gid: string, sid: string, rid: string) => setGroups(p => p.map(g => g.id!==gid?g:{...g,sections:g.sections.map(s=>{if(s.id!==sid)return s;const f=s.subRows.filter(r=>r.id!==rid);return{...s,subRows:f.length?f:[emptySubRow()]}})}))
+  const updSubRow   = (gid: string, sid: string, rid: string, field: keyof SubRow, val: string|number) =>
+    setGroups(p => p.map(g => g.id!==gid?g:{...g,sections:g.sections.map(s=>s.id!==sid?s:{...s,subRows:s.subRows.map(r=>r.id===rid?{...r,[field]:val}:r)})}))
 
-  /* ── column math ── */
-  const totalCols = showMaterialColumns ? 13 : 11
-  const sectionTitleSpan = totalCols - 4
-  const groupTitleSpan = totalCols - 2
-
-  /* ── summary totals ── */
-  const grandTotal = groups.reduce((sum, g) => sum + calcGroupTotal(g, showMaterialColumns), 0)
-  const overhead = grandTotal * 0.12
-  const subTotal = grandTotal + overhead
-  const vat = subTotal * 0.07
+  /* totals */
+  const grandTotal   = groups.reduce((s,g) => s+calcGrpTotal(g,showMat), 0)
+  const overhead     = grandTotal * 0.12
+  const subTotal     = grandTotal + overhead
+  const vat          = subTotal * 0.07
   const totalWithVat = subTotal + vat
+  let globalSecIdx   = 0
 
-  let globalSecIdx = 0
+  /* colSpan helpers */
+  const totalCols      = showMat ? 13 : 11
+  const secTitleSpan   = totalCols - 4
+  const grpTitleSpan   = totalCols - 2
 
-  const SummaryRow = ({ label, amount, highlight }: { label: string; amount: string; highlight: boolean }) => {
+  const SummaryRow = ({ label, amount, highlight }: { label:string; amount:string; highlight:boolean }) => {
     const hl = highlight ? ' boq-summary-label--highlight' : ''
     return (
       <tr>
-        <td className={`boq-td${hl}`}></td>
-        <td className={`boq-td${hl}`}></td>
-        <td className={`boq-td${hl}`}></td>
+        <td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/>
         <td className={`boq-td boq-summary-label${hl}`}>{label}</td>
-        <td className={`boq-td${hl}`}></td>
-        <td className={`boq-td${hl}`}></td>
-        {showMaterialColumns && <><td className={`boq-td${hl}`}></td><td className={`boq-td${hl}`}></td></>}
-        <td className={`boq-td${hl}`}></td>
+        <td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/>
+        {showMat && <><td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/></>}
+        <td className={`boq-td${hl}`}/>
         <td className={`boq-td boq-td-num boq-summary-dash${hl}`}>-</td>
         <td className={`boq-td boq-td-num boq-summary-amount${hl}`}>{amount}</td>
-        <td className={`boq-td${hl}`}></td>
-        <td className={`boq-td${hl}`}></td>
+        <td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/>
       </tr>
     )
   }
 
-  if (loading) {
-    return (
-      <div className="list-page boq-page">
-        <p style={{ padding: 32, color: '#888' }}>กำลังโหลด...</p>
-      </div>
-    )
-  }
+  /* Resize handle element */
+  const RH = ({ col }: { col: ColKey }) => (
+    <div className="boq-col-resize" onMouseDown={e => startResize(col, e)} />
+  )
+
+  if (loading) return <div className="list-page boq-page"><p style={{ padding:32, color:'#888' }}>กำลังโหลด...</p></div>
 
   return (
     <div className="list-page boq-page">
@@ -255,35 +212,18 @@ export default function BoqEditorPage() {
       </header>
 
       <div className="boq-top-bar">
-        <Link href="/dashboard/boq" className="form-button boq-back-btn">
-          ← กลับรายการ BOQ
-        </Link>
-
+        <Link href="/dashboard/boq" className="form-button boq-back-btn">← กลับรายการ BOQ</Link>
         {editing ? (
           <div className="boq-editor-meta">
             <div className="boq-meta-field">
               <label className="boq-job-label">ชื่อ BOQ</label>
-              <input
-                type="text"
-                className="boq-job-select"
-                value={boqTitle}
-                onChange={e => setBoqTitle(e.target.value)}
-                placeholder="ชื่อ BOQ (ถ้าไม่ระบุงาน)"
-                style={{ minWidth: 180 }}
-              />
+              <input type="text" className="boq-job-select" value={boqTitle} onChange={e=>setBoqTitle(e.target.value)} placeholder="ชื่อ BOQ" style={{ minWidth:180 }} />
             </div>
             <div className="boq-meta-field">
               <label className="boq-job-label">งาน (Job)</label>
-              <select
-                className="boq-job-select"
-                value={jobId}
-                onChange={e => setJobId(e.target.value)}
-                style={{ minWidth: 200 }}
-              >
+              <select className="boq-job-select" value={jobId} onChange={e=>setJobId(e.target.value)} style={{ minWidth:200 }}>
                 <option value="">— ไม่ระบุงาน —</option>
-                {jobs.map(j => (
-                  <option key={j.id} value={j.id}>{j.name}</option>
-                ))}
+                {jobs.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
               </select>
             </div>
           </div>
@@ -293,38 +233,52 @@ export default function BoqEditorPage() {
       </div>
 
       <div className="boq-table-wrapper">
-        <table className="boq-table">
+        <table className="boq-table" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: colW.no }} />
+            <col style={{ width: colW.refPage }} />
+            <col style={{ width: colW.refCode }} />
+            <col style={{ width: colW.desc }} />
+            <col style={{ width: colW.qty }} />
+            <col style={{ width: colW.unit }} />
+            {showMat && <><col style={{ width: colW.matPrice }} /><col style={{ width: colW.matAmt }} /></>}
+            <col style={{ width: colW.laborPrice }} />
+            <col style={{ width: colW.laborAmt }} />
+            <col style={{ width: colW.total }} />
+            <col style={{ width: colW.note }} />
+            <col style={{ width: colW.action }} />
+          </colgroup>
+
           <thead>
             <tr>
-              <th rowSpan={2} className="boq-th boq-th-no">ลำดับที่</th>
+              <th rowSpan={2} className="boq-th boq-th-no">ลำดับที่<RH col="no"/></th>
               <th colSpan={2} className="boq-th">อ้างอิง ID</th>
-              <th rowSpan={2} className="boq-th boq-th-desc">รายการ</th>
-              <th rowSpan={2} className="boq-th boq-th-qty">จำนวน</th>
-              <th rowSpan={2} className="boq-th boq-th-unit">หน่วย</th>
-              {showMaterialColumns && (
+              <th rowSpan={2} className="boq-th boq-th-desc">รายการ<RH col="desc"/></th>
+              <th rowSpan={2} className="boq-th boq-th-qty">จำนวน<RH col="qty"/></th>
+              <th rowSpan={2} className="boq-th boq-th-unit">หน่วย<RH col="unit"/></th>
+              {showMat && (
                 <th colSpan={2} className="boq-th boq-th-has-toggle">
-                  <button type="button" className="boq-material-toggle-btn"
-                    onClick={() => setShowMaterialColumns(false)} title="ซ่อนค่าวัสดุสิ่งก่อสร้าง">−</button>
+                  <button type="button" className="boq-material-toggle-btn" onClick={() => setShowMat(false)} title="ซ่อนค่าวัสดุ">−</button>
                   ราคาวัสดุสิ่งก่อสร้าง
                 </th>
               )}
-              <th colSpan={2} className={!showMaterialColumns ? 'boq-th boq-th-has-toggle' : 'boq-th'}>
-                {!showMaterialColumns && (
-                  <button type="button" className="boq-material-toggle-btn"
-                    onClick={() => setShowMaterialColumns(true)} title="แสดงค่าวัสดุสิ่งก่อสร้าง">+</button>
-                )}
-                {showMaterialColumns ? 'ค่าแรงงาน' : 'ค่าแรงงาน+ค่าวัสดุ'}
+              <th colSpan={2} className={!showMat ? 'boq-th boq-th-has-toggle' : 'boq-th'}>
+                {!showMat && <button type="button" className="boq-material-toggle-btn" onClick={() => setShowMat(true)} title="แสดงค่าวัสดุ">+</button>}
+                {showMat ? 'ค่าแรงงาน' : 'ค่าแรงงาน+ค่าวัสดุ'}
               </th>
-              <th rowSpan={2} className="boq-th boq-th-total">ค่าวัสดุ<br />และแรงงาน</th>
-              <th rowSpan={2} className="boq-th boq-th-note">หมายเหตุ</th>
-              <th rowSpan={2} className="boq-th boq-th-action"></th>
+              <th rowSpan={2} className="boq-th boq-th-total">ค่าวัสดุ<br/>และแรงงาน<RH col="total"/></th>
+              <th rowSpan={2} className="boq-th boq-th-note">หมายเหตุ<RH col="note"/></th>
+              <th rowSpan={2} className="boq-th boq-th-action"><RH col="action"/></th>
             </tr>
             <tr>
-              <th className="boq-th boq-th-sub">เลขหน้า</th>
-              <th className="boq-th boq-th-sub">รหัส</th>
-              {showMaterialColumns && (<><th className="boq-th boq-th-sub">ราคาต่อหน่วย</th><th className="boq-th boq-th-sub">จำนวนเงิน</th></>)}
-              <th className="boq-th boq-th-sub">ราคาต่อหน่วย</th>
-              <th className="boq-th boq-th-sub">จำนวนเงิน</th>
+              <th className="boq-th boq-th-sub">เลขหน้า<RH col="refPage"/></th>
+              <th className="boq-th boq-th-sub">รหัส<RH col="refCode"/></th>
+              {showMat && (<>
+                <th className="boq-th boq-th-sub">ราคาต่อหน่วย<RH col="matPrice"/></th>
+                <th className="boq-th boq-th-sub">จำนวนเงิน<RH col="matAmt"/></th>
+              </>)}
+              <th className="boq-th boq-th-sub">ราคาต่อหน่วย<RH col="laborPrice"/></th>
+              <th className="boq-th boq-th-sub">จำนวนเงิน<RH col="laborAmt"/></th>
             </tr>
           </thead>
 
@@ -333,30 +287,30 @@ export default function BoqEditorPage() {
               const groupStartSec = globalSecIdx + 1
               globalSecIdx += group.sections.length
               const groupEndSec = globalSecIdx
-              const groupTotal = calcGroupTotal(group, showMaterialColumns)
+              const groupTotal = calcGrpTotal(group, showMat)
               return (
                 <React.Fragment key={group.id}>
                   <tr className="boq-group-header-row">
                     <td className="boq-td boq-td-group-no">{groupIdx + 1}</td>
-                    <td colSpan={groupTitleSpan} className="boq-td boq-td-group-title-cell">
+                    <td colSpan={grpTitleSpan} className="boq-td boq-td-group-title-cell">
                       <input className="boq-input boq-input-group-title" value={group.title} readOnly={!editing}
-                        onChange={e => editing && updateGroupTitle(group.id, e.target.value)}
-                        placeholder={`หมวดงานที่ ${groupIdx + 1} — พิมพ์ชื่อหมวดงาน`} />
+                        onChange={e => editing && updGrpTitle(group.id, e.target.value)}
+                        placeholder={`หมวดงานที่ ${groupIdx+1} — พิมพ์ชื่อหมวดงาน`} />
                     </td>
                     <td className="boq-td boq-td-action">
                       {editing && (
                         <div className="boq-action-cell">
-                          <button type="button" className="boq-btn boq-action-btn-section-del"
-                            onClick={() => deleteGroup(group.id)} disabled={groups.length <= 1} title="ลบหมวดงานนี้">
+                          <button type="button" className="boq-btn boq-action-btn-section-del" disabled={groups.length<=1}
+                            onClick={() => askConfirm(`ลบหมวดงานที่ ${groupIdx+1} "${group.title||'ไม่มีชื่อ'}" ?`, () => delGroup(group.id))}
+                            title="ลบหมวดงานนี้">
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                              <line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+                              <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                              <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
                             </svg>
                           </button>
-                          <button type="button" className="boq-btn boq-action-btn-add"
-                            onClick={() => addSection(group.id)} title="เพิ่มข้อในหมวดนี้">
+                          <button type="button" className="boq-btn boq-action-btn-add" onClick={() => addSection(group.id)} title="เพิ่มข้อในหมวดนี้">
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
                           </button>
                         </div>
@@ -370,71 +324,71 @@ export default function BoqEditorPage() {
                       <React.Fragment key={section.id}>
                         <tr className="boq-section-header-row">
                           <td className="boq-td boq-td-no boq-td-section-no">{globalNum}</td>
-                          <td className="boq-td"></td>
-                          <td className="boq-td"></td>
-                          <td colSpan={sectionTitleSpan} className="boq-td boq-td-section-title-cell">
+                          <td className="boq-td"/><td className="boq-td"/>
+                          <td colSpan={secTitleSpan} className="boq-td boq-td-section-title-cell">
                             <input className="boq-input boq-input-section-title" value={section.title} readOnly={!editing}
-                              onChange={e => editing && updateSectionTitle(group.id, section.id, e.target.value)}
+                              onChange={e => editing && updSecTitle(group.id, section.id, e.target.value)}
                               placeholder={`ข้อ ${globalNum} — พิมพ์ชื่อข้อ`} />
                           </td>
-                          <td className="boq-td boq-td-action"></td>
+                          <td className="boq-td boq-td-action"/>
                         </tr>
 
                         {section.subRows.map((sr, srIdx) => (
                           <tr key={sr.id} className="boq-row">
-                            <td className="boq-td boq-td-no boq-td-sub-no">{globalNum}.{srIdx + 1}</td>
-                            <td className="boq-td"><input className="boq-input" value={sr.refPage} readOnly={!editing} onChange={e => editing && updateSubRow(group.id, section.id, sr.id, 'refPage', e.target.value)} /></td>
-                            <td className="boq-td"><input className="boq-input" value={sr.refCode} readOnly={!editing} onChange={e => editing && updateSubRow(group.id, section.id, sr.id, 'refCode', e.target.value)} /></td>
+                            <td className="boq-td boq-td-no boq-td-sub-no">{globalNum}.{srIdx+1}</td>
+                            <td className="boq-td"><input className="boq-input" value={sr.refPage} readOnly={!editing} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'refPage',e.target.value)}/></td>
+                            <td className="boq-td"><input className="boq-input" value={sr.refCode} readOnly={!editing} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'refCode',e.target.value)}/></td>
                             <td className="boq-td boq-td-desc">
-                              <input className="boq-input" value={sr.description} readOnly={!editing}
-                                onChange={e => editing && updateSubRow(group.id, section.id, sr.id, 'description', e.target.value)}
-                                placeholder={editing ? `รายการที่ ${globalNum}.${srIdx + 1}` : ''} />
+                              <AutoTextarea className="boq-input boq-textarea" value={sr.description} readOnly={!editing}
+                                onChange={v => editing && updSubRow(group.id,section.id,sr.id,'description',v)}
+                                placeholder={editing ? `รายการที่ ${globalNum}.${srIdx+1}` : ''} />
                             </td>
                             <td className="boq-td boq-td-num">
-                              <NumInput className="boq-input boq-input-num" value={sr.quantity} readOnly={!editing}
-                                onChange={v => editing && updateSubRow(group.id, section.id, sr.id, 'quantity', v)} />
+                              <NumInput className="boq-input boq-input-num" value={sr.quantity} readOnly={!editing} onChange={v=>editing&&updSubRow(group.id,section.id,sr.id,'quantity',v)}/>
                             </td>
-                            <td className="boq-td"><input className="boq-input boq-input-sm" value={sr.unit} readOnly={!editing} onChange={e => editing && updateSubRow(group.id, section.id, sr.id, 'unit', e.target.value)} /></td>
-                            {showMaterialColumns && (
+                            <td className="boq-td"><input className="boq-input boq-input-sm" value={sr.unit} readOnly={!editing} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'unit',e.target.value)}/></td>
+                            {showMat && (
                               <>
                                 <td className="boq-td boq-td-num">
-                                  <NumInput className="boq-input boq-input-num" value={sr.materialPrice} readOnly={!editing}
-                                    onChange={v => editing && updateSubRow(group.id, section.id, sr.id, 'materialPrice', v)} />
+                                  <NumInput className="boq-input boq-input-num" value={sr.materialPrice} readOnly={!editing} onChange={v=>editing&&updSubRow(group.id,section.id,sr.id,'materialPrice',v)}/>
                                 </td>
-                                <td className="boq-td boq-td-num boq-td-calc">{fmt(calcMaterialAmount(sr))}</td>
+                                <td className="boq-td boq-td-num boq-td-calc">{fmt(calcMat(sr))}</td>
                               </>
                             )}
                             <td className="boq-td boq-td-num">
-                              <NumInput className="boq-input boq-input-num" value={sr.laborPrice} readOnly={!editing}
-                                onChange={v => editing && updateSubRow(group.id, section.id, sr.id, 'laborPrice', v)} />
+                              <NumInput className="boq-input boq-input-num" value={sr.laborPrice} readOnly={!editing} onChange={v=>editing&&updSubRow(group.id,section.id,sr.id,'laborPrice',v)}/>
                             </td>
-                            <td className="boq-td boq-td-num boq-td-calc">{fmt(calcLaborAmount(sr))}</td>
-                            <td className="boq-td boq-td-num boq-td-total">{fmt(calcSubRowTotal(sr, showMaterialColumns))}</td>
-                            <td className="boq-td boq-td-note"><input className="boq-input" value={sr.note} readOnly={!editing} onChange={e => editing && updateSubRow(group.id, section.id, sr.id, 'note', e.target.value)} /></td>
+                            <td className="boq-td boq-td-num boq-td-calc">{fmt(calcLab(sr))}</td>
+                            <td className="boq-td boq-td-num boq-td-total">{fmt(calcRowTotal(sr,showMat))}</td>
+                            <td className="boq-td boq-td-note">
+                              <AutoTextarea className="boq-input boq-textarea" value={sr.note} readOnly={!editing}
+                                onChange={v => editing && updSubRow(group.id,section.id,sr.id,'note',v)} />
+                            </td>
                             <td className="boq-td boq-td-action">
                               {editing && (
                                 <div className="boq-action-cell">
                                   {srIdx === 0 && (
                                     <>
-                                      <button type="button" className="boq-btn boq-action-btn-section-del"
-                                        onClick={() => deleteSection(group.id, section.id)} disabled={group.sections.length <= 1} title="ลบข้อนี้">
+                                      <button type="button" className="boq-btn boq-action-btn-section-del" disabled={group.sections.length<=1}
+                                        onClick={() => askConfirm(`ลบข้อ ${globalNum} "${section.title||'ไม่มีชื่อ'}" ?`, () => delSection(group.id,section.id))}
+                                        title="ลบข้อนี้">
                                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                          <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                          <line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+                                          <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                          <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
                                         </svg>
                                       </button>
-                                      <button type="button" className="boq-btn boq-action-btn-add"
-                                        onClick={() => addSubRow(group.id, section.id)} title="เพิ่มรายการย่อย">
+                                      <button type="button" className="boq-btn boq-action-btn-add" onClick={() => addSubRow(group.id,section.id)} title="เพิ่มรายการย่อย">
                                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                                          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                                         </svg>
                                       </button>
                                     </>
                                   )}
-                                  <button type="button" className="boq-btn boq-action-btn-del-row"
-                                    onClick={() => deleteSubRow(group.id, section.id, sr.id)} disabled={section.subRows.length <= 1} title="ลบแถวนี้">
+                                  <button type="button" className="boq-btn boq-action-btn-del-row" disabled={section.subRows.length<=1}
+                                    onClick={() => askConfirm('ลบแถวนี้?', () => delSubRow(group.id,section.id,sr.id))}
+                                    title="ลบแถวนี้">
                                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                                     </svg>
                                   </button>
                                 </div>
@@ -445,9 +399,8 @@ export default function BoqEditorPage() {
                       </React.Fragment>
                     )
                   })}
-
                   <SummaryRow
-                    label={`รวม${group.title || `หมวดงานที่ ${groupIdx + 1}`} ข้อ ${groupStartSec}${groupStartSec !== groupEndSec ? `–${groupEndSec}` : ''}`}
+                    label={`รวม${group.title||`หมวดงานที่ ${groupIdx+1}`} ข้อ ${groupStartSec}${groupStartSec!==groupEndSec?`–${groupEndSec}`:''}`}
                     amount={fmt(groupTotal)} highlight={false} />
                 </React.Fragment>
               )
@@ -455,33 +408,29 @@ export default function BoqEditorPage() {
           </tbody>
 
           <tfoot>
-            <SummaryRow label="ค่าดำเนินงาน 12%" amount={fmt(overhead)} highlight={false} />
-            <SummaryRow label="รวมราคาทั้งสิ้น" amount={fmt(subTotal)} highlight={true} />
-            <SummaryRow label="ภาษีมูลค่าเพิ่ม 7%" amount={fmt(vat)} highlight={false} />
-            <SummaryRow label="ราคารวมภาษีมูลค่าเพิ่ม" amount={fmt(totalWithVat)} highlight={false} />
+            <SummaryRow label="ค่าดำเนินงาน 12%" amount={fmt(overhead)} highlight={false}/>
+            <SummaryRow label="รวมราคาทั้งสิ้น" amount={fmt(subTotal)} highlight={true}/>
+            <SummaryRow label="ภาษีมูลค่าเพิ่ม 7%" amount={fmt(vat)} highlight={false}/>
+            <SummaryRow label="ราคารวมภาษีมูลค่าเพิ่ม" amount={fmt(totalWithVat)} highlight={false}/>
           </tfoot>
         </table>
       </div>
 
       {canEdit && (
         <div className="boq-actions">
-          {editing && (
-            <button type="button" className="boq-add-row-btn" onClick={addGroup}>
-              + เพิ่มหมวดงาน
-            </button>
-          )}
+          {editing && <button type="button" className="boq-add-row-btn" onClick={addGroup}>+ เพิ่มหมวดงาน</button>}
           {editing ? (
             <button type="button" className="boq-save-btn" onClick={handleSave} disabled={saving}>
               {saving ? 'กำลังบันทึก...' : '💾 บันทึก'}
             </button>
           ) : (
-            <button type="button" className="boq-edit-btn" onClick={() => setIsEditing(true)}>
-              ✏️ แก้ไข
-            </button>
+            <button type="button" className="boq-edit-btn" onClick={() => setIsEditing(true)}>✏️ แก้ไข</button>
           )}
           {saveError && <span className="boq-save-error">{saveError}</span>}
         </div>
       )}
+
+      {confirm && <ConfirmModal message={confirm.msg} onConfirm={confirm.fn} onCancel={() => setConfirm(null)} />}
     </div>
   )
 }
