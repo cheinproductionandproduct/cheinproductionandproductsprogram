@@ -1,15 +1,25 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import DashboardLayout from '../../dashboard/layout'
 import '../../dashboard/dashboard.css'
 import { useUser } from '@/hooks/use-user'
 import { formatDateDMY } from '@/lib/utils/date-format'
-import { PrintableDocumentForm } from '@/components/documents/PrintableDocumentForm'
-import { SignatureModal } from '@/components/documents/SignatureModal'
+import { documentStatusLabelTh } from '@/lib/utils/document-status-label'
 import { getCachedDocument, setCachedDocument, clearCachedDocument } from '@/lib/documents/document-cache'
+import { canCancelApprovedDocument } from '@/lib/auth/permissions'
+
+const PrintableDocumentForm = dynamic(
+  () => import('@/components/documents/PrintableDocumentForm').then((m) => ({ default: m.PrintableDocumentForm })),
+  { loading: () => <div className="list-loading">โหลดเอกสาร...</div>, ssr: false }
+)
+const SignatureModal = dynamic(
+  () => import('@/components/documents/SignatureModal').then((m) => ({ default: m.SignatureModal })),
+  { ssr: false }
+)
 
 function mergeSignaturesFromApprovals(doc: any) {
   const formSlug = doc.formTemplate?.slug || ''
@@ -85,6 +95,9 @@ export default function DocumentDetailPage() {
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showSignModal, setShowSignModal] = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [cancelRemark, setCancelRemark] = useState('')
+  const [cancelling, setCancelling] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
   const didFetch = useRef(false)
   const lastFetchedId = useRef<string | null>(null)
@@ -160,11 +173,19 @@ export default function DocumentDetailPage() {
 
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/documents/${id}/submit`, { method: 'POST' })
+      const res = await fetch(`/api/documents/${id}/submit`, {
+        method: 'POST',
+        credentials: 'include',
+      })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.message || data.error || 'Failed to submit')
+      if (!res.ok) {
+        const msg = res.status === 401
+          ? 'กรุณาเข้าสู่ระบบใหม่ (Session หมดอายุหรือไม่พบ)'
+          : (data.message || data.error || 'Failed to submit')
+        throw new Error(msg)
+      }
 
-      const refresh = await fetch(`/api/documents/${id}`)
+      const refresh = await fetch(`/api/documents/${id}`, { credentials: 'include' })
       const refreshData = await refresh.json()
       if (refresh.ok) {
         setDoc(refreshData.document)
@@ -174,6 +195,42 @@ export default function DocumentDetailPage() {
       alert(err.message || 'Failed to submit document')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleCancelApproved = async () => {
+    const remark = cancelRemark.trim()
+    if (!remark) {
+      alert('กรุณาระบุเหตุผลการยกเลิก')
+      return
+    }
+    if (
+      !confirm(
+        'ยืนยันการยกเลิกเอกสารที่อนุมัติแล้วหรือไม่? การดำเนินการนี้จะบันทึกเหตุผลไว้ในเอกสารและไม่สามารถเรียกคืนสถานะเดิมได้อัตโนมัติ'
+      )
+    ) {
+      return
+    }
+
+    setCancelling(true)
+    try {
+      const res = await fetch(`/api/documents/${id}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ remark }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message || data.error || 'ยกเลิกเอกสารไม่สำเร็จ')
+
+      setDoc(data.document)
+      setCachedDocument(id, data.document, assignedUsers)
+      setShowCancelModal(false)
+      setCancelRemark('')
+    } catch (err: any) {
+      alert(err.message || 'ยกเลิกเอกสารไม่สำเร็จ')
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -298,14 +355,35 @@ export default function DocumentDetailPage() {
     )
   }
 
+  const canCancelThisApproved =
+    currentUser &&
+    (doc.status === 'APPROVED' || doc.status === 'CLEARED') &&
+    canCancelApprovedDocument(
+      currentUser.role,
+      doc.createdById,
+      currentUser.id,
+      doc.status
+    )
+
   return (
     <DashboardLayout>
       <div className="list-page doc-view-page">
         <header className="list-header doc-view-top-bar">
           <h1 className="page-title">{doc.title}</h1>
           <p className="page-subtitle">
-            สถานะ: {doc.status} • สร้างเมื่อ: {formatDateDMY(doc.createdAt)}
+            สถานะ: {documentStatusLabelTh(doc.status)} • สร้างเมื่อ: {formatDateDMY(doc.createdAt)}
           </p>
+          {doc.status === 'CANCELLED' && (doc.data as any)?.cancellationRemark && (
+            <p className="doc-cancelled-banner no-print" lang="th">
+              เอกสารนี้ถูกยกเลิกแล้ว — เหตุผล: {(doc.data as any).cancellationRemark}
+              {(doc.data as any)?.cancelledAt && (
+                <span className="doc-cancelled-meta">
+                  {' '}
+                  (เมื่อ {formatDateDMY(String((doc.data as any).cancelledAt).slice(0, 10))})
+                </span>
+              )}
+            </p>
+          )}
           <div className="doc-actions-nav no-print">
             <button onClick={() => router.push('/documents')} className="doc-nav-link">
               ← กลับไปยังรายการเอกสาร
@@ -343,10 +421,22 @@ export default function DocumentDetailPage() {
             {doc.formTemplate?.slug === 'advance-payment-request' &&
               doc.status === 'APPROVED' &&
               doc.createdById === currentUser?.id && (
-                <Link href={`/dashboard/advance-clearance?from=${doc.id}`} className="doc-btn-secondary">
+                <Link href={`/dashboard/advance-clearance?from=${doc.id}`} className="doc-btn-primary">
                   สร้างใบเคลียร์เงินทดรองจ่าย (ADC)
                 </Link>
               )}
+            {canCancelThisApproved && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCancelRemark('')
+                  setShowCancelModal(true)
+                }}
+                className="doc-btn-destructive"
+              >
+                ยกเลิกเอกสาร (หลังอนุมัติ)
+              </button>
+            )}
             {pendingApproval && (
               <button
                 type="button"
@@ -377,6 +467,52 @@ export default function DocumentDetailPage() {
           </div>
         </section>
         
+        {showCancelModal && (
+          <div className="doc-modal-backdrop no-print" role="dialog" aria-modal="true" aria-labelledby="cancel-doc-title">
+            <div className="doc-modal doc-modal--cancel">
+              <h2 id="cancel-doc-title" className="doc-modal-title">
+                ยกเลิกเอกสารที่อนุมัติแล้ว
+              </h2>
+              <p className="doc-modal-text" lang="th">
+                ระบุเหตุผลการยกเลิก (บันทึกในเอกสาร) จากนั้นกดยืนยัน — ระบบจะถามยืนยันอีกครั้ง
+              </p>
+              <label className="doc-modal-label" htmlFor="cancel-remark">
+                เหตุผลการยกเลิก <span className="text-red-600">*</span>
+              </label>
+              <textarea
+                id="cancel-remark"
+                className="doc-modal-textarea"
+                rows={4}
+                value={cancelRemark}
+                onChange={(e) => setCancelRemark(e.target.value)}
+                placeholder="ระบุเหตุผล เช่น ข้อมูลผิดพลาด หรือยกเลิกตามคำสั่ง..."
+                disabled={cancelling}
+              />
+              <div className="doc-modal-actions">
+                <button
+                  type="button"
+                  className="form-button"
+                  disabled={cancelling}
+                  onClick={() => {
+                    setShowCancelModal(false)
+                    setCancelRemark('')
+                  }}
+                >
+                  ปิด
+                </button>
+                <button
+                  type="button"
+                  className="doc-btn-destructive"
+                  disabled={cancelling || !cancelRemark.trim()}
+                  onClick={handleCancelApproved}
+                >
+                  {cancelling ? 'กำลังบันทึก...' : 'ยืนยันยกเลิก'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Signature Modal for Signing */}
         {showSignModal && pendingApproval && (
           <SignatureModal

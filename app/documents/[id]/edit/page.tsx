@@ -1,13 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { useParams, useRouter } from 'next/navigation'
-import { AdvancePaymentRequestForm } from '@/components/forms/AdvancePaymentRequestForm'
 import type { FormField } from '@/types/database'
 import DashboardLayout from '../../../dashboard/layout'
 import '../../../dashboard/dashboard.css'
 import { useUser } from '@/hooks/use-user'
 import { getCachedDocumentForEdit, setCachedDocumentForEdit } from '@/lib/documents/document-cache'
+
+const AdvancePaymentRequestForm = dynamic(
+  () => import('@/components/forms/AdvancePaymentRequestForm').then((m) => ({ default: m.AdvancePaymentRequestForm })),
+  { loading: () => <div className="list-loading">โหลดฟอร์ม...</div>, ssr: false }
+)
 
 export default function DocumentEditPage() {
   const params = useParams()

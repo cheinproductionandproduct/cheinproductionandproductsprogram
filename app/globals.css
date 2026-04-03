@@ -12,10 +12,29 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   background: #ffffff;
   color: #000000;
   font-family: Arial, Helvetica, sans-serif;
+  /* Safe area for notched phones (iPhone X+, iPad) */
+  padding-left: env(safe-area-inset-left, 0);
+  padding-right: env(safe-area-inset-right, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Touch-friendly: reduce accidental zoom and improve tap response on iOS/Android */
+button,
+a,
+input,
+select,
+textarea,
+[role="button"] {
+  touch-action: manipulation;
 }
 
 /* Hide number input spinners (arrows) - avoids issues with decimals like 0.99 */

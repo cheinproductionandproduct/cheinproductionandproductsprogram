@@ -80,11 +80,27 @@ export function numberToThaiText(num: number): string {
   return rounded.toLocaleString('th-TH') + 'บาทถ้วน'
 }
 
+const MONEY_FORMAT: Intl.NumberFormatOptions = {
+  useGrouping: true,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+}
+
 /**
- * Format number with 2 decimal places
+ * Format number with 2 decimal places (e.g. 1,000.00). Non-finite values → 0.00.
  */
 export function formatNumber(num: number): string {
-  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const n = Number(num)
+  const safe = Number.isFinite(n) ? n : 0
+  return new Intl.NumberFormat('en-US', MONEY_FORMAT).format(safe)
+}
+
+/**
+ * Format money from loose input (null/empty/invalid → 0.00).
+ */
+export function formatMoneyValue(v: number | string | null | undefined): string {
+  if (v == null || v === '') return formatNumber(0)
+  return formatNumber(Number(v))
 }
 
 /**

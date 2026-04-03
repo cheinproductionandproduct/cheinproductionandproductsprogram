@@ -46,6 +46,7 @@ export function useUser() {
 
         const syncResponse = await fetch('/api/auth/sync-user', {
           method: 'POST',
+          credentials: 'include',
         })
 
         if (!syncResponse.ok) {
@@ -83,7 +84,13 @@ export function useUser() {
       }
     }
 
-    fetchUser()
+    // First mount: full load only if we have no cached user; otherwise refresh in
+    // background so switching routes/tabs does not flip loading or re-trigger layout effects.
+    if (cachedUser !== null) {
+      fetchUser(true)
+    } else {
+      fetchUser(false)
+    }
 
     const supabase = createClient()
     const {

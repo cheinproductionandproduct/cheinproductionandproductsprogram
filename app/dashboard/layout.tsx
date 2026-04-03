@@ -8,7 +8,7 @@ import { ReactNode } from 'react'
 import { LogoutButton } from '@/components/auth/LogoutButton'
 import { useUser } from '@/hooks/use-user'
 import { createClient } from '@/lib/supabase/client'
-import { canApprove, isAdmin } from '@/lib/auth/permissions'
+import { canApprove, isAdmin, isManager } from '@/lib/auth/permissions'
 import { UserRole } from '@prisma/client'
 import './dashboard.css'
 
@@ -23,32 +23,42 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [hasSupabaseUser, setHasSupabaseUser] = useState<boolean | null>(null)
   const [supabaseUserInfo, setSupabaseUserInfo] = useState<{ email?: string; fullName?: string } | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false)
 
   const closeMobileMenu = () => setMobileMenuOpen(false)
 
   useEffect(() => {
-    // Check Supabase auth directly
+    let cancelled = false
+
     const checkSupabaseAuth = async () => {
       const supabase = createClient()
-      const { data: { user: supabaseUser } } = await supabase.auth.getUser()
+      const {
+        data: { user: supabaseUser },
+      } = await supabase.auth.getUser()
+      if (cancelled) return
+
       setHasSupabaseUser(!!supabaseUser)
-      
-      // Store Supabase user info as fallback
+
       if (supabaseUser) {
         setSupabaseUserInfo({
           email: supabaseUser.email,
           fullName: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name,
         })
+      } else {
+        setSupabaseUserInfo(null)
       }
-      
-      // Only redirect if there's no Supabase user at all
-      if (!supabaseUser && !loading) {
+
+      if (!supabaseUser) {
         router.push('/login')
       }
     }
-    
+
     checkSupabaseAuth()
-  }, [loading, router])
+
+    return () => {
+      cancelled = true
+    }
+  }, [router])
 
   // Show loading only when we have no user yet and still checking (avoids flash when returning to tab with cached user)
   if (loading && !user && hasSupabaseUser === null) {
@@ -68,9 +78,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   // The useUser hook will eventually sync it
 
   return (
-    <div className={`dashboard-layout ${mobileMenuOpen ? 'mobile-menu-open' : ''}`} style={{ display: 'flex', minHeight: '100vh', background: '#f0f0f0' }}>
+    <div
+      className={`dashboard-layout ${mobileMenuOpen ? 'mobile-menu-open' : ''} ${desktopSidebarCollapsed ? 'desktop-sidebar-collapsed' : ''}`}
+      style={{ display: 'flex', minHeight: '100vh', background: '#f0f0f0' }}
+    >
       {/* SIDEBAR - desktop: always visible; mobile: drawer opened by hamburger */}
-      <aside className={`sidebar ${mobileMenuOpen ? 'sidebar--open' : ''}`}>
+      <aside className={`sidebar ${mobileMenuOpen ? 'sidebar--open' : ''} ${desktopSidebarCollapsed ? 'sidebar--collapsed' : ''}`}>
+        <button
+          type="button"
+          className="sidebar-collapse-btn"
+          onClick={() => setDesktopSidebarCollapsed(true)}
+          aria-label="ยุบเมนูด้านข้าง"
+          title="ยุบเมนู"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
         <div className="logo-area">
           <img 
             src="/cheinprodlogo-removebg-preview.png" 
@@ -113,9 +137,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <polyline points="10 9 9 9 8 9"></polyline>
               </svg>
             </span>
-            เอกสารรอดำเนินการ
+            เอกสาร
           </Link>
-          {/* Only show for managers/approvers/admins - never for EMPLOYEE */}
+          {/* Managers/approvers: documents waiting for their signature */}
           {user && user.role !== UserRole.EMPLOYEE && canApprove(user.role as UserRole) && (
             <Link
               href="/signing"
@@ -128,39 +152,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <circle cx="12" cy="10" r="3"></circle>
                 </svg>
               </span>
-              เอกสารรออนุมัติ
+              เอกสารที่ต้องเซ็น
             </Link>
           )}
-          {user && user.role !== UserRole.EMPLOYEE && canApprove(user.role as UserRole) && (
-            <Link
-              href="/dashboard/advance-register"
-              className={`nav-btn ${pathname === '/dashboard/advance-register' ? 'nav-btn--active' : ''}`}
-              onClick={closeMobileMenu}
-            >
-              <span className="nav-btn-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                  <line x1="16" y1="13" x2="8" y2="13"></line>
-                  <line x1="16" y1="17" x2="8" y2="17"></line>
-                  <line x1="10" y1="9" x2="8" y2="9"></line>
-                </svg>
-              </span>
-              ทะเบียนคุมลูกหนี้เงินทดรอง
-            </Link>
-          )}
-          <Link
-            href="/approvals"
-            className={`nav-btn ${pathname === '/approvals' ? 'nav-btn--active' : ''}`}
-            onClick={closeMobileMenu}
-          >
-            <span className="nav-btn-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </span>
-            เอกสารที่อนุมัติแล้ว
-          </Link>
           <Link
             href="/rejected"
             className={`nav-btn ${pathname === '/rejected' ? 'nav-btn--active' : ''}`}
@@ -188,6 +182,36 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </span>
             Job List
           </Link>
+          <Link
+            href="/dashboard/boq"
+            className={`nav-btn ${pathname?.startsWith('/dashboard/boq') ? 'nav-btn--active' : ''}`}
+            onClick={closeMobileMenu}
+          >
+            <span className="nav-btn-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="3" y1="9" x2="21" y2="9" />
+                <line x1="9" y1="21" x2="9" y2="9" />
+              </svg>
+            </span>
+            BOQ
+          </Link>
+          {user && (isManager(user.role as UserRole) || isAdmin(user.role as UserRole)) && (
+            <Link
+              href="/dashboard/vehicle-requests"
+              className={`nav-btn ${pathname === '/dashboard/vehicle-requests' ? 'nav-btn--active' : ''}`}
+              onClick={closeMobileMenu}
+            >
+              <span className="nav-btn-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="4" rx="1" />
+                  <rect x="3" y="10" width="18" height="4" rx="1" />
+                  <rect x="3" y="16" width="10" height="4" rx="1" />
+                </svg>
+              </span>
+              รายการขอใช้รถ
+            </Link>
+          )}
           {user && isAdmin(user.role as UserRole) && (
             <Link
               href="/dashboard/admin"
@@ -242,6 +266,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="sidebar-backdrop" onClick={closeMobileMenu} aria-hidden="true" />
 
       <div className="dashboard-main-wrap">
+        {desktopSidebarCollapsed && (
+          <button
+            type="button"
+            className="sidebar-expand-btn"
+            onClick={() => setDesktopSidebarCollapsed(false)}
+            aria-label="ขยายเมนูด้านข้าง"
+            title="แสดงเมนู"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+        )}
         {/* Mobile-only top bar with hamburger — hidden on desktop via CSS */}
         <header className="mobile-header">
           <button type="button" className="mobile-menu-btn" onClick={() => setMobileMenuOpen(true)} aria-label="เปิดเมนู">

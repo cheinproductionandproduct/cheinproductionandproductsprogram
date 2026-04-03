@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { Document, FormTemplate, User } from '@prisma/client'
+import { formatNumber } from '@/lib/utils/thai-number'
 
 interface DocumentWithRelations extends Document {
   formTemplate: FormTemplate
@@ -35,6 +36,8 @@ export function exportDocumentToExcel(document: DocumentWithRelations): XLSX.Wor
     
     if (field.type === 'date' && value) {
       displayValue = new Date(value).toLocaleDateString('th-TH')
+    } else if (field.type === 'number' && value !== '' && value != null) {
+      displayValue = formatNumber(Number(value))
     } else if (field.type === 'items-table' && value?.items) {
       // Handle items table - create separate sheet
       const items = value.items || []
@@ -46,20 +49,26 @@ export function exportDocumentToExcel(document: DocumentWithRelations): XLSX.Wor
       ]
       
       items.forEach((item: any, index: number) => {
+        const amt = Number(item.amount)
         itemsData.push([
           index + 1,
           item.description || '',
-          item.amount || 0
+          Number.isFinite(amt) ? Number(amt.toFixed(2)) : 0,
         ])
       })
-      
+
       itemsData.push([])
-      itemsData.push(['รวม', '', total])
+      const totalNum = Number(total)
+      itemsData.push([
+        'รวม',
+        '',
+        Number.isFinite(totalNum) ? Number(totalNum.toFixed(2)) : 0,
+      ])
       
       const itemsSheet = XLSX.utils.aoa_to_sheet(itemsData)
       XLSX.utils.book_append_sheet(workbook, itemsSheet, `${field.label} - Items`)
       
-      displayValue = `จำนวน ${items.length} รายการ รวม ${total.toLocaleString('en-US', { minimumFractionDigits: 2 })} บาท (ดูรายละเอียดใน Sheet "${field.label} - Items")`
+      displayValue = `จำนวน ${items.length} รายการ รวม ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท (ดูรายละเอียดใน Sheet "${field.label} - Items")`
     } else if (typeof value === 'object') {
       displayValue = JSON.stringify(value)
     } else {

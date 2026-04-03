@@ -21,7 +21,7 @@ body,
 /* Thai text and page titles (except dashboard) use Sarabun */
 .thai,
 [lang="th"],
-.card-label,
+.card-label,  
 .page-subtitle,
 .page-title,
 .sidebar .nav-btn,
@@ -54,13 +54,73 @@ body,
   overflow-y: auto;
 }
 
-/* Desktop: hide mobile-only elements */
+.sidebar-collapse-btn {
+  position: absolute;
+  top: 12px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background: #f5f5f5;
+  color: #333;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.sidebar-collapse-btn:hover {
+  background: #e8e8e8;
+}
+
+.sidebar-expand-btn {
+  position: fixed;
+  top: 12px;
+  left: 10px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  z-index: 25;
+}
+
+.sidebar-expand-btn:hover {
+  background: #f2f2f2;
+}
+
+.dashboard-layout.desktop-sidebar-collapsed .sidebar {
+  transform: translateX(-100%);
+}
+
+/* Desktop: hide mobile-only elements — collapse completely so no white stripe */
 .sidebar-backdrop,
-.mobile-header,
 .floating-menu-btn,
 .topbar-close-btn,
 .sidebar-close-btn {
   display: none;
+}
+
+/* Remove from flow and hide so no white stripe on desktop */
+.mobile-header {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* Desktop backdrop (still needed so class exists) */
@@ -217,6 +277,10 @@ body,
   background: #f0f0f0;
 }
 
+.dashboard-layout.desktop-sidebar-collapsed .dashboard-main {
+  margin-left: 0;
+}
+
 .page-title {
   font-size: 30px;
   font-weight: 800;
@@ -254,6 +318,43 @@ body,
   aspect-ratio: 1 / 1;
   background: #c4c4c4;
   border-radius: 7px;
+}
+
+.card-image--apr {
+  background-image: url('/apr.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.card-image--apc {
+  background-image: url('/apc.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.card-image--debtlist {
+  background-image: url('/debtlist.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.card-image--car {
+  background-image: url('/car.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.card-image--boq {
+  background-color: #e2e8f0;
+  background-image:
+    linear-gradient(to right, #94a3b8 1px, transparent 1px),
+    linear-gradient(to bottom, #94a3b8 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: center;
 }
 
 .card-label {
@@ -309,6 +410,13 @@ body,
   border-radius: 8px;
 }
 
+.vehicle-card-image--car {
+  background-image: url('/car.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
 .vehicle-card-label {
   font-size: 18px;
   font-weight: 600;
@@ -334,6 +442,50 @@ body,
   background: #a93226;
 }
 
+.vehicle-card-link {
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.vehicle-card-link:hover {
+  border-color: #999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Sub-category page: smaller cards in a grid */
+.vehicle-page .vehicle-sub-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 20px;
+  margin-bottom: 24px;
+}
+.vehicle-sub-card {
+  background: #fff;
+  border: 1.5px solid #d0d0d0;
+  border-radius: 10px;
+  padding: 16px 20px;
+  min-width: 140px;
+  flex: 1 1 160px;
+  max-width: 220px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 15px;
+  color: #222;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  text-decoration: none;
+  display: block;
+}
+.vehicle-sub-card:hover {
+  border-color: #999;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.vehicle-sub-card a {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
 @media (max-width: 768px) {
   .vehicle-page .vehicle-card-row {
     justify-content: center;
@@ -341,6 +493,14 @@ body,
   .vehicle-page .vehicle-card {
     width: 100%;
     max-width: 320px;
+  }
+  .vehicle-page .vehicle-sub-row {
+    justify-content: center;
+  }
+  .vehicle-sub-card {
+    max-width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
   }
 }
 
@@ -350,8 +510,10 @@ body,
   min-width: 0;
   display: flex;
   flex-direction: column;
+  border-top: none;
 }
 
+/* Mobile header: only visible and sized on small screens (see @media below) */
 .mobile-header {
   display: flex;
   align-items: center;
@@ -432,8 +594,25 @@ body,
 
 /* ===== MOBILE: drawer sidebar + top bar ===== */
 @media (max-width: 768px) {
-  /* Show mobile-only top bar */
+  .sidebar-collapse-btn,
+  .sidebar-expand-btn {
+    display: none !important;
+  }
+
+  /* Show mobile-only top bar (restore size and border so stripe appears on phone) */
   .mobile-header {
+    position: sticky;
+    left: 0;
+    width: auto;
+    height: auto;
+    min-height: auto;
+    padding: 12px 16px;
+    margin: 0;
+    border: none;
+    border-bottom: 1px solid #e0e0e0;
+    overflow: visible;
+    visibility: visible;
+    pointer-events: auto;
     display: flex !important;
   }
 
@@ -564,6 +743,13 @@ body,
   border-color: #000;
 }
 
+/* Money fields: right-align; tabular figures so places line up (1,000.00 under 10,000.00) */
+.form-input--money,
+input.form-input[type='number'] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .form-textarea {
   resize: vertical;
   min-height: 80px;
@@ -590,6 +776,24 @@ body,
   background: #999;
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+/* Primary submit / ส่งเอกสาร / อนุมัติลงนาม — green (matches doc-btn-primary) */
+.form-button.form-button-submit {
+  background: #16a34a;
+  border-color: #166534;
+  color: #fff;
+}
+.form-button.form-button-submit:hover {
+  background: #15803d;
+  border-color: #14532d;
+}
+.form-button.form-button-submit:disabled {
+  background: #86efac;
+  border-color: #86efac;
+  color: #fff;
+  opacity: 1;
+  cursor: not-allowed;
 }
 
 .form-label {
@@ -942,6 +1146,8 @@ body,
 
 .items-table-td-amount {
   text-align: right;
+  /* Make digits same width so 1,000 vs 10,000 is easier to visually compare */
+  font-variant-numeric: tabular-nums;
 }
 
 .items-table-input {
@@ -962,6 +1168,7 @@ body,
 
 .items-table-input-amount {
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .items-table-text {
@@ -1081,6 +1288,10 @@ body,
   font-size: 16px;
   color: #222;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  display: block;
+  width: 100%;
 }
 
 .signature-grid {
@@ -1406,6 +1617,83 @@ body,
   margin-bottom: 16px;
 }
 
+/* Documents list: quick ใบเบิก / ใบเคลียร์ filter */
+.doc-list-advance-type {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  background: #fafafa;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+}
+
+.doc-list-advance-type-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #222;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+}
+
+.doc-list-advance-type-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.doc-list-type-btn {
+  padding: 8px 16px;
+  border: 1.5px solid #333;
+  border-radius: 8px;
+  background: #fff;
+  color: #222;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.doc-list-type-btn:hover {
+  background: #f3f3f3;
+}
+
+.doc-list-type-btn--active {
+  background: #c0392b;
+  color: #fff;
+  border-color: #c0392b;
+}
+
+.doc-list-type-btn--active:hover {
+  background: #a93226;
+  border-color: #a93226;
+}
+
+/* Card: ใบเบิก / ใบเคลียร์ chip next to title */
+.doc-card-kind {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+}
+
+.doc-card-kind--apr {
+  background: #e8f4fc;
+  color: #0c5460;
+  border: 1px solid #7ec8e3;
+}
+
+.doc-card-kind--apc {
+  background: #f3e8ff;
+  color: #5b2c87;
+  border: 1px solid #c4a5e8;
+}
+
 .list-filters-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1513,6 +1801,41 @@ body,
   text-decoration: underline;
 }
 
+/* Documents page: toggle between Pending / Approved */
+.doc-view-toggle {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.doc-view-toggle-btn {
+  padding: 10px 20px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #fff;
+  color: #222;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.doc-view-toggle-btn:hover {
+  background: #f5f5f5;
+}
+
+.doc-view-toggle-btn--active {
+  background: #c0392b;
+  color: #fff;
+  border-color: #c0392b;
+}
+
+.doc-view-toggle-btn--active:hover {
+  background: #a93226;
+  border-color: #a93226;
+}
+
 .list-cards {
   display: flex;
   flex-direction: column;
@@ -1526,66 +1849,102 @@ body,
 .doc-card {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
+  gap: 20px;
+  padding: 18px 20px;
   background: #fff;
-  border: 1px solid #d0d0d0;
-  border-radius: 10px;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
   text-decoration: none;
   color: inherit;
-  transition: all 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
 }
 
 .doc-card:hover {
   border-color: #c0392b;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
 .doc-card-main {
   flex: 1;
+  min-width: 0;
+  width: 100%;
 }
 
 .doc-card-title-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .doc-card-title {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
-  color: #222;
+  color: #1a1a1a;
+  line-height: 1.4;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
 }
 
 .doc-status-badge {
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid #000;
+  border: 1px solid #333;
   background: #fff;
   font-size: 11px;
   font-weight: 600;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+  flex-shrink: 0;
 }
 
 .doc-card-meta {
-  font-size: 12px;
+  font-size: 14px;
   color: #555;
+  line-height: 1.5;
+  margin-top: 4px;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+}
+
+.doc-card-job {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-top: 6px;
+  line-height: 1.5;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
 }
 
 .doc-card-amount {
-  margin-top: 4px;
+  margin-top: 10px;
+  text-align: right;
+  width: 100%;
+  font-size: 14px;
+  color: #555;
+  line-height: 1.5;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+}
+
+.doc-card-amount-label {
+  font-size: 14px;
+  color: #555;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
 }
 
 .doc-card-amount-value {
-  font-weight: 600;
-  color: #000;
+  font-size: 20px;
+  font-weight: 800;
+  color: #1a1a1a;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .doc-card-side {
   min-width: 140px;
   text-align: right;
   font-size: 12px;
-  color: #333;
+  color: #666;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
 }
 
 .doc-card-stat {
@@ -1937,6 +2296,30 @@ body,
   font-variant-numeric: tabular-nums;
 }
 
+.adv-reg-cell-transfer {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.adv-reg-transfer-controls {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.adv-reg-transfer-input {
+  width: 140px;
+  padding: 6px 8px;
+  border: 1px solid #000;
+  border-radius: 6px;
+  background: #fff;
+  color: #000;
+  font-size: 13px;
+  font-family: 'Inter', system-ui, sans-serif;
+  box-sizing: border-box;
+}
+
 .adv-reg-link {
   color: #c0392b;
   text-decoration: none;
@@ -2020,6 +2403,101 @@ body,
 .list-page-btn {
   padding-inline: 14px;
   font-size: 12px;
+}
+
+/* ===== SALE REPORT — job cards (3 per row, short, Enter next to text) ===== */
+.sale-report-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.sale-report-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f5f5f5;
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-height: 0;
+}
+
+.sale-report-card-image {
+  width: 56px;
+  min-width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  background: #6b6b6b;
+  border: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.sale-report-card-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sale-report-card-text {
+  min-width: 0;
+}
+
+.sale-report-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 2px;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+  line-height: 1.3;
+}
+
+.sale-report-card-status {
+  font-size: 13px;
+  color: #333;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+  line-height: 1.3;
+}
+
+.sale-report-card-actions {
+  flex-shrink: 0;
+}
+
+.sale-report-card .enter-btn {
+  width: auto;
+  min-width: 72px;
+  padding: 6px 14px;
+  font-size: 12px;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .sale-report-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .sale-report-cards {
+    grid-template-columns: 1fr;
+  }
+  .sale-report-card {
+    flex-wrap: wrap;
+  }
+  .sale-report-card-body {
+    flex-wrap: wrap;
+  }
+  .sale-report-card-image {
+    width: 48px;
+    min-width: 48px;
+    height: 48px;
+  }
 }
 
 /* ===== JOB LIST PAGE ===== */
@@ -2931,6 +3409,7 @@ body,
 .adv-tbl-amt {
   width: 140px;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .adv-tbl tbody tr {
@@ -3083,6 +3562,7 @@ body,
 .adc-tbl-amt {
   width: 140px;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .adc-tbl tbody tr {
@@ -3193,6 +3673,93 @@ body,
 .doc-btn-destructive:hover { background: #dc2626; color: #fff; }
 .doc-btn-destructive:hover svg { stroke: #fff; }
 .doc-btn-destructive:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.doc-cancelled-banner {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #991b1b;
+  font-size: 14px;
+  max-width: 720px;
+}
+
+.doc-cancelled-meta {
+  color: #7f1d1d;
+  font-size: 13px;
+}
+
+.doc-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.doc-modal {
+  background: #fff;
+  border-radius: 12px;
+  max-width: 480px;
+  width: 100%;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.doc-modal-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+}
+
+.doc-modal-text {
+  margin: 0 0 1rem;
+  font-size: 14px;
+  color: #444;
+}
+
+.doc-modal-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.doc-modal-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  margin-bottom: 1rem;
+  resize: vertical;
+}
+
+.doc-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.adv-cancelled-banner-print {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  background: #fef2f2;
+  border: 2px solid #dc2626;
+  border-radius: 8px;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.adv-cancelled-banner-print p {
+  margin: 0;
+}
 
 /* Navigation links: minimal, text style */
 .doc-nav-link {

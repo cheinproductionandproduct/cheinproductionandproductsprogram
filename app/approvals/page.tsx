@@ -16,7 +16,7 @@ export default function ApprovalsPage() {
           </p>
         </header>
         <section className="list-content">
-          <DocumentList initialStatus="APPROVED" />
+          <DocumentList initialStatus="APPROVED,CLEARED" />
         </section>
       </div>
     </DashboardLayout>

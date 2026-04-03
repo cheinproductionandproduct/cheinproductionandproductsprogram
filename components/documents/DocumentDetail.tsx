@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { Document, User, DocumentStatus } from '@prisma/client'
 import { formatDateDMY } from '@/lib/utils/date-format'
+import { formatNumber } from '@/lib/utils/thai-number'
+import { documentStatusLabelTh } from '@/lib/utils/document-status-label'
 import { SignatureModal } from './SignatureModal'
 
 interface DocumentDetailProps {
@@ -22,6 +24,7 @@ export function DocumentDetail({ document, currentUser }: DocumentDetailProps) {
       DRAFT: 'bg-white text-black border border-black',
       PENDING: 'bg-white text-black border border-black',
       APPROVED: 'bg-white text-black border border-black',
+      CLEARED: 'bg-white text-black border border-black',
       REJECTED: 'bg-white text-black border border-black',
       CANCELLED: 'bg-white text-black border border-black',
     }
@@ -147,7 +150,7 @@ export function DocumentDetail({ document, currentUser }: DocumentDetailProps) {
                   document.status
                 )}`}
               >
-                {document.status}
+                {documentStatusLabelTh(document.status)}
               </span>
             </div>
             <p className="mt-2 text-black">
@@ -172,7 +175,7 @@ export function DocumentDetail({ document, currentUser }: DocumentDetailProps) {
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="rounded-md bg-red-600 border-2 border-black px-4 py-2 text-sm text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                className="rounded-md bg-green-600 border-2 border-black px-4 py-2 text-sm text-white transition-colors hover:bg-green-700 disabled:opacity-50"
               >
                 Submit for Approval
               </button>
@@ -195,7 +198,7 @@ export function DocumentDetail({ document, currentUser }: DocumentDetailProps) {
             {pendingApproval && (
               <button
                 onClick={() => setShowSignModal(true)}
-                className="rounded-md bg-red-600 border-2 border-black px-4 py-2 text-sm text-white transition-colors hover:bg-red-700"
+                className="rounded-md bg-green-600 border-2 border-black px-4 py-2 text-sm text-white transition-colors hover:bg-green-700"
               >
                 Sign
               </button>
@@ -264,7 +267,7 @@ export function DocumentDetail({ document, currentUser }: DocumentDetailProps) {
                                 {item.description || '—'}
                               </td>
                               <td className="px-4 py-2 text-sm text-black">
-                                {item.amount ? Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'} บาท
+                                {formatNumber(Number(item.amount) || 0)} บาท
                               </td>
                             </tr>
                           ))}
@@ -275,7 +278,7 @@ export function DocumentDetail({ document, currentUser }: DocumentDetailProps) {
                               รวม (Total)
                             </td>
                             <td className="px-4 py-2 text-sm font-bold text-black">
-                              {itemsData.total ? Number(itemsData.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'} บาท
+                              {formatNumber(Number(itemsData.total) || 0)} บาท
                             </td>
                           </tr>
                         </tfoot>

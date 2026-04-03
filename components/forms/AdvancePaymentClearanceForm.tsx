@@ -28,7 +28,9 @@ export function AdvancePaymentClearanceForm({
   const fromAprId = searchParams.get('from')
   const { user: currentUser } = useUser()
   const [error, setError] = useState<string | null>(null)
-  const [aprDocuments, setAprDocuments] = useState<{ id: string; documentNumber: string | null; data: any; createdAt: string }[]>([])
+  const [aprDocuments, setAprDocuments] = useState<
+    { id: string; documentNumber: string | null; title?: string | null; data: any; createdAt: string }[]
+  >([])
   const [aprTemplateId, setAprTemplateId] = useState<string | null>(null)
   const [loadingAprList, setLoadingAprList] = useState(true)
   const [selectedAprId, setSelectedAprId] = useState<string | null>(fromAprId || null)
@@ -65,6 +67,10 @@ export function AdvancePaymentClearanceForm({
       advanceAmount: defaultValues.advanceAmount ?? 0,
       amountToReturn: defaultValues.amountToReturn ?? 0,
       additionalAmount: defaultValues.additionalAmount ?? 0,
+      transferDate:
+        defaultValues.transferDate ||
+        defaultValues.transferredDate ||
+        '',
       requesterName: defaultValues.requesterName || currentUser?.fullName || currentUser?.email || '',
       position: defaultValues.position || currentUser?.position || '',
       department: defaultValues.department || currentUser?.department || '',
@@ -92,18 +98,21 @@ export function AdvancePaymentClearanceForm({
 
         if (aprTemplate?.id && !cancelled) {
           const dRes = await fetch(
-            `/api/documents?limit=200&sortBy=createdAt&sortOrder=desc&formTemplateId=${encodeURIComponent(aprTemplate.id)}`
+            `/api/documents?limit=50&sortBy=createdAt&sortOrder=desc&formTemplateId=${encodeURIComponent(aprTemplate.id)}`
           )
           if (cancelled) return
           if (dRes.ok) {
             const dData = await dRes.json()
             const docs = dData.documents || []
-            setAprDocuments(docs.map((d: any) => ({
-              id: d.id,
-              documentNumber: d.documentNumber,
-              data: d.data || {},
-              createdAt: d.createdAt,
-            })))
+            setAprDocuments(
+              docs.map((d: any) => ({
+                id: d.id,
+                documentNumber: d.documentNumber,
+                title: d.title,
+                data: d.data || {},
+                createdAt: d.createdAt,
+              }))
+            )
           }
         }
       } catch (e) {
@@ -241,7 +250,7 @@ export function AdvancePaymentClearanceForm({
       })
     } catch (e) {
       console.error('Load APR document:', e)
-      setError('ไม่สามารถโหลดข้อมูล APR ได้')
+      setError('ไม่สามารถโหลดข้อมูลใบเบิกได้')
     }
   }
 
@@ -256,6 +265,23 @@ export function AdvancePaymentClearanceForm({
     if (val == null || val === '') return ''
     const s = String(val)
     return s.length === 10 && s[4] === '-' && s[7] === '-' ? s : ''
+  }
+
+  const getAprSelectOptionLabel = (doc: { id: string; documentNumber: string | null; title?: string | null; data: any }) => {
+    const d = doc.data || {}
+    const adv = doc.documentNumber || d.advNumber || doc.id
+    const rawAmt =
+      typeof d.totalAmount === 'number' && Number.isFinite(d.totalAmount)
+        ? d.totalAmount
+        : typeof d.items?.total === 'number' && Number.isFinite(d.items.total)
+          ? d.items.total
+          : null
+    const amountStr = rawAmt != null ? `${formatNumber(rawAmt)} บาท` : '—'
+    const job =
+      (typeof d.jobName === 'string' && d.jobName.trim()) ||
+      (typeof doc.title === 'string' && doc.title.trim()) ||
+      '—'
+    return `${adv} · ${amountStr} · ${job}`
   }
 
   const expenseItems = watch('expenseItems') || initialItems
@@ -399,27 +425,27 @@ export function AdvancePaymentClearanceForm({
       <form onSubmit={handleSubmit(handleFormSubmit)} className="form-wrapper">
         {/* Select APR to bring data from */}
         <div className="form-section">
-          <h2 className="form-section-title">อ้างอิงใบเบิกเงินทดรองจ่าย (APR)</h2>
+          <h2 className="form-section-title">อ้างอิงใบเบิกเงินทดรองจ่าย</h2>
           <div className="form-field-group">
-            <label className="form-label">เลือกเอกสาร APR ที่ต้องการเคลียร์ <span className="text-red-600">*</span></label>
+            <label className="form-label">เลือกเอกสารใบเบิกที่ต้องการเคลียร์ <span className="text-red-600">*</span></label>
             <select
               className="form-select"
               value={selectedAprId || ''}
               onChange={(e) => onSelectApr(e.target.value)}
               required
             >
-              <option value="">-- เลือกเลขที่ ADV --</option>
+              <option value="">-- เลือกใบเบิก (เลขที่ · จำนวนเงิน · งาน) --</option>
               {loadingAprList ? (
                 <option disabled>โหลด...</option>
               ) : (
                 aprDocuments.map((doc) => (
                   <option key={doc.id} value={doc.id}>
-                    {doc.documentNumber || doc.data?.advNumber || doc.id} — {getDateDisplay(doc.data?.date)} — {doc.data?.requesterName || '-'}
+                    {getAprSelectOptionLabel(doc)}
                   </option>
                 ))
               )}
             </select>
-            <p className="form-hint" lang="th">เมื่อเลือกแล้ว ข้อมูลผู้ขอเบิก วันที่เคลียร์ทดลองจ่าย และจำนวนที่เบิกทดรอง จะถูกนำมาจาก APR</p>
+            <p className="form-hint" lang="th">เมื่อเลือกแล้ว ข้อมูลผู้ขอเบิก วันที่เคลียร์ทดลองจ่าย และจำนวนที่เบิกทดรอง จะถูกนำมาจากใบเบิก</p>
           </div>
         </div>
 
@@ -447,6 +473,17 @@ export function AdvancePaymentClearanceForm({
                 readOnly
                 disabled
               />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-field-group form-field-date">
+              <label className="form-label" lang="th">
+                วันที่โอนเงิน <span className="text-gray-500 font-normal">(Date money was transferred)</span>
+              </label>
+              <input type="date" className="form-input" {...register('transferDate')} />
+              <p className="form-hint" lang="th">
+                วันที่โอนเงินคืน/เบิกเพิ่มตามผลเคลียร์ — กรอกเมื่อทราบวันที่ (สอดคล้องกับที่บันทึกในทะเบียน)
+              </p>
             </div>
           </div>
           <div className="form-row">
@@ -487,7 +524,7 @@ export function AdvancePaymentClearanceForm({
 
         {/* Requester (from APR) */}
         <div className="form-section">
-          <h2 className="form-section-title">ข้อมูลผู้ขอเบิก (จาก APR)</h2>
+          <h2 className="form-section-title">ข้อมูลผู้ขอเบิก (จากใบเบิก)</h2>
           <Input label="ชื่อผู้ขอเบิก" value={watch('requesterName') || ''} onChange={() => {}} disabled />
           <div className="form-row">
             <Input label="ตำแหน่ง" value={watch('position') || ''} onChange={() => {}} disabled />
@@ -515,7 +552,7 @@ export function AdvancePaymentClearanceForm({
         {/* Expense table — editable, from APR, with จำนวนเงินที่ใช้จริง */}
         <div className="form-section">
           <div className="form-section-header">
-            <h2 className="form-section-title">รายการค่าใช้จ่าย (จาก APR)</h2>
+            <h2 className="form-section-title">รายการค่าใช้จ่าย (จากใบเบิก)</h2>
             <button type="button" onClick={addExpenseRow} className="form-button form-button-small">
               + เพิ่มรายการ
             </button>
@@ -546,7 +583,7 @@ export function AdvancePaymentClearanceForm({
                   <tr>
                     <td colSpan={4} className="items-table-empty">
                       <div className="items-table-empty-content">
-                        <span>เลือกเอกสาร APR เพื่อนำรายการมา หรือเพิ่มรายการเอง</span>
+                        <span>เลือกเอกสารใบเบิกเพื่อนำรายการมา หรือเพิ่มรายการเอง</span>
                         <button type="button" onClick={addExpenseRow} className="form-button form-button-small">
                           + เพิ่มรายการแรก
                         </button>
@@ -650,7 +687,7 @@ export function AdvancePaymentClearanceForm({
               <label className="form-label">รวมค่าใช้จ่าย (บาท)</label>
               <input
                 type="text"
-                className="form-input"
+                className="form-input form-input--money"
                 value={formatNumber(totalActual)}
                 readOnly
                 disabled
@@ -658,7 +695,13 @@ export function AdvancePaymentClearanceForm({
             </div>
             <div className="form-field-group">
               <label className="form-label">(หัก) จำนวนที่เบิกทดรอง (บาท)</label>
-              <input type="text" className="form-input" value={formatNumber(advanceAmount)} readOnly disabled />
+              <input
+                type="text"
+                className="form-input form-input--money"
+                value={formatNumber(advanceAmount)}
+                readOnly
+                disabled
+              />
             </div>
           </div>
           <div className="form-row">
@@ -669,9 +712,9 @@ export function AdvancePaymentClearanceForm({
                 min={0}
                 step="0.01"
                 className="form-input"
-                value={amountToReturn || ''}
+                value={Number.isFinite(amountToReturn) ? amountToReturn : 0}
                 onChange={(e) => setValue('amountToReturn', parseFloat(e.target.value) || 0, { shouldValidate: true })}
-                placeholder="0"
+                placeholder="0.00"
               />
             </div>
             <div className="form-field-group">
@@ -681,9 +724,9 @@ export function AdvancePaymentClearanceForm({
                 min={0}
                 step="0.01"
                 className="form-input"
-                value={additionalAmount || ''}
+                value={Number.isFinite(additionalAmount) ? additionalAmount : 0}
                 onChange={(e) => setValue('additionalAmount', parseFloat(e.target.value) || 0, { shouldValidate: true })}
-                placeholder="0"
+                placeholder="0.00"
               />
             </div>
           </div>

@@ -34,9 +34,11 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  createdDocuments     Document[]           @relation("DocumentCreator")
-  approvals            Approval[]
-  workflowAssignments  WorkflowStep[]       @relation("WorkflowStepAssignee")
+  createdDocuments      Document[]           @relation("DocumentCreator")
+  createdBoqDocuments   BoqDocument[]        @relation("BoqDocumentCreator")
+  approvals             Approval[]
+  workflowAssignments   WorkflowStep[]       @relation("WorkflowStepAssignee")
+  vehicleRequests       VehicleRequest[]
 
   @@map("users")
 }
@@ -61,6 +63,8 @@ model Job {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  boqDocuments BoqDocument[]
 
   @@index([isActive])
   @@map("jobs")
@@ -184,6 +188,7 @@ enum DocumentStatus {
   DRAFT       // Being created, not submitted
   PENDING     // Submitted, awaiting approval
   APPROVED    // All approvals completed
+  CLEARED     // APC fully approved — advance cleared (ใบเคลียร์เงินทดรองจ่าย)
   REJECTED    // Rejected at some step
   CANCELLED   // Cancelled by creator
 }
@@ -292,4 +297,85 @@ model DocumentRelationship {
   @@index([parentDocId])
   @@index([childDocId])
   @@map("document_relationships")
+}
+
+// ============================================
+// VEHICLE REQUESTS
+// ============================================
+
+enum VehicleRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+model VehicleRequest {
+  id           String              @id @default(cuid())
+  type         String              // e.g. "messenger" or "vehicle"
+  categorySlug String
+  subSlug      String
+  serviceLabel String
+
+  requesterId  String
+  requester    User                @relation(fields: [requesterId], references: [id])
+
+  start        Json                // Starting point info (name, phone, time, location, placeId, lat, lng)
+  dest         Json                // Destination info
+
+  status       VehicleRequestStatus @default(PENDING)
+
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([categorySlug, subSlug])
+  @@index([status])
+  @@map("vehicle_requests")
+}
+
+// ============================================
+// BOQ (Bill of Quantities) — per job
+// ============================================
+
+enum BoqDocumentStatus {
+  DRAFT
+  PENDING
+  APPROVED
+}
+
+model BoqDocument {
+  id               String            @id @default(cuid())
+  jobId            String
+  title            String            @default("")
+  status           BoqDocumentStatus @default(DRAFT)
+  showMaterial     Boolean           @default(true)
+  data             Json?             // Full groups/sections/rows JSON blob
+  createdById      String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  job     Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  creator User      @relation("BoqDocumentCreator", fields: [createdById], references: [id])
+  lines   BoqLine[]
+
+  @@unique([jobId])
+  @@index([createdById])
+  @@index([status])
+  @@map("boq_documents")
+}
+
+model BoqLine {
+  id            String   @id @default(cuid())
+  boqDocumentId String
+  sortOrder     Int      @default(0)
+  description   String?
+  quantity      Decimal  @db.Decimal(18, 4)
+  unit          String?
+  unitPrice     Decimal  @db.Decimal(18, 2)
+  amount        Decimal? @db.Decimal(18, 2)
+
+  boqDocument BoqDocument @relation(fields: [boqDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([boqDocumentId])
+  @@map("boq_lines")
 }

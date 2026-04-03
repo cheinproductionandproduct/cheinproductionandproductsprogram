@@ -2,26 +2,28 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+// Canonical job list — seed skips any name that already exists
 const jobs = [
-  { name: 'For Sale', description: 'For Sale items' },
-  { name: 'สำนักงาน', description: 'Office items' },
-  { name: '2022.001_Futurium(FTR.)G0,G1,G3:PO-202200033', description: null },
-  { name: '2023.002_FTR.G2,G4,G5,G6 : PO-202300032', description: null },
-  { name: '2023.003_FTR.G7 : PO-202300033', description: null },
-  { name: '2023.006_FTR.ชั้น 4 (J3) : PO-202300064', description: null },
-  { name: '2023.008,010_FTR.Model', description: null },
-  { name: '2024.039_FTR.Signage(QT2024100001-5)', description: null },
-  { name: '2025.012_งานไทยเฟรค', description: null },
-  { name: '2025.015_JURASSIC WORLD @เอเชียทีค', description: null },
-  { name: '2025.017_PTT. Museum', description: null },
-  { name: '2025.019_Gistda_ศูนย์นวัตกรรมอวกาศ', description: null },
-  { name: '2025.022_Gistda-Model มนุษย์อวกาศ', description: null },
-  { name: '2025.024_5D THEATRE @RAMA 9 MUSEUM', description: null },
-  { name: '2025.025_TIF.Office @CP.Tower North Park', description: null },
-  { name: '2025.026_TIF.Office @สนามบิน พิษณุโลก', description: null },
-  { name: '2025.027_Canbitec อยุธยา', description: null },
-  { name: '2025.028_FTR.งานเพิ่มก่อนเปิด 11.11.2025', description: null },
-  { name: '2026.001_Gistda งานเพิ่มเติม01', description: null },
+  { name: '2022.001_Futurium(FTR.)G0,G1,G3:PO-202200033    ชื่อลูกค้า' },
+  { name: '2023.002_FTR.G2,G4,G5,G6 : PO-202300032' },
+  { name: '2023.003_FTR.G7 : PO-202300033' },
+  { name: '2023.006_FTR.ชั้น 4 (J3) : PO-202300064' },
+  { name: '2023.008,010_FTR.Model' },
+  { name: '2024.039_FTR.Signage(QT2024100001-5)' },
+  { name: '2025.012_งานไทยเฟรค' },
+  { name: '2025.013_ปิด Job FTR.ให้ทีม Toomax,V-tech.   ชื่อลูกค้า บริษัท วีเทค เดคคอร์ จำกัด    QT2025020010_1/1.      1/1 : 100%' },
+  { name: '2025.015_JURASSIC WORLD @เอเชียทีค' },
+  { name: '2025.017_PTT. Museum' },
+  { name: '2025.019_Gistda_ศูนย์นวัตกรรมอวกาศ' },
+  { name: '2025.022_Gistda-Model มนุษย์อวกาศ' },
+  { name: '2025.024_5D THEATRE @RAMA 9 MUSEUM' },
+  { name: '2025.025_TIF.Office @CP.Tower North Park' },
+  { name: '2025.026_TIF.Office @สนามบิน พิษณุโลก' },
+  { name: '2025.027_Canbitec อยุธยา' },
+  { name: '2025.028_FTR.งานเพิ่มก่อนเปิด 11.11.2025' },
+  { name: '2026.001_Gistda งานเพิ่มเติม01' },
+  { name: 'For Sale' },
+  { name: 'สำนักงาน' },
 ]
 
 async function main() {
@@ -41,7 +43,7 @@ async function main() {
       data: {
         name: job.name,
         code: null,
-        description: job.description,
+        description: null,
         isActive: true,
       },
     })

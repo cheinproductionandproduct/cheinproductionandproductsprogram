@@ -257,6 +257,13 @@ async function main() {
             helpText: 'Additional amount needed if expenses exceed advance',
           },
           {
+            name: 'transferDate',
+            type: 'date',
+            label: 'วันที่โอนเงิน (Date money was transferred)',
+            required: false,
+            helpText: 'วันที่โอนเงินคืน/เบิกเพิ่มเข้าบัญชี (กรอกเมื่อทราบวันที่)',
+          },
+          {
             name: 'receipts',
             type: 'file',
             label: 'ใบเสร็จ/หลักฐาน (Receipts/Evidence)',
@@ -291,6 +298,12 @@ async function main() {
           { name: 'advanceAmount', type: 'number', label: '(หัก) จำนวนที่เบิกทดรอง', required: true },
           { name: 'amountToReturn', type: 'number', label: 'จำนวนที่เหลือส่งคืน', required: true },
           { name: 'additionalAmount', type: 'number', label: 'จำนวนที่เบิกเพิ่ม', required: true },
+          {
+            name: 'transferDate',
+            type: 'date',
+            label: 'วันที่โอนเงิน (Date money was transferred)',
+            required: false,
+          },
           { name: 'receipts', type: 'file', label: 'ใบเสร็จ/หลักฐาน', required: false },
         ],
       } as any,

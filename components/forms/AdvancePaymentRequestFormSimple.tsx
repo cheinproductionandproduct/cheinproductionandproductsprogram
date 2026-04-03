@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { formatDateDMY } from '@/lib/utils/date-format';
+import { formatMoneyValue, formatNumber } from '@/lib/utils/thai-number';
 
 interface TableItem {
   id: number;
@@ -29,7 +30,7 @@ export function AdvancePaymentRequestFormSimpleView({
   while (rows.length < 5) rows.push({ description: '', details: '', amount: '' });
 
   const formatAmount = (val: unknown) =>
-    val != null && val !== '' ? Number(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+    val != null && val !== '' ? formatMoneyValue(val as number | string) : '';
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-8 flex justify-center">
@@ -292,7 +293,7 @@ export function AdvancePaymentRequestFormSimple() {
             <tr className="border-b border-black font-bold text-sm bg-gray-50">
               <td colSpan={2} className="border-r border-black p-2 text-center">รวม</td>
               <td className="p-2 text-right">
-                {calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatNumber(calculateTotal())}
               </td>
             </tr>
           </tbody>

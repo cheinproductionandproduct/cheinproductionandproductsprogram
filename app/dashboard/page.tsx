@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { useUser } from '@/hooks/use-user'
-import { canApprove } from '@/lib/auth/permissions'
+import { isManager } from '@/lib/auth/permissions'
 import { UserRole } from '@prisma/client'
 
 export default function DashboardPage() {
-  const { user } = useUser()
-  const canSeeAdvanceRegister = user && user.role !== UserRole.EMPLOYEE && canApprove(user.role as UserRole)
+  const { user, loading: userLoading } = useUser()
+  // Show Sale Report card while loading so it appears immediately for managers (hide after load if not manager)
+  const canSeeSaleReport = userLoading || (user && isManager(user.role as UserRole))
 
   return (
     <>
@@ -18,39 +19,52 @@ export default function DashboardPage() {
 
       <div className="card-row card-row-top">
         <div className="card">
-          <div className="card-image"></div>
+          <div className="card-image card-image--apr"></div>
           <div className="card-label">ใบเบิกเงินทดรองจ่าย</div>
-          <Link href="/dashboard/advance">
+          <Link href="/dashboard/advance/new">
             <button className="enter-btn">Enter</button>
           </Link>
         </div>
         <div className="card">
-          <div className="card-image"></div>
+          <div className="card-image card-image--apc"></div>
           <div className="card-label">ใบเคลียร์เงินทดรองจ่าย</div>
           <Link href="/dashboard/advance-clearance">
             <button className="enter-btn">Enter</button>
           </Link>
         </div>
-        {/* hidden until ready */}
-        {canSeeAdvanceRegister && (
-          <div className="card" style={{ display: 'none' }}>
-            <div className="card-image"></div>
-            <div className="card-label">ทะเบียนคุมลูกหนี้เงินทดรองและติดตามทวงถาม</div>
-            <Link href="/dashboard/advance-register">
-              <button className="enter-btn">Enter</button>
-            </Link>
-          </div>
-        )}
+        <div className="card">
+          <div className="card-image card-image--debtlist"></div>
+          <div className="card-label">ทะเบียนคุมลูกหนี้เงินทดรอง</div>
+          <Link href="/dashboard/advance-register">
+            <button className="enter-btn">Enter</button>
+          </Link>
+        </div>
+        <div className="card">
+          <div className="card-image card-image--boq"></div>
+          <div className="card-label">BOQ (Bill of Quantities)</div>
+          <Link href="/dashboard/boq">
+            <button className="enter-btn">Enter</button>
+          </Link>
+        </div>
       </div>
 
       <div className="card-row card-row-bottom">
         <div className="card">
-          <div className="card-image"></div>
-          <div className="card-label">ใบเบิกใบคุมการใช้รถ</div>
+          <div className="card-image card-image--car"></div>
+          <div className="card-label">Car List (รายการรถ)</div>
           <Link href="/dashboard/vehicle">
             <button className="enter-btn">Enter</button>
           </Link>
         </div>
+        {canSeeSaleReport && (
+          <div className="card">
+            <div className="card-image"></div>
+            <div className="card-label">รายงานยอดขาย (Sale Report)</div>
+            <Link href="/dashboard/sale-report">
+              <button className="enter-btn">Enter</button>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* hidden until ready */}

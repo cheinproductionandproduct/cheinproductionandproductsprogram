@@ -1,10 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import { AdvancePaymentClearanceForm } from '@/components/forms/AdvancePaymentClearanceForm'
 import { formatDateDMY } from '@/lib/utils/date-format'
 import '../dashboard.css'
+
+const AdvancePaymentClearanceForm = dynamic(
+  () => import('@/components/forms/AdvancePaymentClearanceForm').then((m) => ({ default: m.AdvancePaymentClearanceForm })),
+  { loading: () => <div className="list-loading">โหลดฟอร์ม...</div>, ssr: false }
+)
 
 export default function AdvancePaymentClearancePage() {
   const [creNumber, setCreNumber] = useState('')

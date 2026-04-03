@@ -3,6 +3,11 @@ import { DocumentStatus } from '@prisma/client'
 import type { FormTemplateConfig } from '@/types/database'
 import { getClosestClearanceDueDate } from '@/lib/utils/distribution-dates'
 
+/** APC (advance-payment-clearance) finished workflow: CLEARED (current) or APPROVED (legacy). */
+export function isApcClearedStatus(status: DocumentStatus): boolean {
+  return status === DocumentStatus.APPROVED || status === DocumentStatus.CLEARED
+}
+
 /**
  * Generate document number based on form template settings
  * Format: YYYY-MM-XXX (e.g., 2026-03-001)
@@ -231,6 +236,7 @@ export async function listDocuments(options?: {
   limit?: number
   formTemplateId?: string
   status?: DocumentStatus
+  statusIn?: DocumentStatus[]
   createdById?: string
   search?: string
   sortBy?: 'createdAt' | 'updatedAt' | 'title'
@@ -242,7 +248,11 @@ export async function listDocuments(options?: {
 
   const where: any = {}
   if (options?.formTemplateId) where.formTemplateId = options.formTemplateId
-  if (options?.status) where.status = options.status
+  if (options?.statusIn?.length) {
+    where.status = { in: options.statusIn }
+  } else if (options?.status) {
+    where.status = options.status
+  }
   if (options?.createdById) where.createdById = options.createdById
   if (options?.search) {
     where.OR = [
@@ -300,10 +310,42 @@ export async function listDocuments(options?: {
 }
 
 /**
- * List advance payment requests (APR) with clearance status for manager register.
- * Each item includes the APR document and whether it has been cleared (APC approved) or not.
+ * Strip document.data to a minimal shape for list views (amount only).
+ * Avoids sending full form data (signatures, items array, etc.) when only list summary is needed.
  */
-export async function getAdvanceRegister(options?: { page?: number; limit?: number }) {
+export function stripDocumentDataForList(doc: any): any {
+  if (!doc) return doc
+  const d = doc.data as Record<string, unknown> | null
+  if (!d || typeof d !== 'object') return { ...doc, data: {} }
+  const lean: Record<string, unknown> = {}
+  if (typeof d.totalAmount === 'number') lean.totalAmount = d.totalAmount
+  if (d.items && typeof d.items === 'object' && typeof (d.items as any).total === 'number')
+    lean.items = { total: (d.items as any).total }
+  if (typeof d.totalExpenses === 'number') lean.totalExpenses = d.totalExpenses
+  if (typeof d.advanceAmount === 'number') lean.advanceAmount = d.advanceAmount
+  if (d.jobId) lean.jobId = d.jobId
+  if (typeof d.jobName === 'string') lean.jobName = d.jobName
+  if (typeof d.jobCode === 'string') lean.jobCode = d.jobCode
+  if (typeof d.requesterName === 'string' && d.requesterName.trim()) {
+    lean.requesterName = d.requesterName.trim()
+  } else if (d.requesterName != null && d.requesterName !== '') {
+    const r = String(d.requesterName).trim()
+    if (r) lean.requesterName = r
+  }
+  if (!lean.requesterName && doc.creator) {
+    const c = doc.creator as { fullName?: string | null; email?: string | null }
+    const nm = (c.fullName && String(c.fullName).trim()) || (c.email && String(c.email).trim())
+    if (nm) lean.requesterName = nm
+  }
+
+  return { ...doc, data: lean }
+}
+
+/**
+ * List advance payment requests (APR) with clearance status for ทะเบียน.
+ * Only APPROVED APRs are included. For employees: only their own APRs. For managers: all.
+ */
+export async function getAdvanceRegister(options?: { page?: number; limit?: number; createdById?: string }) {
   const page = options?.page || 1
   const limit = options?.limit || 30
   const skip = (page - 1) * limit
@@ -317,6 +359,7 @@ export async function getAdvanceRegister(options?: { page?: number; limit?: numb
   }
 
   const whereApr: any = { formTemplateId: aprTemplate.id, status: 'APPROVED' }
+  if (options?.createdById) whereApr.createdById = options.createdById
   const [aprDocuments, total] = await Promise.all([
     prisma.document.findMany({
       where: whereApr,
@@ -331,34 +374,36 @@ export async function getAdvanceRegister(options?: { page?: number; limit?: numb
     prisma.document.count({ where: whereApr }),
   ])
 
-  const items: Array<{
-    apr: typeof aprDocuments[0]
-    clearanceDocument: { id: string; documentNumber: string | null; status: DocumentStatus; data: any } | null
-    clearanceStatus: 'cleared' | 'pending_clearance' | 'not_cleared'
-  }> = []
-
-  for (const apr of aprDocuments) {
-    const docNumber = apr.documentNumber || ''
-    const clearanceDocs = await prisma.document.findMany({
-      where: {
-        formTemplateId: adcTemplate.id,
-        data: { path: ['advReference'], equals: docNumber },
-      },
-      select: { id: true, documentNumber: true, status: true, data: true },
-      orderBy: { createdAt: 'desc' },
+  // Parallel clearance lookup per APR (avoids sequential N+1; each query is small)
+  const clearanceResults = await Promise.all(
+    aprDocuments.map(async (apr) => {
+      const docNumber = apr.documentNumber || ''
+      const clearanceDocs = docNumber
+        ? await prisma.document.findMany({
+            where: {
+              formTemplateId: adcTemplate.id,
+              data: { path: ['advReference'], equals: docNumber },
+            },
+            select: { id: true, documentNumber: true, status: true, data: true },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          })
+        : []
+      const rawClearance = clearanceDocs[0] || null
+      const clearanceDoc = rawClearance
+        ? { id: rawClearance.id, documentNumber: rawClearance.documentNumber, status: rawClearance.status, data: rawClearance.data }
+        : null
+      const clearanceStatus: 'cleared' | 'pending_clearance' | 'not_cleared' =
+        clearanceDoc && isApcClearedStatus(clearanceDoc.status)
+          ? 'cleared'
+          : clearanceDoc
+            ? 'pending_clearance'
+            : 'not_cleared'
+      return { apr, clearanceDocument: clearanceDoc, clearanceStatus }
     })
-    const rawClearance = clearanceDocs[0] || null
-    const clearanceDoc = rawClearance
-      ? { id: rawClearance.id, documentNumber: rawClearance.documentNumber, status: rawClearance.status, data: rawClearance.data }
-      : null
-    const clearanceStatus: 'cleared' | 'pending_clearance' | 'not_cleared' =
-      clearanceDoc?.status === 'APPROVED'
-        ? 'cleared'
-        : clearanceDoc
-          ? 'pending_clearance'
-          : 'not_cleared'
-    items.push({ apr, clearanceDocument: clearanceDoc, clearanceStatus })
-  }
+  )
+
+  const items = clearanceResults
 
   return {
     items,
@@ -419,7 +464,11 @@ export async function getPastDueAdvanceRegister(options?: { limit?: number }): P
       ? { id: rawClearance.id, documentNumber: rawClearance.documentNumber, status: rawClearance.status, data: rawClearance.data }
       : null
     const clearanceStatus: 'cleared' | 'pending_clearance' | 'not_cleared' =
-      clearanceDoc?.status === 'APPROVED' ? 'cleared' : clearanceDoc ? 'pending_clearance' : 'not_cleared'
+      clearanceDoc && isApcClearedStatus(clearanceDoc.status)
+        ? 'cleared'
+        : clearanceDoc
+          ? 'pending_clearance'
+          : 'not_cleared'
 
     if (clearanceStatus === 'cleared') continue
     const completedAt = apr.completedAt ? String(apr.completedAt).slice(0, 10) : ''
@@ -501,7 +550,7 @@ export async function getUnclearedForReminder(options?: {
       ? { id: rawClearance.id, documentNumber: rawClearance.documentNumber, status: rawClearance.status, data: rawClearance.data }
       : null
     const clearanceStatus: 'cleared' | 'pending_clearance' | 'not_cleared' =
-      clearanceDoc?.status === 'APPROVED'
+      clearanceDoc && isApcClearedStatus(clearanceDoc.status)
         ? 'cleared'
         : clearanceDoc
           ? 'pending_clearance'
@@ -598,6 +647,7 @@ export async function updateDocument(
     title?: string
     data?: Record<string, any>
     status?: DocumentStatus
+    changeNote?: string
   },
   userId: string
 ) {
@@ -646,7 +696,7 @@ export async function updateDocument(
         data: data.data,
         status: updated.status,
         changedBy: userId,
-        changeNote: 'Document updated',
+        changeNote: data.changeNote || 'Document updated',
       },
     })
 
@@ -711,6 +761,54 @@ export async function updateDocument(
   }
 
   return updated
+}
+
+/**
+ * Cancel a fully approved document (APPROVED or APC CLEARED). Requires audit remark in document data.
+ */
+export async function cancelApprovedDocument(
+  documentId: string,
+  userId: string,
+  remark: string
+) {
+  const trimmed = (remark || '').trim()
+  if (!trimmed) {
+    throw new Error('กรุณาระบุเหตุผลการยกเลิก')
+  }
+
+  const document = await prisma.document.findUnique({
+    where: { id: documentId },
+  })
+
+  if (!document) {
+    throw new Error('Document not found')
+  }
+
+  if (
+    document.status !== DocumentStatus.APPROVED &&
+    document.status !== DocumentStatus.CLEARED
+  ) {
+    throw new Error('ยกเลิกได้เฉพาะเอกสารที่อนุมัติแล้วหรือเคลียร์แล้วเท่านั้น')
+  }
+
+  const prev = (document.data || {}) as Record<string, any>
+  const nextData = {
+    ...prev,
+    cancellationRemark: trimmed,
+    cancelledAt: new Date().toISOString(),
+    cancelledById: userId,
+  }
+
+  const notePreview = trimmed.length > 180 ? `${trimmed.slice(0, 180)}…` : trimmed
+  return updateDocument(
+    documentId,
+    {
+      data: nextData,
+      status: DocumentStatus.CANCELLED,
+      changeNote: `ยกเลิกเอกสาร: ${notePreview}`,
+    },
+    userId
+  )
 }
 
 /**

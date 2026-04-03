@@ -31,23 +31,38 @@ export default function LoginPage() {
       }
 
       if (data.user) {
-        // Sync user to Prisma - wait for it to complete
-        try {
-          const syncResponse = await fetch('/api/auth/sync-user', { method: 'POST' })
-          if (!syncResponse.ok) {
-            throw new Error('Failed to sync user')
+        // Give the browser time to commit auth cookies before server reads them
+        await new Promise(resolve => setTimeout(resolve, 300))
+        // Sync user to Prisma (with retry once if session not yet visible to server)
+        let syncOk = false
+        for (let attempt = 0; attempt < 2 && !syncOk; attempt++) {
+          try {
+            const syncResponse = await fetch('/api/auth/sync-user', {
+              method: 'POST',
+              credentials: 'include',
+            })
+            if (syncResponse.ok) {
+              syncOk = true
+              break
+            }
+            const errBody = await syncResponse.json().catch(() => ({}))
+            const msg = errBody.message || errBody.error || 'Failed to sync user'
+            if (syncResponse.status === 401 && attempt === 0) {
+              await new Promise(resolve => setTimeout(resolve, 400))
+              continue
+            }
+            throw new Error(msg)
+          } catch (syncError: any) {
+            if (attempt === 1) {
+              console.error('Sync error:', syncError)
+              setError(syncError?.message || 'Failed to sync user. Please try again.')
+              setLoading(false)
+              return
+            }
+            await new Promise(resolve => setTimeout(resolve, 400))
           }
-        } catch (syncError) {
-          console.error('Sync error:', syncError)
-          setError('Failed to sync user. Please try again.')
-          setLoading(false)
-          return
         }
-        
-        // Wait a bit for auth state to propagate, then redirect
         await new Promise(resolve => setTimeout(resolve, 100))
-        
-        // Use window.location for hard redirect to ensure clean navigation
         window.location.href = '/dashboard'
       }
     } catch (err: any) {

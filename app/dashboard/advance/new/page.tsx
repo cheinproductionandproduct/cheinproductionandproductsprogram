@@ -1,12 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AdvancePaymentRequestForm } from '@/components/forms/AdvancePaymentRequestForm'
 import type { FormField } from '@/types/database'
 import { formatDateDMY } from '@/lib/utils/date-format'
 import '../../dashboard.css'
+
+const AdvancePaymentRequestForm = dynamic(
+  () => import('@/components/forms/AdvancePaymentRequestForm').then((m) => ({ default: m.AdvancePaymentRequestForm })),
+  { loading: () => <div className="list-loading">โหลดฟอร์ม...</div>, ssr: false }
+)
 
 export default function AdvancePaymentRequestNewPage() {
   const [fields, setFields] = useState<FormField[]>([])
@@ -112,7 +117,9 @@ export default function AdvancePaymentRequestNewPage() {
     return (
       <div className="list-page">
         <div className="list-error">{error}</div>
-        <Link href="/dashboard/advance" className="form-button" style={{ marginTop: 12 }}>กลับไป APR</Link>
+        <Link href="/dashboard/advance" className="doc-btn-secondary" style={{ marginTop: 12 }}>
+          กลับไปใบเบิก
+        </Link>
       </div>
     )
   }
@@ -122,7 +129,7 @@ export default function AdvancePaymentRequestNewPage() {
       <div className="list-page" style={{ paddingBottom: 0 }}>
         <header className="list-header" style={{ marginBottom: 16 }}>
           <Link href="/dashboard/advance" className="doc-nav-link" style={{ marginBottom: 8, display: 'inline-block' }}>
-            ← กลับไป APR
+            ← กลับไปใบเบิก
           </Link>
         </header>
       </div>

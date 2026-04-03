@@ -1,7 +1,7 @@
 'use client'
 
 import { formatDateDMY } from '@/lib/utils/date-format'
-import { numberToThaiText } from '@/lib/utils/thai-number'
+import { numberToThaiText, formatMoneyValue } from '@/lib/utils/thai-number'
 
 const COMPANY = {
   name: 'บริษัท เชน โปรดักชั่น แอนด์ โปรดักส์ จำกัด (สำนักงานใหญ่)',
@@ -19,10 +19,7 @@ export function PrintableDocumentFormAPR({ document, assignedUsers }: { document
   const total = data.items?.total ?? data.totalAmount ?? 0
   const rows = items.filter((item: any) => item.description || item.amount)
 
-  const fmtAmt = (v: any) =>
-    v != null && v !== '' && Number(v) !== 0
-      ? Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      : ''
+  const fmtAmt = (v: any) => formatMoneyValue(v)
 
   return (
     <div className="adv-sheet" lang="th">
@@ -179,11 +176,12 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
   const advanceAmount = Number(data.advanceAmount) ?? 0
   const amountToReturn = Number(data.amountToReturn) ?? 0
   const additionalAmount = Number(data.additionalAmount) ?? 0
+  const transferDate =
+    (typeof data.transferDate === 'string' && data.transferDate) ||
+    (typeof data.transferredDate === 'string' && data.transferredDate) ||
+    ''
 
-  const fmtAmt = (v: any) =>
-    v != null && v !== '' && !Number.isNaN(Number(v))
-      ? Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      : ''
+  const fmtAmt = (v: any) => formatMoneyValue(v)
 
   return (
     <div className="adv-sheet adc-sheet" lang="th">
@@ -218,6 +216,10 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
           <div className="adv-meta-line">
             <span>วันที่เคลียร์ทดลองจ่าย</span>
             <span className="adv-meta-val">{data.dateMoneyNeeded ? formatDateDMY(data.dateMoneyNeeded) : '..../..../....'}</span>
+          </div>
+          <div className="adv-meta-line">
+            <span>วันที่โอนเงิน</span>
+            <span className="adv-meta-val">{transferDate ? formatDateDMY(transferDate) : '..../..../....'}</span>
           </div>
         </div>
       </div>
@@ -357,6 +359,31 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
 export function PrintableDocumentForm({ document, assignedUsers }: { document: any; assignedUsers: any }) {
   const slug = document?.formTemplate?.slug || ''
   const isADC = slug === 'advance-payment-clearance'
-  if (isADC) return <PrintableDocumentFormADC document={document} assignedUsers={assignedUsers} />
-  return <PrintableDocumentFormAPR document={document} assignedUsers={assignedUsers} />
+  const cancelNote =
+    document?.status === 'CANCELLED' && (document?.data as any)?.cancellationRemark
+      ? String((document.data as any).cancellationRemark)
+      : null
+
+  const cancelledBanner = cancelNote ? (
+    <div className="adv-cancelled-banner-print" lang="th">
+      <p>
+        <strong>ยกเลิกแล้ว</strong> — {cancelNote}
+      </p>
+    </div>
+  ) : null
+
+  if (isADC) {
+    return (
+      <>
+        {cancelledBanner}
+        <PrintableDocumentFormADC document={document} assignedUsers={assignedUsers} />
+      </>
+    )
+  }
+  return (
+    <>
+      {cancelledBanner}
+      <PrintableDocumentFormAPR document={document} assignedUsers={assignedUsers} />
+    </>
+  )
 }

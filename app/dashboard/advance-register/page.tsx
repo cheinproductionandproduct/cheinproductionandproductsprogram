@@ -4,9 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import '../dashboard.css'
 import { useUser } from '@/hooks/use-user'
-import { canApprove } from '@/lib/auth/permissions'
-import { UserRole } from '@prisma/client'
-import { useRouter } from 'next/navigation'
+import { canSetAdvanceRegisterTransferDate } from '@/lib/auth/permissions'
 import { formatDateDMY } from '@/lib/utils/date-format'
 import { getClosestClearanceDueDate } from '@/lib/utils/distribution-dates'
 
@@ -32,20 +30,17 @@ interface RegisterItem {
 
 export default function AdvanceRegisterPage() {
   const { user, loading: userLoading } = useUser()
-  const router = useRouter()
   const [items, setItems] = useState<RegisterItem[]>([])
   const [pagination, setPagination] = useState({ page: 1, limit: 30, total: 0, totalPages: 0 })
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [filter, setFilter] = useState<FilterStatus>('all')
 
+  const [transferDateDrafts, setTransferDateDrafts] = useState<Record<string, string>>({})
+  const [savingTransferForId, setSavingTransferForId] = useState<string | null>(null)
+
   useEffect(() => {
-    if (userLoading) return
-    if (user && (user.role === UserRole.EMPLOYEE || !canApprove(user.role as UserRole))) {
-      router.replace('/dashboard')
-      return
-    }
-    if (!user) return
+    if (userLoading || !user) return
     fetchRegister()
   }, [user, userLoading, page])
 
@@ -145,12 +140,15 @@ export default function AdvanceRegisterPage() {
     const additional = Number(d.additionalAmount) ?? 0
     const remaining = toReturn > 0 ? formatMoney(toReturn) : additional > 0 ? formatMoney(additional) : '—'
     return {
-      totalExpenses: typeof totalExpenses === 'number' ? totalExpenses.toLocaleString('en-US', { maximumFractionDigits: 0 }) : String(totalExpenses || '—'),
+      totalExpenses:
+        typeof totalExpenses === 'number'
+          ? totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : String(totalExpenses || '—'),
       remaining,
     }
   }
 
-  if (userLoading || !user || (user && (user.role === UserRole.EMPLOYEE || !canApprove(user.role as UserRole)))) {
+  if (userLoading || !user) {
     return (
       <div className="list-page">
         <div className="list-loading">โหลด...</div>
@@ -158,12 +156,14 @@ export default function AdvanceRegisterPage() {
     )
   }
 
+  const canEditTransferDate = canSetAdvanceRegisterTransferDate(user.email)
+
   return (
     <div className="list-page">
         <header className="list-header">
           <h1 className="page-title">ทะเบียนคุมลูกหนี้เงินทดรอง</h1>
           <p className="page-subtitle" lang="th">
-            ทะเบียนคุมลูกหนี้เงินทดรองและติดตามทวงถาม — รายการ APR และสถานะการเคลียร์ (APC)
+            ทะเบียนคุมลูกหนี้เงินทดรองและติดตามทวงถาม — รายการใบเบิกและสถานะการเคลียร์ (ใบเคลียร์)
           </p>
         </header>
         <section className="list-content">
@@ -234,6 +234,7 @@ export default function AdvanceRegisterPage() {
                         <th>ชื่อ - นามสกุล</th>
                         <th>วันที่ยืมเงินทดรอง</th>
                         <th>วันที่จัดกิจกรรม</th>
+                        <th>โอนแล้ว</th>
                         <th>วันที่คืนเงินทดรอง</th>
                         <th>จำนวนเงินเงินทดรอง</th>
                         <th>รวมค่าใช้จ่าย</th>
@@ -250,6 +251,14 @@ export default function AdvanceRegisterPage() {
                         const dateActivity = apr.data?.dateMoneyNeeded ? formatDateDMY(apr.data.dateMoneyNeeded) : '—'
                         const advNumber = apr.documentNumber || apr.id
                         const creatorName = apr.creator?.fullName || apr.creator?.email || '—'
+
+                        const clearanceDoc = item.clearanceDocument
+                        const clearanceData = clearanceDoc?.data || {}
+                        const existingTransferDate =
+                          (typeof clearanceData?.transferDate === 'string' && clearanceData.transferDate) ||
+                          (typeof clearanceData?.transferredDate === 'string' && clearanceData.transferredDate) ||
+                          ''
+
                         return (
                           <tr key={apr.id} className="adv-reg-table-row">
                             <td className="adv-reg-cell-no">
@@ -264,6 +273,78 @@ export default function AdvanceRegisterPage() {
                             </td>
                             <td>{dateLoan}</td>
                             <td>{dateActivity}</td>
+                            <td className="adv-reg-cell-transfer">
+                              {clearanceDoc ? (
+                                canEditTransferDate ? (
+                                  <div className="adv-reg-transfer-controls">
+                                    <input
+                                      type="date"
+                                      className="adv-reg-transfer-input"
+                                      value={transferDateDrafts[clearanceDoc.id] ?? existingTransferDate}
+                                      onChange={(e) =>
+                                        setTransferDateDrafts((prev) => ({
+                                          ...prev,
+                                          [clearanceDoc.id]: e.target.value,
+                                        }))
+                                      }
+                                    />
+                                    <button
+                                      type="button"
+                                      className="form-button form-button-small"
+                                      style={{ whiteSpace: 'nowrap' }}
+                                      disabled={
+                                        savingTransferForId === clearanceDoc.id ||
+                                        !(transferDateDrafts[clearanceDoc.id] ?? existingTransferDate)
+                                      }
+                                      onClick={async () => {
+                                        const selected = transferDateDrafts[clearanceDoc.id] ?? existingTransferDate
+                                        if (!selected) return
+
+                                        setSavingTransferForId(clearanceDoc.id)
+                                        try {
+                                          const res = await fetch(`/api/documents/${clearanceDoc.id}/transfer-date`, {
+                                            method: 'PATCH',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ transferDate: selected }),
+                                          })
+                                          const data = await res.json().catch(() => ({}))
+                                          if (!res.ok) throw new Error(data.error || data.message || 'บันทึกไม่สำเร็จ')
+
+                                          setItems((prev) =>
+                                            prev.map((it) => {
+                                              if (it.clearanceDocument?.id !== clearanceDoc.id) return it
+                                              const prevData = it.clearanceDocument?.data || {}
+                                              return {
+                                                ...it,
+                                                clearanceDocument: {
+                                                  ...it.clearanceDocument!,
+                                                  data: {
+                                                    ...prevData,
+                                                    transferDate: selected,
+                                                  },
+                                                },
+                                              }
+                                            })
+                                          )
+                                        } catch (e: any) {
+                                          alert(e?.message || 'บันทึกไม่สำเร็จ')
+                                        } finally {
+                                          setSavingTransferForId(null)
+                                        }
+                                      }}
+                                    >
+                                      {savingTransferForId === clearanceDoc.id ? 'กำลังบันทึก...' : 'ยืนยัน'}
+                                    </button>
+                                  </div>
+                                ) : existingTransferDate ? (
+                                  formatDateDMY(existingTransferDate)
+                                ) : (
+                                  '—'
+                                )
+                              ) : (
+                                '—'
+                              )}
+                            </td>
                             <td className="adv-reg-cell-repayment">
                               {pastDue && (
                                 <span

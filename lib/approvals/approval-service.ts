@@ -201,11 +201,12 @@ export async function approveDocumentStep(
   const nextStep = currentStep + 1
 
   if (nextStep > totalSteps) {
-    // All steps completed - approve document
+    // All steps completed — APC uses CLEARED; other forms use APPROVED
+    const finalStatus = isADC ? DocumentStatus.CLEARED : DocumentStatus.APPROVED
     await prisma.document.update({
       where: { id: approval.documentId },
       data: {
-        status: DocumentStatus.APPROVED,
+        status: finalStatus,
         currentStep: null,
         completedAt: new Date(),
       },

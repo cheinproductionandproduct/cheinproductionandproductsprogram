@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf'
 import type { Document, FormTemplate, User } from '@prisma/client'
+import { formatNumber } from '@/lib/utils/thai-number'
 
 interface DocumentWithRelations extends Document {
   formTemplate: FormTemplate
@@ -76,11 +77,13 @@ export function exportDocumentToPDF(document: DocumentWithRelations): jsPDF {
     
     if (field.type === 'date' && value) {
       displayValue = new Date(value).toLocaleDateString('th-TH')
+    } else if (field.type === 'number' && value !== '' && value != null) {
+      displayValue = formatNumber(Number(value))
     } else if (field.type === 'items-table' && value?.items) {
       // Handle items table
       const items = value.items || []
       const total = value.total || 0
-      displayValue = `จำนวน ${items.length} รายการ รวม ${total.toLocaleString('en-US', { minimumFractionDigits: 2 })} บาท`
+      displayValue = `จำนวน ${items.length} รายการ รวม ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`
     } else if (typeof value === 'object') {
       displayValue = JSON.stringify(value)
     } else {

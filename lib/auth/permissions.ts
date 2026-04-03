@@ -38,6 +38,13 @@ export function isAdmin(userRole: UserRole | null | undefined): boolean {
 }
 
 /**
+ * Check if user is manager
+ */
+export function isManager(userRole: UserRole | null | undefined): boolean {
+  return userRole === UserRole.MANAGER
+}
+
+/**
  * Check if user can approve documents
  */
 export function canApprove(userRole: UserRole | null | undefined): boolean {
@@ -57,6 +64,14 @@ export function canManageUsers(userRole: UserRole | null | undefined): boolean {
 export function canCreateDocuments(userRole: UserRole | null | undefined): boolean {
   // All authenticated users can create documents
   return !!userRole
+}
+
+/** Email allowed to set โอนแล้ว (transfer date) on advance register / APC */
+export const ADVANCE_REGISTER_TRANSFER_EMAIL = 'bee@cheinproductionandproducts.co.th'
+
+export function canSetAdvanceRegisterTransferDate(email: string | null | undefined): boolean {
+  if (!email) return false
+  return email.trim().toLowerCase() === ADVANCE_REGISTER_TRANSFER_EMAIL
 }
 
 /**
@@ -101,6 +116,20 @@ export function canDeleteDocument(
     return true
   }
   
+  return false
+}
+
+/** Cancel after final approval: อนุมัติแล้ว / เคลียร์แล้ว — creator, manager, or admin */
+export function canCancelApprovedDocument(
+  userRole: UserRole | null | undefined,
+  documentCreatorId: string,
+  currentUserId: string,
+  documentStatus: string
+): boolean {
+  if (!userRole) return false
+  if (documentStatus !== 'APPROVED' && documentStatus !== 'CLEARED') return false
+  if (isAdmin(userRole) || isManager(userRole)) return true
+  if (documentCreatorId === currentUserId) return true
   return false
 }
 

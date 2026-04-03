@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth/middleware-helpers'
-import { listDocuments, createDocument } from '@/lib/documents/document-service'
+import { listDocuments, createDocument, stripDocumentDataForList } from '@/lib/documents/document-service'
 import { canCreateDocuments } from '@/lib/auth/permissions'
 import { DocumentStatus } from '@prisma/client'
 
@@ -18,7 +18,17 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const formTemplateId = searchParams.get('formTemplateId') || undefined
-    const status = searchParams.get('status') as DocumentStatus | undefined
+    const rawStatus = searchParams.get('status') || undefined
+    let status: DocumentStatus | undefined
+    let statusIn: DocumentStatus[] | undefined
+    if (rawStatus?.includes(',')) {
+      statusIn = rawStatus
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean) as DocumentStatus[]
+    } else if (rawStatus) {
+      status = rawStatus as DocumentStatus
+    }
     const createdById = searchParams.get('createdById') || undefined
     const search = searchParams.get('search') || undefined
     const sortBy = (searchParams.get('sortBy') as any) || 'createdAt'
@@ -33,13 +43,16 @@ export async function GET(request: NextRequest) {
       limit,
       formTemplateId,
       status,
+      statusIn,
       createdById: filterCreatedById,
       search,
       sortBy,
       sortOrder,
     })
 
-    return NextResponse.json(result)
+    // Send lean payload: only amount-related fields from document.data (no signatures, full items, etc.)
+    const documents = (result.documents || []).map(stripDocumentDataForList)
+    return NextResponse.json({ ...result, documents })
   } catch (error) {
     console.error('Error listing documents:', error)
     return NextResponse.json(

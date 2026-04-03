@@ -1,5 +1,21 @@
 # Environment variables
 
+## Optional: Google Maps (Car List — Messenger location search)
+
+For **Car List → Messenger** (Lalamove, Grab, etc.), the start and destination location fields use **Google Places Autocomplete** so users can search and select an address on the map.
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create or select a project and enable **Maps JavaScript API** and **Places API**.
+2. Create an API key (Credentials → Create credentials → API key) and restrict it to your domain if needed.
+3. Set in `.env.local`:
+
+```bash
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+```
+
+If this variable is not set, the location inputs still work: users can type the address manually (a short hint is shown).
+
+---
+
 ## Optional: LINE Official Account (advance register)
 
 To connect **past-due** advance payment clearance items on the APC table page (ทะเบียนคุมลูกหนี้เงินทดรอง) to your LINE Official Account:
