@@ -181,7 +181,7 @@ export default function BoqEditorPage() {
     setGroups(p => p.map(g => g.id!==gid?g:{...g,sections:g.sections.map(s=>s.id!==sid?s:{...s,subRows:s.subRows.map(r=>r.id===rid?{...r,[field]:val}:r)})}))
 
   /* totals */
-  const totalItems      = groups.reduce((s,g) => s + g.sections.reduce((ss,sec) => ss + sec.subRows.length, 0), 0)
+  const totalItems      = groups.reduce((s,g) => s + g.sections.length, 0)
   const grandTotal      = groups.reduce((s,g) => s+calcGrpTotal(g,showMat), 0)
   const overhead        = grandTotal * (overheadPct || 0) / 100
   const subtotalBeforeDiscount = grandTotal + overhead
