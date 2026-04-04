@@ -28,8 +28,8 @@ const calcRowTotal = (sr: SubRow, mat = true) => (mat ? calcMat(sr) : 0) + calcL
 const calcGrpTotal = (g: Group, mat = true) => g.sections.flatMap(s => s.subRows).reduce((s, r) => s + calcRowTotal(r, mat), 0)
 const fmt = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-/* ── Default column widths ─────────────────────────────── */
-const DEFAULT_WIDTHS = { no: 60, refPage: 60, refCode: 60, desc: 380, qty: 64, unit: 48, matPrice: 95, matAmt: 95, laborPrice: 95, laborAmt: 95, total: 92, note: 90, action: 82 }
+/* ── Default column widths (baseline layout — see ../DEFAULTS.md) ── */
+const DEFAULT_WIDTHS = { no: 60, refPage: 60, refCode: 60, desc: 380, qty: 64, unit: 48, matPrice: 95, matAmt: 95, laborPrice: 95, laborAmt: 95, total: 92, action: 72, note: 140 }
 type ColKey = keyof typeof DEFAULT_WIDTHS
 
 /* ── NumInput ─────────────────────────────────────────── */
@@ -64,18 +64,20 @@ function SummaryRow({
   label, amount, highlight, editNode, showMat,
 }: { label: React.ReactNode; amount: string; highlight: boolean; editNode?: React.ReactNode; showMat: boolean }) {
   const hl = highlight ? ' boq-summary-label--highlight' : ''
+  const rowCls = highlight ? 'boq-summary-row boq-summary-row--highlight' : 'boq-summary-row'
+  const cellCls = highlight ? ' boq-summary-cell boq-summary-cell--highlight' : ' boq-summary-cell'
   return (
-    <tr>
-      <td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/>
-      <td className={`boq-td boq-summary-label${hl}`}>{label}</td>
-      <td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/>
-      {showMat && <><td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/></>}
-      <td className={`boq-td${hl}`}/>
-      <td className={`boq-td boq-td-num boq-summary-dash${hl}`}>-</td>
-      <td className={`boq-td boq-td-num boq-summary-amount${hl}`}>
+    <tr className={rowCls}>
+      <td className={`boq-td${cellCls}${hl}`}/><td className={`boq-td${cellCls}${hl}`}/><td className={`boq-td${cellCls}${hl}`}/>
+      <td className={`boq-td boq-summary-label${cellCls}${hl}`}>{label}</td>
+      <td className={`boq-td${cellCls}${hl}`}/><td className={`boq-td${cellCls}${hl}`}/>
+      {showMat && <><td className={`boq-td${cellCls}${hl}`}/><td className={`boq-td${cellCls}${hl}`}/></>}
+      <td className={`boq-td${cellCls}${hl}`}/>
+      <td className={`boq-td boq-td-num boq-summary-dash${cellCls}${hl}`}>-</td>
+      <td className={`boq-td boq-td-num boq-summary-amount${cellCls}${hl}`}>
         {editNode ?? amount}
       </td>
-      <td className={`boq-td${hl}`}/><td className={`boq-td${hl}`}/>
+      <td className={`boq-td${cellCls}${hl}`}/><td className={`boq-td${cellCls}${hl}`}/>
     </tr>
   )
 }
@@ -237,7 +239,7 @@ export default function BoqEditorPage() {
   /* colSpan helpers */
   const totalCols      = showMat ? 13 : 11
   const secTitleSpan   = totalCols - 4
-  const grpTitleSpan   = totalCols - 2
+  const grpTitleSpan   = totalCols - 4
 
   /* Resize handle element */
   const RH = ({ col }: { col: ColKey }) => (
@@ -289,7 +291,7 @@ export default function BoqEditorPage() {
       </div>
 
       <div className="boq-table-wrapper">
-        <table className="boq-table" style={{ tableLayout: 'fixed' }}>
+        <table className="boq-table">
           <colgroup>
             <col style={{ width: colW.no }} />
             <col style={{ width: colW.refPage }} />
@@ -348,11 +350,17 @@ export default function BoqEditorPage() {
                 <React.Fragment key={group.id}>
                   <tr className="boq-group-header-row">
                     <td className="boq-td boq-td-group-no">{groupIdx + 1}</td>
-                    <td colSpan={grpTitleSpan} className="boq-td boq-td-group-title-cell">
+                    <td className="boq-td"/><td className="boq-td"/>
+                    <td className="boq-td boq-td-group-title-cell">
                       <input className="boq-input boq-input-group-title" value={group.title} readOnly={!editing}
                         onChange={e => editing && updGrpTitle(group.id, e.target.value)}
                         placeholder={`หมวดงานที่ ${groupIdx+1} — พิมพ์ชื่อหมวดงาน`} />
                     </td>
+                    <td className="boq-td"/><td className="boq-td"/>
+                    {showMat && <><td className="boq-td"/><td className="boq-td"/></>}
+                    <td className="boq-td"/><td className="boq-td"/>
+                    <td className="boq-td"/>
+                    <td className="boq-td"/>
                     <td className="boq-td boq-td-action">
                       {editing && (
                         <div className="boq-action-cell">
@@ -381,11 +389,15 @@ export default function BoqEditorPage() {
                         <tr className="boq-section-header-row">
                           <td className="boq-td boq-td-no boq-td-section-no">{globalNum}</td>
                           <td className="boq-td"/><td className="boq-td"/>
-                          <td colSpan={secTitleSpan} className="boq-td boq-td-section-title-cell">
+                          <td className="boq-td boq-td-section-title-cell">
                             <input className="boq-input boq-input-section-title" value={section.title} readOnly={!editing}
                               onChange={e => editing && updSecTitle(group.id, section.id, e.target.value)}
                               placeholder={`ข้อ ${globalNum} — พิมพ์ชื่อข้อ`} />
                           </td>
+                          <td className="boq-td"/><td className="boq-td"/>
+                          {showMat && (<><td className="boq-td"/><td className="boq-td"/></>)}
+                          <td className="boq-td"/><td className="boq-td"/><td className="boq-td"/>
+                          <td className="boq-td"/>
                           <td className="boq-td boq-td-action"/>
                         </tr>
 
