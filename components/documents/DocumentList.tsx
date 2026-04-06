@@ -9,6 +9,7 @@ import '@/app/dashboard/dashboard.css'
 import { formatDateDMY } from '@/lib/utils/date-format'
 import { documentStatusLabelTh } from '@/lib/utils/document-status-label'
 import { formatNumber } from '@/lib/utils/thai-number'
+import { getDocumentListMoneyTotal } from '@/lib/documents/document-list-money'
 
 interface DocumentListProps {
   initialPage?: number
@@ -180,16 +181,8 @@ export function DocumentList({
     return null
   }
 
-  /** Get total amount from document data (APR: totalAmount/items.total, APC: totalExpenses/advanceAmount) */
-  const getDocumentAmount = (doc: any): number | null => {
-    const d = doc?.data
-    if (!d || typeof d !== 'object') return null
-    if (typeof d.totalAmount === 'number' && !Number.isNaN(d.totalAmount)) return d.totalAmount
-    if (d.items && typeof d.items.total === 'number' && !Number.isNaN(d.items.total)) return d.items.total
-    if (typeof d.totalExpenses === 'number' && !Number.isNaN(d.totalExpenses)) return d.totalExpenses
-    if (typeof d.advanceAmount === 'number' && !Number.isNaN(d.advanceAmount)) return d.advanceAmount
-    return null
-  }
+  /** Same rules as APR dashboard sum — see getDocumentListMoneyTotal */
+  const getDocumentAmount = (doc: any) => getDocumentListMoneyTotal(doc?.data)
 
   return (
     <div className="list-panel">

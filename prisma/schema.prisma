@@ -343,10 +343,18 @@ enum BoqDocumentStatus {
   APPROVED
 }
 
+// BOQ plan (estimate) vs actual (as-built)
+enum BoqDocumentKind {
+  PLAN
+  ACTUAL
+}
+
 model BoqDocument {
   id               String            @id @default(cuid())
   jobId            String?
   title            String            @default("")
+  kind             BoqDocumentKind   @default(PLAN)
+  planBoqId        String?
   status           BoqDocumentStatus @default(DRAFT)
   showMaterial     Boolean           @default(true)
   data             Json?             // Full groups/sections/rows JSON blob
@@ -354,13 +362,17 @@ model BoqDocument {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
-  job     Job?      @relation(fields: [jobId], references: [id], onDelete: SetNull)
-  creator User      @relation("BoqDocumentCreator", fields: [createdById], references: [id])
-  lines   BoqLine[]
+  job           Job?          @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  creator       User          @relation("BoqDocumentCreator", fields: [createdById], references: [id])
+  lines         BoqLine[]
+  planBoq       BoqDocument?  @relation("BoqPlanActual", fields: [planBoqId], references: [id], onDelete: SetNull)
+  linkedActuals BoqDocument[] @relation("BoqPlanActual")
 
   @@index([jobId])
   @@index([createdById])
   @@index([status])
+  @@index([kind])
+  @@index([planBoqId])
   @@map("boq_documents")
 }
 

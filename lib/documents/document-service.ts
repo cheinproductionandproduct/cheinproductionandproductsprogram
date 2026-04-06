@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { DocumentStatus } from '@prisma/client'
 import type { FormTemplateConfig } from '@/types/database'
 import { getClosestClearanceDueDate } from '@/lib/utils/distribution-dates'
+import { coerceFiniteMoney } from '@/lib/documents/document-list-money'
 
 /** APC (advance-payment-clearance) finished workflow: CLEARED (current) or APPROVED (legacy). */
 export function isApcClearedStatus(status: DocumentStatus): boolean {
@@ -318,11 +319,15 @@ export function stripDocumentDataForList(doc: any): any {
   const d = doc.data as Record<string, unknown> | null
   if (!d || typeof d !== 'object') return { ...doc, data: {} }
   const lean: Record<string, unknown> = {}
-  if (typeof d.totalAmount === 'number') lean.totalAmount = d.totalAmount
-  if (d.items && typeof d.items === 'object' && typeof (d.items as any).total === 'number')
-    lean.items = { total: (d.items as any).total }
-  if (typeof d.totalExpenses === 'number') lean.totalExpenses = d.totalExpenses
-  if (typeof d.advanceAmount === 'number') lean.advanceAmount = d.advanceAmount
+  const ta = coerceFiniteMoney(d.totalAmount)
+  if (ta !== null) lean.totalAmount = ta
+  const itemTotal =
+    d.items && typeof d.items === 'object' ? coerceFiniteMoney((d.items as { total?: unknown }).total) : null
+  if (itemTotal !== null) lean.items = { total: itemTotal }
+  const te = coerceFiniteMoney(d.totalExpenses)
+  if (te !== null) lean.totalExpenses = te
+  const aa = coerceFiniteMoney(d.advanceAmount)
+  if (aa !== null) lean.advanceAmount = aa
   if (d.jobId) lean.jobId = d.jobId
   if (typeof d.jobName === 'string') lean.jobName = d.jobName
   if (typeof d.jobCode === 'string') lean.jobCode = d.jobCode

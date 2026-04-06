@@ -1,8 +1,13 @@
-/* BOQ baseline: no column freeze; table wrapper has no horizontal scroll.
-   Full spec: app/dashboard/boq/DEFAULTS.md */
+/* BOQ baseline — see DEFAULTS.md */
 
 .boq-page {
   font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+}
+
+/* BOQ lives in flex main; allow inner content to respect viewport width */
+.list-page.boq-page {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .boq-table-wrapper {
@@ -36,6 +41,26 @@
   background: #e8e8e8;
   font-weight: 500;
   font-size: 12px;
+}
+
+/* Actual vs approved plan: mirror (read-only) plan money + variance columns */
+.boq-th-plan-mirror,
+.boq-th-var {
+  background: #fde8d4;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.boq-th-subhint {
+  display: block;
+  font-weight: 500;
+  font-size: 11px;
+  opacity: 0.88;
+}
+
+.boq-td--plan-mirror {
+  background: #fff8f0;
+  color: #2a2a2a;
 }
 
 .boq-material-toggle-btn {
@@ -73,6 +98,47 @@
   height: 18px;
 }
 
+/* Collapsible อ้างอิง ID */
+.boq-ref-toggle-btn {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #666;
+  border-radius: 3px;
+  background: #f2f2f2;
+  color: #222;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.boq-ref-toggle-btn:hover {
+  background: #e2e2e2;
+}
+
+.boq-th-ref-head.boq-th-has-toggle .boq-ref-toggle-btn {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 18px;
+}
+
+.boq-th-ref-collapsed {
+  width: 32px;
+  min-width: 32px;
+  max-width: 40px;
+  padding: 4px 2px;
+  vertical-align: middle;
+  text-align: center;
+}
+
 .boq-th-no     { width: 60px; }
 .boq-th-desc   { min-width: 380px; width: 42%; }
 .boq-th-qty    { width: 64px; }
@@ -99,6 +165,7 @@
 
 .boq-td-num  { text-align: right; }
 .boq-td-desc { min-width: 300px; }
+
 .boq-td-note { min-width: 100px; }
 
 .boq-td-total {
@@ -160,6 +227,20 @@
 }
 .boq-action-btn-add svg { stroke: #2e7d32; }
 .boq-action-btn-add:hover:not(:disabled) { background: #c8e6c9; }
+
+/* Nested line (1.1.1) — second + control */
+.boq-action-btn-add-nested {
+  border-color: #5c6bc0;
+  background: #e8eaf6;
+}
+.boq-action-btn-add-nested svg { stroke: #3949ab; }
+.boq-action-btn-add-nested:hover:not(:disabled) { background: #c5cae9; border-color: #3949ab; }
+
+.boq-td-sub-no--nested {
+  font-size: 12px;
+  font-weight: 600;
+  color: #37474f;
+}
 
 .boq-action-btn-del-row {
   border-color: #bbb;
@@ -333,6 +414,14 @@
   color: #fff;
 }
 
+.boq-discount-type-label {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #555;
+}
+
 /* ── Job chip (editor page header) ──────────── */
 .boq-job-chip {
   display: inline-block;
@@ -343,6 +432,159 @@
   font-size: 13px;
   font-weight: 600;
   color: #1565c0;
+}
+
+/* ── BOQ document page header: title left, badges + filter flush right ── */
+.boq-document-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.boq-document-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.boq-filter-wrap {
+  position: relative;
+}
+
+.boq-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #fff;
+  color: #333;
+  border: 1px solid #000;
+  border-radius: 6px;
+  font-family: 'Sarabun', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.boq-filter-btn:hover {
+  background: #f5f5f5;
+}
+
+.boq-filter-btn--active {
+  border-color: #1565c0;
+  color: #1565c0;
+  background: #e3f2fd;
+}
+
+.boq-filter-btn__icon {
+  flex-shrink: 0;
+}
+
+.boq-filter-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 220px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #000;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-sizing: border-box;
+}
+
+.boq-filter-dropdown__label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 6px;
+}
+
+.boq-filter-dropdown__select {
+  width: 100%;
+  padding: 8px 10px;
+  font-family: 'Sarabun', system-ui, sans-serif;
+  font-size: 14px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.boq-filter-dropdown__close {
+  width: 100%;
+  padding: 8px;
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-family: 'Sarabun', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.boq-filter-dropdown__close:hover {
+  background: #e5e5e5;
+}
+
+.boq-filter-dropdown__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-family: 'Sarabun', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  user-select: none;
+}
+
+.boq-filter-dropdown__option input {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.boq-filter-dropdown--wide {
+  min-width: 288px;
+}
+
+.boq-filter-dropdown__hint {
+  margin: -4px 0 10px;
+  padding: 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #555;
+}
+
+.boq-summary-label-stack {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.boq-summary-label-text,
+.boq-summary-label-stack > .boq-summary-label-text {
+  font-weight: inherit;
+}
+
+.boq-summary-inline-amt {
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 /* ── Create button ───────────────────────────── */
@@ -359,7 +601,11 @@
   transition: background 0.15s;
   white-space: nowrap;
 }
-.boq-create-btn:hover { background: #1b5e20; }
+.boq-create-btn:hover:not(:disabled) { background: #1b5e20; }
+.boq-create-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 /* ── Empty state ─────────────────────────────── */
 .boq-empty {
@@ -408,9 +654,10 @@
 
 .boq-list-job { font-weight: 600; color: #1a1a1a; }
 .boq-list-subtitle { display: block; font-size: 12px; font-weight: 400; color: #888; margin-top: 2px; }
+.boq-list-status { white-space: nowrap; }
 .boq-list-date { color: #666; font-size: 13px; }
 
-.boq-list-action { text-align: right; }
+.boq-list-action { text-align: right; display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
 .boq-open-link { color: #1565c0; font-weight: 600; font-size: 13px; }
 
 .boq-list-delete-btn {
@@ -433,6 +680,104 @@
 .boq-list-delete-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.boq-list-plan-ref {
+  font-size: 13px;
+  color: #555;
+  max-width: 200px;
+}
+
+/* BOQ dashboard: plan vs actual sections */
+.boq-dash-section {
+  margin-bottom: 40px;
+}
+
+.boq-dash-section--actual {
+  padding-top: 8px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.boq-dash-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.boq-dash-section-title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a1a;
+  font-family: 'Sarabun', system-ui, sans-serif;
+}
+
+.boq-dash-section-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+  max-width: 520px;
+  line-height: 1.45;
+}
+
+.boq-empty--inline {
+  padding: 20px 16px;
+  background: #fafafa;
+  border: 1px dashed #ccc;
+  border-radius: 8px;
+}
+
+.boq-create-btn--actual {
+  background: #f3e5f5;
+  border-color: #ce93d8;
+  color: #6a1b9a;
+}
+
+.boq-create-btn--actual:hover:not(:disabled) {
+  background: #e1bee7;
+  border-color: #ba68c8;
+}
+.boq-create-btn--actual:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Document page: plan / actual badge */
+.boq-doc-kind-row {
+  margin: 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.boq-doc-kind {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.boq-doc-kind--plan {
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #90caf9;
+}
+
+.boq-doc-kind--actual {
+  background: #f3e5f5;
+  color: #6a1b9a;
+  border: 1px solid #ce93d8;
+}
+
+.boq-doc-plan-ref {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
 }
 
 /* ── Modal ───────────────────────────────────── */
@@ -476,6 +821,13 @@
   margin-bottom: 12px;
 }
 
+.boq-modal-hint {
+  margin: -8px 0 16px;
+  font-size: 12px;
+  color: #666;
+  line-height: 1.45;
+}
+
 .boq-modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -502,6 +854,16 @@
   gap: 16px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.boq-top-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .boq-back-btn {
@@ -528,6 +890,63 @@
 .boq-delete-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.boq-submit-btn {
+  padding: 8px 18px;
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #90caf9;
+  border-radius: 6px;
+  font-family: 'Sarabun', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.boq-submit-btn:hover:not(:disabled) { background: #bbdefb; }
+.boq-submit-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.boq-sign-btn {
+  padding: 8px 18px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+  border-radius: 6px;
+  font-family: 'Sarabun', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.boq-sign-btn:hover:not(:disabled) { background: #c8e6c9; }
+.boq-sign-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.boq-status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.boq-status-draft {
+  background: #f5f5f5;
+  color: #777;
+  border: 1px solid #ddd;
+}
+
+.boq-status-pending {
+  background: #fff8e1;
+  color: #f57f17;
+  border: 1px solid #ffe082;
+}
+
+.boq-status-approved {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
 }
 
 .boq-job-selector {
@@ -797,3 +1216,4 @@
   background: #f5f5f5;
   box-shadow: inset 3px 0 0 #ccc;
 }
+

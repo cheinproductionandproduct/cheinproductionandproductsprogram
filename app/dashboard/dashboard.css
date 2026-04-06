@@ -272,6 +272,7 @@ body,
 .dashboard-main {
   margin-left: 250px;
   flex: 1;
+  min-width: 0; /* allow inner overflow-x (e.g. BOQ freeze) instead of growing past viewport */
   padding: 36px 36px 40px;
   min-height: 100vh;
   background: #f0f0f0;

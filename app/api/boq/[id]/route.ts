@@ -17,12 +17,23 @@ export async function GET(
 
     const { id } = await params
 
-    const boq = await (prisma as any).boqDocument.findUnique({
+    const row = await (prisma as any).boqDocument.findUnique({
       where: { id },
-      include: { job: { select: { id: true, name: true, code: true } } },
+      include: {
+        job: { select: { id: true, name: true, code: true } },
+      },
     })
 
-    if (!boq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    let planBoq: { id: string; title: string; job: { name: string } | null } | null = null
+    if (row.planBoqId) {
+      planBoq = await (prisma as any).boqDocument.findUnique({
+        where: { id: row.planBoqId },
+        select: { id: true, title: true, job: { select: { name: true } } },
+      })
+    }
+    const boq = { ...row, planBoq }
     return NextResponse.json({ boq })
   } catch (err: any) {
     console.error('GET /api/boq/[id] error:', err)

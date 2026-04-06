@@ -1,24 +1,34 @@
 # BOQ default layout (baseline)
 
-This file records the **intended default** for the Bill of Quantities editor and table chrome. Treat changes here as deliberate product decisions.
-
-## Scroll and freeze
-
-- **No column freeze** — there is no sticky/frozen pane (Excel-style). All columns scroll with the page if the viewport is narrow.
-- **No horizontal scroll on the BOQ table wrapper** — `.boq-table-wrapper` uses `overflow-x: visible` so the framed table does not show its own horizontal scrollbar. The table is sized to fit the available width (`width: 100%`, `table-layout: fixed`).
+**Saved state:** 2026-04-04 — canonical spec for the Bill of Quantities editor and table. Prefer updating this file when layout behavior is an intentional product change.
 
 ## Table frame
 
-- Outer edge: single border on `.boq-table` (`border-collapse: collapse`, uniform cell borders).
-- Wrapper is a simple container (no second outer border on the wrapper).
+- **Border:** `1px solid #bbb` on `.boq-table`, `border-collapse: collapse`, uniform `1px` cell borders on `.boq-th` / `.boq-td`.
+- **Wrapper:** background only; no second outer border on `.boq-table-wrapper` (avoids double frame lines).
+
+## Line numbering (ลำดับ)
+
+- **Section** rows: `1`, `2`, … (ข้อ).
+- **Sub-rows:** `1.1`, `1.2`, … under each section.
+- **Nested:** `1.1.1`, `1.1.2`, … under a parent line — stored as `children[]` on each line item; deeper levels (e.g. `1.1.1.1`) use the same structure.
+- In edit mode, the **blue +** on each line adds a nested child under that line; the **green +** on the first line of a section still adds a new sibling `1.2`, `1.3`, … at section level.
+
+## อ้างอิง ID (reference columns)
+
+- **Collapsible** — `−` in the “อ้างอิง ID” header hides เลขหน้า / รหัส; a narrow column with **`+`** next to “ลำดับที่” restores them. UI state only (not saved in BOQ JSON unless added later).
 
 ## Column order (right side)
 
-Rightmost columns are: **ค่าวัสดุและแรงงาน** → **หมายเหตุ** → **action** (edit buttons — last column).
+After **ค่าวัสดุและแรงงาน** (total): **หมายเหตุ** (notes), then **action** (edit/delete/add buttons) — **buttons are the last column**.
+
+## Alignment note
+
+- Sub-row numbers (`1.1`, `1.2`, …) use **inset box-shadow** for the left stripe (`.boq-td-sub-no`), not a thick `border-left`, so the first column stays aligned under `border-collapse: collapse`.
 
 ## Default column widths (pixels)
 
-Defined in `app/dashboard/boq/[id]/page.tsx` as `DEFAULT_WIDTHS`:
+Source: `DEFAULT_WIDTHS` in `app/dashboard/boq/[id]/page.tsx`:
 
 | Key        | Default |
 | ---------- | ------- |
@@ -33,13 +43,13 @@ Defined in `app/dashboard/boq/[id]/page.tsx` as `DEFAULT_WIDTHS`:
 | laborPrice | 95      |
 | laborAmt   | 95      |
 | total      | 92      |
-| action     | 72      |
 | note       | 140     |
+| action     | 72      |
 
-Users can still resize via the header drag handles (`RH`); widths are not persisted unless saved with the document JSON where applicable.
+Header resize handles (`RH`) adjust widths in session; they are not persisted in BOQ JSON unless that is added later.
 
 ## Related files
 
-- `app/dashboard/boq/boq.css` — table, headers, summary rows, modals.
-- `app/dashboard/boq/[id]/page.tsx` — editor, column widths, row structure.
+- `app/dashboard/boq/boq.css` — table, headers, group/section rows, summary rows, modals.
+- `app/dashboard/boq/[id]/page.tsx` — editor, `colgroup`, row cell structure, footer formulas.
 - `app/dashboard/boq/page.tsx` — BOQ list dashboard.

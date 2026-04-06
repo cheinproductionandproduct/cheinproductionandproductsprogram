@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useUser } from '@/hooks/use-user'
 import { formatNumber } from '@/lib/utils/thai-number'
+import { getDocumentListMoneyTotal } from '@/lib/documents/document-list-money'
 import DashboardLayout from '../dashboard/layout'
 import '../dashboard/dashboard.css'
 
@@ -41,11 +42,8 @@ function DocumentsPageContent() {
         const list = Array.isArray(documents) ? documents : []
         let sum = 0
         for (const doc of list) {
-          const d = doc?.data
-          if (d && typeof d === 'object') {
-            if (typeof d.totalAmount === 'number' && !Number.isNaN(d.totalAmount)) sum += d.totalAmount
-            else if (d.items?.total != null && !Number.isNaN(Number(d.items.total))) sum += Number(d.items.total)
-          }
+          const n = getDocumentListMoneyTotal(doc?.data)
+          if (n != null) sum += n
         }
         if (!cancelled) setAprSummary({ totalAmount: sum, documentCount: list.length, aprTemplateId: apr.id })
       } catch {
