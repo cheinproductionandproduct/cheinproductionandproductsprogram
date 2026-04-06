@@ -672,12 +672,22 @@ export async function updateDocument(
 
   const newVersion = (latestVersion?.version || 0) + 1
 
+  /** Shallow-merge JSON so PATCH never drops keys the client form did not submit (signatures, assignments, etc.). */
+  const existingData =
+    document.data != null && typeof document.data === 'object' && !Array.isArray(document.data)
+      ? { ...(document.data as Record<string, unknown>) }
+      : {}
+  const mergedPayload =
+    data.data != null && typeof data.data === 'object' && !Array.isArray(data.data)
+      ? { ...existingData, ...(data.data as Record<string, unknown>) }
+      : undefined
+
   // Update document
   const updated = await prisma.document.update({
     where: { id: documentId },
     data: {
       ...(data.title && { title: data.title }),
-      ...(data.data && { data: data.data }),
+      ...(mergedPayload !== undefined && { data: mergedPayload as object }),
       ...(data.status && { status: data.status }),
     },
     include: {
@@ -693,12 +703,12 @@ export async function updateDocument(
   })
 
   // Create new version if data changed
-  if (data.data) {
+  if (mergedPayload !== undefined) {
     await prisma.documentVersion.create({
       data: {
         documentId,
         version: newVersion,
-        data: data.data,
+        data: mergedPayload as object,
         status: updated.status,
         changedBy: userId,
         changeNote: data.changeNote || 'Document updated',
@@ -706,7 +716,7 @@ export async function updateDocument(
     })
 
     // If userAssignments changed and document is PENDING, update approvals
-    const updatedData = data.data as any
+    const updatedData = mergedPayload as any
     const newUserAssignments = updatedData.userAssignments || updatedData._userAssignments
     if (newUserAssignments && updated.status === DocumentStatus.PENDING) {
       // Get workflow steps

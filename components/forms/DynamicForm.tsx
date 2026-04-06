@@ -1,10 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { ItemsTable } from './ItemsTable'
 import type { FormField, FormTemplateConfig } from '@/types/database'
+import { firstFormErrorMessage } from '@/lib/utils/form-errors'
 
 interface DynamicFormProps {
   fields: FormField[]
@@ -112,6 +114,8 @@ export function DynamicForm({
     resolver: zodResolver(schema),
     defaultValues,
   })
+
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const renderField = (field: FormField) => {
     const error = errors[field.name]
@@ -256,8 +260,23 @@ export function DynamicForm({
     }
   }
 
+  const onValidSubmit = async (formData: Record<string, any>) => {
+    setSubmitError(null)
+    await onSubmit(formData)
+  }
+
+  const onInvalidSubmit = (errors: Record<string, unknown>) => {
+    const msg = firstFormErrorMessage(errors)
+    setSubmitError(msg || 'Please fix the highlighted fields.')
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(onValidSubmit, onInvalidSubmit)} className="space-y-6">
+      {submitError && (
+        <p className="rounded-md bg-red-50 p-3 text-sm text-red-800 border border-red-200" role="alert">
+          {submitError}
+        </p>
+      )}
       {fields.map((field) => (
         <div key={field.name}>
           {field.type !== 'checkbox' && (

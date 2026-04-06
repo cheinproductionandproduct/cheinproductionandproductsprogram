@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DynamicForm } from '@/components/forms/DynamicForm'
 import type { FormTemplateConfig } from '@/types/database'
+import { clearCachedDocument } from '@/lib/documents/document-cache'
 
 interface DocumentEditFormProps {
   document: any
@@ -23,6 +24,7 @@ export function DocumentEditForm({ document }: DocumentEditFormProps) {
     setError(null)
 
     try {
+      const mergedData = { ...currentData, ...data }
       const response = await fetch(`/api/documents/${document.id}`, {
         method: 'PATCH',
         headers: {
@@ -30,21 +32,22 @@ export function DocumentEditForm({ document }: DocumentEditFormProps) {
         },
         body: JSON.stringify({
           title: data.title || document.title,
-          data,
+          data: mergedData,
         }),
       })
 
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.message || 'Failed to update document')
+        throw new Error(result.message || result.error || 'Failed to update document')
       }
 
-      // Redirect to document detail page
+      clearCachedDocument(document.id)
       router.push(`/documents/${document.id}`)
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'An error occurred')
+    } finally {
       setLoading(false)
     }
   }

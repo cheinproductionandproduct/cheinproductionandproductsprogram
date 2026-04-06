@@ -7,7 +7,7 @@ import type { FormField } from '@/types/database'
 import DashboardLayout from '../../../dashboard/layout'
 import '../../../dashboard/dashboard.css'
 import { useUser } from '@/hooks/use-user'
-import { getCachedDocumentForEdit, setCachedDocumentForEdit } from '@/lib/documents/document-cache'
+import { getCachedDocumentForEdit, setCachedDocumentForEdit, clearCachedDocument } from '@/lib/documents/document-cache'
 
 const AdvancePaymentRequestForm = dynamic(
   () => import('@/components/forms/AdvancePaymentRequestForm').then((m) => ({ default: m.AdvancePaymentRequestForm })),
@@ -101,13 +101,16 @@ export default function DocumentEditPage() {
     setError(null)
 
     try {
-      // Merge userAssignments into the data object (as it's stored in document.data)
+      const prev =
+        document?.data != null && typeof document.data === 'object' && !Array.isArray(document.data)
+          ? (document.data as Record<string, unknown>)
+          : {}
       const updatedData = {
+        ...prev,
         ...data,
         userAssignments: data.userAssignments || {},
       }
 
-      // Update document via PATCH
       const updateResponse = await fetch(`/api/documents/${params.id}`, {
         method: 'PATCH',
         headers: {
@@ -124,7 +127,8 @@ export default function DocumentEditPage() {
         throw new Error(result.message || result.error || 'Failed to update document')
       }
 
-      // Redirect to document detail page
+      clearCachedDocument(String(params.id))
+      setSubmitting(false)
       router.push(`/documents/${params.id}`)
     } catch (err: any) {
       setError(err.message || 'Failed to update document')
@@ -205,6 +209,7 @@ export default function DocumentEditPage() {
             onSubmit={handleSubmit}
             defaultValues={defaultValues}
             loading={submitting}
+            isEditingExistingDocument
           />
         </section>
       </div>

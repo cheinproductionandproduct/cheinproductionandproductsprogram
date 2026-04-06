@@ -10,12 +10,15 @@ import { isValidDistributionDate, isAtLeast7DaysBefore, getDateMoneyNeededOption
 import type { FormField } from '@/types/database'
 import { SignatureCanvas } from '@/components/signature/SignatureCanvas'
 import { useUser } from '@/hooks/use-user'
+import { firstFormErrorMessage } from '@/lib/utils/form-errors'
 
 interface AdvancePaymentRequestFormProps {
   fields: FormField[]
   onSubmit: (data: Record<string, any>) => Promise<void>
   defaultValues?: Record<string, any>
   loading?: boolean
+  /** When true (แก้ไขเอกสารร่าง): keep saved วันที่จ่ายเงิน and skip “ล่วงหน้า 7 วัน” validation so save still works after dates pass. */
+  isEditingExistingDocument?: boolean
 }
 
 // Reusable Input Component
@@ -89,6 +92,7 @@ export function AdvancePaymentRequestForm({
   onSubmit,
   defaultValues = {},
   loading = false,
+  isEditingExistingDocument = false,
 }: AdvancePaymentRequestFormProps) {
   const { user: currentUser } = useUser()
   const [error, setError] = useState<string | null>(null)
@@ -201,8 +205,9 @@ export function AdvancePaymentRequestForm({
     jobId: z.string().min(1, 'กรุณาเลือกงาน (Job)'),
     urgent: z.boolean().optional(),
   })
-  // วันที่ต้องใช้เงิน: when Urgent=true use current date; otherwise must be distribution Friday and 7 days ahead
+  // วันที่ต้องใช้เงิน: when Urgent=true use current date; otherwise must be distribution Friday and 7 days ahead (new docs only)
   schema = schema.superRefine((data: any, ctx) => {
+    if (isEditingExistingDocument) return
     if (data.urgent === true) return // Skip validation when urgent is checked — both dates use current date
     const d = data.dateMoneyNeeded
     if (!d || typeof d !== 'string' || d.length < 10) return
@@ -255,9 +260,17 @@ export function AdvancePaymentRequestForm({
       date: (defaultValues.date && dateOptions.some((o) => o.value === defaultValues.date))
         ? defaultValues.date
         : (dateOptions[0]?.value || new Date().toISOString().split('T')[0]),
-      dateMoneyNeeded: (defaultValues.dateMoneyNeeded && dateMoneyNeededOptions.some((o) => o.value === defaultValues.dateMoneyNeeded))
-        ? defaultValues.dateMoneyNeeded
-        : getNextDistributionFriday(defaultValues.date || dateOptions[0]?.value || new Date().toISOString().split('T')[0]),
+      dateMoneyNeeded: (() => {
+        const saved = defaultValues.dateMoneyNeeded
+        if (saved == null || saved === '') {
+          return getNextDistributionFriday(defaultValues.date || dateOptions[0]?.value || new Date().toISOString().split('T')[0])
+        }
+        const s = String(saved)
+        const iso = s.length === 10 && s[4] === '-' && s[7] === '-' ? s : ''
+        if (isEditingExistingDocument && iso && isValidDistributionDate(iso)) return iso
+        if (dateMoneyNeededOptions.some((o) => o.value === saved)) return saved
+        return getNextDistributionFriday(defaultValues.date || dateOptions[0]?.value || new Date().toISOString().split('T')[0])
+      })(),
       items: initialItems,
       totalAmount: initialItems.total || 0,
       requesterName: defaultValues.requesterName || currentUser?.fullName || currentUser?.email || '',
@@ -305,13 +318,16 @@ export function AdvancePaymentRequestForm({
       const today = new Date().toISOString().split('T')[0]
       setValue('date', today, { shouldValidate: true })
       setValue('dateMoneyNeeded', today, { shouldValidate: true })
-    } else if (dateRequest && getDateISO(dateRequest) !== '') {
-      // When urgent is not checked, use selected Friday and push dateMoneyNeeded to next Friday
+      return
+    }
+    // Editing an existing draft: do not overwrite วันที่ต้องใช้เงิน from วันที่ on load (would block save / lose saved payout date)
+    if (isEditingExistingDocument) return
+    if (dateRequest && getDateISO(dateRequest) !== '') {
       const requestIso = getDateISO(dateRequest) || dateRequest
       const nextFriday = getNextDistributionFriday(requestIso)
       if (nextFriday) setValue('dateMoneyNeeded', nextFriday, { shouldValidate: true })
     }
-  }, [urgent, dateRequest, setValue])
+  }, [urgent, dateRequest, setValue, isEditingExistingDocument])
 
   // Display date as d/m/y when value is YYYY-MM-DD (avoids regex in JSX and ensures correct format on load)
   const getDateDisplay = (val: string | undefined) => {
@@ -500,7 +516,7 @@ export function AdvancePaymentRequestForm({
       
       <form onSubmit={handleSubmit(handleFormSubmit, (errors) => {
         console.error('[AdvancePaymentRequestForm] Form validation errors:', errors)
-        setError('กรุณากรอกข้อมูลให้ครบถ้วน')
+        setError(firstFormErrorMessage(errors as Record<string, unknown>) || 'กรุณากรอกข้อมูลให้ครบถ้วน')
       })} className="form-wrapper">
         {/* Document Info Section */}
         <div className="form-section">
