@@ -12,18 +12,495 @@
 
 .boq-table-wrapper {
   position: relative;
-  overflow-x: visible;
+  overflow-x: auto;
+  overflow-y: visible;
   margin-top: 16px;
   background: #fff;
+  min-width: 0;
+}
+
+/* One horizontal scrollbar for main table + side panel together.
+   Main is at least the visible width (like original 1fr column); side sits to the right — scroll to see it. */
+.boq-split-scroll {
+  container-type: inline-size;
+  container-name: boq-split;
+  overflow-x: auto;
+  overflow-y: visible;
+  min-width: 0;
+  max-width: 100%;
+  /* Set by BOQ page: main thead row heights → PLAN thead matches (body rows align) */
+  --boq-thead-r1-height: auto;
+  --boq-thead-r2-height: auto;
+}
+
+.boq-split-scroll .boq-table-wrapper {
+  overflow-x: visible;
+}
+
+.boq-split-scroll .boq-side-table-wrapper {
+  overflow-x: visible;
+}
+
+.boq-split-layout {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  /* flex-start: both tables share the same top edge; stretch was stretching panels and could look “stepped” vs the main grid */
+  align-items: flex-start;
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
+}
+
+.boq-split-panel {
+  min-width: 0;
+  margin: 0;
+}
+
+.boq-split-panel--main {
+  flex: 0 0 auto;
+  min-width: max-content;
+  display: flex;
+  flex-direction: column;
+}
+
+@supports (width: 1cqi) {
+  .boq-split-panel--main {
+    /* Full visible scroll width when the table is narrow; flex min-size grows with wide tables */
+    min-width: 100cqi;
+  }
+}
+
+.boq-split-panel--main .boq-table-wrapper {
+  margin-top: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.boq-side-panel {
+  flex: 0 0 auto;
+  /* Wider PLAN strip — main table scrolls horizontally; side wrapper scrolls if needed */
+  width: clamp(720px, 54vw, 1040px);
+  min-width: min(100%, 640px);
+  max-width: 1200px;
+  /* No border here — .boq-table already draws the outer grid; panel+table borders stacked as “double” lines */
+  border: none;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.boq-side-table-wrapper {
+  overflow-x: auto;
+  overflow-y: visible;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.boq-side-table {
+  width: 100%;
+  min-width: 920px;
+  table-layout: fixed;
+}
+
+.boq-side-table .boq-side-col {
+  width: calc((100% - 88px - 120px) / 7);
+  min-width: 56px;
+}
+
+.boq-side-table .boq-side-col--boq-ref {
+  width: 120px;
+  min-width: 100px;
+  max-width: none;
+}
+
+.boq-side-table .boq-side-col--lead {
+  width: 88px;
+  min-width: 72px;
+  max-width: 120px;
+}
+
+.boq-side-th--rowhead {
+  vertical-align: middle;
+  white-space: normal;
+  line-height: 1.15;
+  min-width: 0;
+}
+
+.boq-side-td--text {
+  text-align: left;
+  padding-left: 8px;
+  padding-right: 8px;
+  color: #222;
+  font-size: 13px;
+}
+
+.boq-side-td--num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #222;
+  font-weight: 600;
+}
+
+.boq-side-td--muted {
+  color: #9e9e9e;
+  font-weight: 500;
+}
+
+.boq-side-td--sell {
+  color: #0d47a1;
+  font-weight: 700;
+}
+
+.boq-side-td--gp-avg {
+  color: #c62828 !important;
+  font-weight: 800;
+}
+
+/* Side thead: same padding/font as main .boq-th so header band height matches BOQ */
+.boq-side-table thead .boq-th {
+  padding: 6px 8px;
+  font-size: 13px;
+  line-height: 1.25;
+  white-space: normal;
+}
+
+/* ลำดับ BOQ — second header row (single line so row height can match main BOQ sub-header row) */
+.boq-side-th--boq-ref-head {
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1.2;
+  vertical-align: middle;
+  background: #e8e8e8;
+  white-space: normal;
+  text-align: center;
+}
+
+/* Spans ลำดับ BOQ + ราคาขาย — label text styled on .boq-side-th-r1-label */
+.boq-side-th--plan-band {
+  background: #d9d9d9;
+}
+
+.boq-side-th--plan-band .boq-side-th-r1-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #1a1a1a;
+}
+
+.boq-side-td--boq-ref {
+  text-align: center;
+  vertical-align: middle;
+  padding: 2px 3px;
+}
+
+.boq-side-boq-ref-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.boq-side-boq-ref-no {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: #1a1a1a;
+}
+
+.boq-side-boq-ref-orphan {
+  font-size: 10px;
+  font-weight: 600;
+  color: #b45309;
+}
+
+.boq-side-boq-ref-select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  font-size: 12px;
+  padding: 4px 6px;
+  box-sizing: border-box;
+}
+
+.boq-side-th__kind {
+  display: block;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #444;
+  line-height: 1.1;
+  margin-bottom: 1px;
+}
+
+.boq-side-th__rowhead-label {
+  display: block;
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 1.15;
+  white-space: normal;
+}
+
+.boq-side-th--cost-group {
+  background: #d9d9d9;
+  font-weight: 700;
+  text-align: center;
+}
+
+.boq-side-th--sell-group {
+  /* Match main BOQ band headers (e.g. แรง) — neutral grid, not a separate blue theme */
+  background: #d9d9d9;
+  color: #1a1a1a;
+  font-weight: 700;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.boq-side-th--cost-leaf {
+  background: #e8e8e8;
+  font-weight: 600;
+  font-size: 12px;
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.boq-side-th--sell-leaf {
+  /* Same leaf band as ต้นทุน / main .boq-th-sub */
+  background: #e8e8e8;
+  color: #1a1a1a;
+  font-weight: 600;
+  font-size: 12px;
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.boq-side-td {
+  vertical-align: middle;
+  padding: 2px 4px;
+  font-size: 13px;
+}
+
+/* Body rows: match main BOQ line density (main .boq-td has no min-height) */
+.boq-side-table tbody .boq-side-td {
+  min-height: unset;
+  box-sizing: border-box;
+}
+
+/* ขีดแบ่งกลุ่มคอลัมน์เหมือนช่องคำนวณในตารางหลัก (วัสดุ | แรง) */
+.boq-table.boq-side-table tbody .boq-side-td--segment-sell {
+  border-left: 1px dashed #a0b4d6;
+}
+
+.boq-table.boq-side-table tfoot .boq-side-td--segment-sell {
+  border-left: 1px dashed #a0b4d6;
+}
+
+/* แถวสรุป PLAN/ACTUAL — โทนเดียวกับสรุปในตารางหลัก */
+.boq-table.boq-side-table tfoot .boq-side-summary-row > .boq-td {
+  border-top: 1px solid #757575;
+  font-weight: 700;
+}
+
+.boq-side-table tbody > tr.boq-row:nth-child(even) > .boq-td {
+  background-color: #fafafa;
+}
+
+.boq-side-table tbody > tr.boq-row:nth-child(even) > .boq-td.boq-td-calc {
+  background-color: #fafafa;
+}
+
+.boq-side-table tbody > tr.boq-row:nth-child(even) > .boq-td.boq-td-total {
+  background-color: #fafafa;
+}
+
+/* PLAN/ACTUAL grid: center cell text (headers already centered via .boq-th) */
+.boq-table.boq-side-table tbody .boq-td,
+.boq-table.boq-side-table tfoot .boq-td {
+  text-align: center;
+}
+
+.boq-table.boq-side-table tbody .boq-input,
+.boq-table.boq-side-table tbody .boq-input-num {
+  text-align: center;
+}
+
+.boq-table.boq-side-table tbody .boq-side-td--text .boq-input {
+  text-align: center;
+}
+
+.boq-table.boq-side-table tbody .boq-side-last-cell-inner {
+  justify-content: center;
+}
+
+/*
+ * Two-row PLAN thead: row heights are half of main thead total (JS) so band row = sub-header row.
+ * Labels stay in-flow (no absolute) to avoid ghost text above row 2.
+ */
+.boq-table.boq-side-table thead.boq-side-thead--two-row tr:first-child {
+  height: var(--boq-thead-r1-height, auto);
+}
+
+.boq-table.boq-side-table thead.boq-side-thead--two-row tr:first-child > .boq-th {
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+.boq-table.boq-side-table thead.boq-side-thead--two-row tr:first-child > .boq-th > .boq-side-th-r1-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.25;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.boq-table.boq-side-table thead.boq-side-thead--two-row tr:nth-child(2) {
+  height: var(--boq-thead-r2-height, auto);
+}
+
+.boq-table.boq-side-table thead.boq-side-thead--two-row tr:nth-child(2) > .boq-th {
+  height: 100%;
+  box-sizing: border-box;
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+/* Keep “ลำดับ BOQ” on one line inside the fixed half-row height (column widened in colgroup). */
+.boq-table.boq-side-table thead.boq-side-thead--two-row .boq-side-th--boq-ref-head {
+  white-space: nowrap;
+}
+
+.boq-side-panel__actions {
+  padding: 8px 10px 10px;
+  border-top: 1px solid #e0e0e0;
+  background: #fafafa;
+}
+
+.boq-side-add-row-btn {
+  font-size: 13px;
+}
+
+.boq-side-input,
+.boq-side-input-text {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  box-sizing: border-box;
+  font-size: 13px !important;
+  padding: 3px 5px !important;
+  background: #fff;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+}
+
+.boq-side-input:focus,
+.boq-side-input-text:focus {
+  background: #fff9e6;
+  border-color: #9e9e9e;
+  outline: none;
+}
+
+.boq-side-input-text {
+  text-align: left;
+}
+
+.boq-side-input--pct {
+  text-align: right;
+}
+
+.boq-side-td--last-cell {
+  padding-right: 6px;
+  padding-left: 4px;
+}
+
+.boq-side-last-cell-inner {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.boq-side-last-val {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.boq-side-row-del {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  line-height: 1;
+  font-size: 16px;
+  font-weight: 700;
+  color: #666;
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.boq-side-row-del:hover {
+  background: #ffebee;
+  color: #b71c1c;
+  border-color: #e57373;
+}
+
+@media (max-width: 1280px) {
+  .boq-split-layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .boq-split-panel--main {
+    flex: 0 0 auto;
+    min-width: max-content;
+    width: 100%;
+  }
+
+  .boq-side-panel {
+    width: 100%;
+    max-width: none;
+    align-self: stretch;
+  }
 }
 
 .boq-table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
+  border-spacing: 0;
   font-size: 13px;
   font-family: 'Sarabun', system-ui, sans-serif;
   table-layout: fixed;
   border: 1px solid #bbb;
+}
+
+/* PLAN/ACTUAL side table: wins over .boq-table width:max-content (later rule) so col % widths and thead/tbody columns stay aligned */
+.boq-table.boq-side-table {
+  width: 100%;
+  min-width: 920px;
+  box-sizing: border-box;
 }
 
 /* ── Header ─────────────────────────────────── */
@@ -61,6 +538,53 @@
 .boq-td--plan-mirror {
   background: #fff8f0;
   color: #2a2a2a;
+}
+
+/* ราคาวัสดุสิ่งก่อสร้าง — hide detail cols (− center-right); narrow + col when collapsed */
+.boq-th-mat-head {
+  position: relative;
+  vertical-align: middle;
+}
+.boq-th-mat-head__title {
+  display: block;
+  text-align: center;
+  padding: 4px 30px 4px 8px;
+  line-height: 1.25;
+}
+.boq-th-mat-head__hide {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border: 1px solid #666;
+  border-radius: 3px;
+  background: #f2f2f2;
+  color: #222;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.boq-th-mat-head__hide:hover {
+  background: #e2e2e2;
+}
+.boq-th-mat-collapsed-head {
+  width: 32px;
+  min-width: 32px;
+  max-width: 40px;
+  padding: 4px 2px;
+  vertical-align: middle;
+  text-align: center;
+}
+.boq-td-mat-collapsed-slot {
+  padding: 0;
+  background: #f0f0f0;
 }
 
 .boq-material-toggle-btn {
@@ -144,8 +668,13 @@
 .boq-th-qty    { width: 64px; }
 .boq-th-unit   { width: 48px; }
 .boq-th-note   { width: 140px; min-width: 100px; }
-.boq-th-total  { width: 92px; }
-.boq-th-action { width: 72px; min-width: 64px; }
+.boq-th-total {
+  width: 92px;
+  min-width: 7.5em;
+  white-space: normal;
+  line-height: 1.25;
+}
+.boq-th-action { width: 100px; min-width: 100px; }
 
 /* ID reference sub-cols: keep short */
 .boq-th-sub    { width: 60px; }
@@ -182,8 +711,9 @@
 
 .boq-td-action {
   text-align: center;
-  width: 80px;
-  padding: 2px 4px;
+  width: 100px;
+  min-width: 100px;
+  padding: 4px 4px;
 }
 
 .boq-action-cell {
@@ -192,7 +722,7 @@
   flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 /* Shared button base — no position:absolute, fully inline */
@@ -202,15 +732,22 @@
   justify-content: center;
   flex-shrink: 0;
   width: 22px;
+  min-width: 22px;
   height: 22px;
+  min-height: 22px;
   border-radius: 4px;
   border: 1px solid #bbb;
   background: #f2f2f2;
   cursor: pointer;
   padding: 0;
   transition: background 0.15s, opacity 0.15s;
+  box-sizing: border-box;
 }
-.boq-btn svg { flex-shrink: 0; }
+.boq-btn svg {
+  flex-shrink: 0;
+  width: 11px;
+  height: 11px;
+}
 .boq-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .boq-action-btn-section-del {
@@ -356,6 +893,80 @@
   font-size: 14px;
 }
 
+/* Full-width discount strip sits on the row below รวมหมวด (spans รายการ → รวม). */
+.boq-summary-row--group-discount > .boq-td {
+  border-top: none;
+  padding-top: 0;
+  padding-bottom: 8px;
+  vertical-align: top;
+}
+
+.boq-group-discount-span-cell {
+  padding: 4px 10px 10px !important;
+}
+
+.boq-group-discount-addon {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border: 1px solid #b0b0b0;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f4f4 100%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+  font-size: 12px;
+  line-height: 1.45;
+  color: #2a2a2a;
+}
+
+.boq-group-discount-addon__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  padding: 6px 0;
+}
+
+.boq-group-discount-addon__row:first-child {
+  padding-top: 0;
+}
+
+.boq-group-discount-addon__row + .boq-group-discount-addon__row {
+  border-top: 1px solid #e5e5e5;
+}
+
+.boq-group-discount-addon__row--net {
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid #bdbdbd;
+}
+
+.boq-group-discount-addon__label {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-weight: 500;
+  color: #4a4a4a;
+}
+
+.boq-group-discount-addon__value {
+  flex-shrink: 0;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.boq-group-discount-addon__row--net .boq-group-discount-addon__label {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.boq-group-discount-addon__row--net .boq-group-discount-addon__value {
+  font-size: 13px;
+  color: #0d47a1;
+}
+
 .boq-summary-editable-label {
   display: inline-flex;
   align-items: center;
@@ -422,18 +1033,6 @@
   color: #555;
 }
 
-/* ── Job chip (editor page header) ──────────── */
-.boq-job-chip {
-  display: inline-block;
-  padding: 4px 12px;
-  background: #e3f2fd;
-  border: 1px solid #90caf9;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #1565c0;
-}
-
 /* ── BOQ document page header: title left, badges + filter flush right ── */
 .boq-document-page-header {
   display: flex;
@@ -454,6 +1053,7 @@
 
 .boq-filter-wrap {
   position: relative;
+  z-index: 25;
 }
 
 .boq-filter-btn {
@@ -491,7 +1091,7 @@
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  z-index: 30;
+  z-index: 40;
   min-width: 220px;
   padding: 14px 16px;
   background: #fff;
@@ -499,6 +1099,8 @@
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   box-sizing: border-box;
+  max-height: min(420px, 70vh);
+  overflow-y: auto;
 }
 
 .boq-filter-dropdown__label {
@@ -554,6 +1156,11 @@
   height: 16px;
   flex-shrink: 0;
   cursor: pointer;
+}
+
+.boq-filter-dropdown__option input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .boq-filter-dropdown--wide {
@@ -745,13 +1352,60 @@
   cursor: not-allowed;
 }
 
-/* Document page: plan / actual badge */
-.boq-doc-kind-row {
-  margin: 8px 0 0;
+/* Main title: BOQ ▪ job — Inter via next/font; shared size/weight for both parts */
+h1.page-title.boq-page-title-row {
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.25;
+  margin-bottom: 6px;
+  color: #1a1a1a;
+}
+
+.boq-page-title-row {
+  --boq-title-word-size: clamp(1.75rem, 4.5vw, 2.25rem);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 0 0.55rem;
+}
+
+.boq-page-title-product,
+.boq-page-title-job {
+  font-size: var(--boq-title-word-size);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: #141414;
+  line-height: 1.1;
+}
+
+.boq-page-title-product {
+  flex-shrink: 0;
+}
+
+.boq-page-title-bullet {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  background: #9e9e9e;
+  border-radius: 1px;
+  user-select: none;
+}
+
+.boq-page-title-job {
+  min-width: 0;
+}
+
+/* Subtitle: Plan / Actual chip only */
+.boq-page-subtitle-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.boq-doc-plan-ref-row {
+  margin: 6px 0 0;
 }
 
 .boq-doc-kind {
@@ -849,6 +1503,9 @@
 
 /* ── Top bar (back button + job selector) ────── */
 .boq-top-bar {
+  position: relative;
+  z-index: 15;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -864,6 +1521,28 @@
   gap: 10px;
   margin-left: auto;
   flex-shrink: 0;
+}
+
+/* Edit / save / structure controls — top bar so users don’t scroll past the table */
+.boq-top-bar-edit-cluster {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.boq-top-bar-edit-cluster .boq-save-error {
+  flex-basis: 100%;
+}
+
+/* Middle slot reserved for future search; currently hosts Delete */
+.boq-top-bar-search-slot {
+  flex: 1 1 280px;
+  min-width: 180px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .boq-back-btn {
@@ -1077,23 +1756,6 @@
   font-size: 11px;
 }
 
-/* ── Saved badge ─────────────────────────────── */
-.boq-saved-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  background: #e8f5e9;
-  border: 1px solid #66bb6a;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #2e7d32;
-  margin-left: 12px;
-}
-
-.boq-saved-badge::before { content: '✓'; }
-
 /* ── Actions row ─────────────────────────────── */
 .boq-actions {
   margin-top: 12px;
@@ -1130,6 +1792,20 @@
 .boq-save-btn:hover:not(:disabled) { background: #0d47a1; }
 .boq-save-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
+.boq-history-btn {
+  padding: 8px 14px;
+  background: #f5f5f5;
+  color: #333;
+  border: 1px solid #c7c7c7;
+  border-radius: 8px;
+  font-family: 'Sarabun', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.boq-history-btn:hover:not(:disabled) { background: #ebebeb; }
+.boq-history-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .boq-edit-btn {
   padding: 8px 22px;
   background: #f57c00;
@@ -1152,6 +1828,14 @@
 
 /* Alternating row shading */
 .boq-row:nth-child(even) .boq-td { background-color: #fafafa; }
+
+/* Nested lines (1.1.1 …): full-row light blue band + soft left accent (matches nested + button hue) */
+.boq-row.boq-row--nested > .boq-td {
+  background-color: #d6defa;
+}
+.boq-row:nth-child(even).boq-row--nested > .boq-td {
+  background-color: #cdd6f3;
+}
 
 /* ── Group header row ────────────────────────── */
 .boq-group-header-row .boq-td {
@@ -1211,9 +1895,9 @@
   font-style: italic;
 }
 
-/* Inset stripe only — a thick border-left shifts the grid under border-collapse */
+/* Lead / ลำดับ-style cols: flat fill only (no left stripe — gradients read as thick bars inside cells) */
 .boq-td-sub-no {
+  box-shadow: none;
   background: #f5f5f5;
-  box-shadow: inset 3px 0 0 #ccc;
 }
 

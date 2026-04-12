@@ -39,6 +39,7 @@ export function AdvancePaymentClearanceForm({
   const [users, setUsers] = useState<{ id: string; fullName?: string; email: string }[]>([])
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [openSignatureModal, setOpenSignatureModal] = useState<string | null>(null)
+  const [actualAmountDrafts, setActualAmountDrafts] = useState<Record<number, string>>({})
   const [signatures, setSignatures] = useState<Record<string, string>>({
     requesterSignature: defaultValues.signatures?.requesterSignature || defaultValues.requesterSignature || '',
     approverSignature: defaultValues.signatures?.approverSignature || defaultValues.approverSignature || '',
@@ -180,17 +181,16 @@ export function AdvancePaymentClearanceForm({
     }
   }, [])
 
-  // Default assignees: ผู้อนุมัติ = bee@cheinprod, ผู้รับเคลียร์เงิน = pc@cheinprod, ผู้จัดการฝ่ายเงิน = tassanee@cheinproduction.co.th (added when user exists)
+  // Default assignees (APC): ผู้อนุมัติ = tassanee@cheinproduction.co.th, ผู้รับเคลียร์เงิน = pc@cheinprod, ผู้จัดการฝ่ายเงิน = tassanee@cheinproduction.co.th
   useEffect(() => {
     if (users.length === 0) return
     const existingApprover = defaultValues.userAssignments?.approver || defaultValues.approverUserId
     const existingRecipient = defaultValues.userAssignments?.recipient || defaultValues.recipientUserId
     const existingPayer = defaultValues.userAssignments?.payer || defaultValues.payerUserId
     const email = (u: any) => (u.email || '').toLowerCase()
-    const bee = users.find((u: any) => /^bee@chein/.test(email(u)))
     const pc = users.find((u: any) => /^pc@chein/.test(email(u)))
     const tassanee = users.find((u: any) => email(u) === 'tassanee@cheinproduction.co.th')
-    if (bee && !existingApprover) setValue('approverUserId', bee.id)
+    if (tassanee && !existingApprover) setValue('approverUserId', tassanee.id)
     if (pc && !existingRecipient) setValue('recipientUserId', pc.id)
     if (tassanee && !existingPayer) setValue('payerUserId', tassanee.id)
   }, [users, setValue, defaultValues.userAssignments, defaultValues.approverUserId, defaultValues.recipientUserId, defaultValues.payerUserId])
@@ -365,6 +365,23 @@ export function AdvancePaymentClearanceForm({
     const next = items.filter((i: any, iIdx: number) => iIdx !== index && i.parentId !== item.id)
     const total = next.reduce((s: number, i: any) => s + (((Number(i.actualAmount) ?? Number(i.amount)) || 0)), 0)
     setValue('expenseItems', { items: next, total }, { shouldValidate: true })
+  }
+
+  const beginActualEdit = (flatIndex: number, current: unknown) => {
+    const n = Number(current)
+    setActualAmountDrafts((prev) => ({ ...prev, [flatIndex]: Number.isFinite(n) ? String(n) : '' }))
+  }
+  const changeActualEdit = (flatIndex: number, text: string) => {
+    setActualAmountDrafts((prev) => ({ ...prev, [flatIndex]: text }))
+  }
+  const commitActualEdit = (flatIndex: number) => {
+    const raw = (actualAmountDrafts[flatIndex] ?? '').trim()
+    const n = Number(raw.replace(/,/g, ''))
+    updateExpenseItem(flatIndex, 'actualAmount', Number.isFinite(n) ? n : 0)
+    setActualAmountDrafts((prev) => {
+      const { [flatIndex]: _, ...rest } = prev
+      return rest
+    })
   }
 
   /** Build display order: each parent followed by its children. Returns { item, flatIndex, displayNumber }. */
@@ -650,13 +667,18 @@ export function AdvancePaymentClearanceForm({
                         </td>
                         <td className="items-table-td items-table-td-amount">
                           <input
-                            type="number"
-                            min={0}
-                            step="0.01"
+                            type="text"
+                            inputMode="decimal"
                             className="items-table-input items-table-input-amount"
-                            value={item.actualAmount ?? item.amount ?? ''}
-                            onChange={(e) => updateExpenseItem(flatIndex, 'actualAmount', parseFloat(e.target.value) || 0)}
-                            placeholder="0"
+                            value={
+                              actualAmountDrafts[flatIndex] !== undefined
+                                ? actualAmountDrafts[flatIndex]
+                                : formatNumber(Number(item.actualAmount ?? item.amount ?? 0))
+                            }
+                            onFocus={() => beginActualEdit(flatIndex, item.actualAmount ?? item.amount ?? 0)}
+                            onChange={(e) => changeActualEdit(flatIndex, e.target.value)}
+                            onBlur={() => commitActualEdit(flatIndex)}
+                            placeholder="0.00"
                           />
                         </td>
                       </tr>

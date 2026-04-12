@@ -111,9 +111,11 @@ export default function BoqDashboardPage() {
           const res = await fetch(`/api/boq/${boq.id}`, { method: 'DELETE' })
           const d = await res.json().catch(() => ({}))
           if (!res.ok) throw new Error(d.error || 'ลบไม่สำเร็จ')
+          setConfirm(null)
           await fetchData()
         } catch (err) {
           setCreateError(err instanceof Error ? err.message : 'ลบไม่สำเร็จ')
+          setConfirm(null)
         } finally {
           setDeletingId(null)
         }
@@ -155,6 +157,7 @@ export default function BoqDashboardPage() {
 
   const handleSign = (boq: BoqRow) => {
     askConfirm(`อนุมัติและลงนาม BOQ "${boqDisplayName(boq)}"?`, async () => {
+      setConfirm(null)
       setSigningId(boq.id)
       try {
         const res = await fetch(`/api/boq/${boq.id}/status`, {
@@ -416,7 +419,7 @@ export default function BoqDashboardPage() {
               <button type="button" className="boq-modal-cancel" onClick={() => setConfirm(null)}>
                 ยกเลิก
               </button>
-              <button type="button" className="boq-confirm-ok" onClick={() => { confirm.fn(); setConfirm(null) }}>
+              <button type="button" className="boq-confirm-ok" onClick={() => confirm.fn()}>
                 ยืนยัน
               </button>
             </div>

@@ -44,7 +44,7 @@ Source: `DEFAULT_WIDTHS` in `app/dashboard/boq/[id]/page.tsx`:
 | laborAmt   | 95      |
 | total      | 92      |
 | note       | 140     |
-| action     | 72      |
+| action     | 100     |
 
 Header resize handles (`RH`) adjust widths in session; they are not persisted in BOQ JSON unless that is added later.
 
