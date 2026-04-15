@@ -34,7 +34,9 @@ type PlanSideRow = {
   linkedSubRowId: string
   listPrice: number | ''
   sub: string
-  docNo: string
+  /** คอลัมน์ลูกใต้หัวกลุ่ม “เลขที่เอกสาร” */
+  docIssue: string
+  docTitle: string
   pricePerUnit: number | ''
   cost: number | ''
   gpPct: number | ''
@@ -75,11 +77,48 @@ const emptyPlanSideRow = (): PlanSideRow => ({
   linkedSubRowId: '',
   listPrice: '',
   sub: '',
-  docNo: '',
+  docIssue: '',
+  docTitle: '',
   pricePerUnit: '',
   cost: '',
   gpPct: '',
 })
+
+/** Triplex: editable blank slot row before a real `PlanSideRow` exists in state (id is not persisted). */
+const TRIPLEX_PENDING_PLAN_ROW_PREFIX = 'triplex-slot:' as const
+function triplexPendingPlanRowId(subRowId: string) {
+  return `${TRIPLEX_PENDING_PLAN_ROW_PREFIX}${subRowId}`
+}
+function isTriplexPendingPlanRowId(rowId: string) {
+  return rowId.startsWith(TRIPLEX_PENDING_PLAN_ROW_PREFIX)
+}
+
+/** Same 2:5:3 split as PLAN band row (`colSpan` 2+5+3 on 10 cols), scaled to main BOQ column count. */
+function planBandColSpansForMain(total: number): [number, number, number] {
+  if (total < 3) return [1, 1, Math.max(1, total - 2)]
+  const n1 = Math.max(1, Math.floor((2 * total) / 10))
+  const n3 = Math.max(1, Math.floor((3 * total) / 10))
+  let n2 = Math.max(1, total - n1 - n3)
+  let diff = total - (n1 + n2 + n3)
+  if (diff > 0) return [n1 + diff, n2, n3]
+  let a = n1
+  let b = n2
+  let c = n3
+  let over = -diff
+  while (over > 0 && b > 1) {
+    b--
+    over--
+  }
+  while (over > 0 && a > 1) {
+    a--
+    over--
+  }
+  while (over > 0 && c > 1) {
+    c--
+    over--
+  }
+  return [a, b, c]
+}
 
 function normalizePlanSideRow(r: unknown): PlanSideRow {
   const o = r && typeof r === 'object' ? (r as Record<string, unknown>) : {}
@@ -88,12 +127,25 @@ function normalizePlanSideRow(r: unknown): PlanSideRow {
     const n = Number(v)
     return Number.isFinite(n) ? n : ''
   }
+  let docIssue = typeof o.docIssue === 'string' ? o.docIssue : ''
+  let docTitle = typeof o.docTitle === 'string' ? o.docTitle : ''
+  const legacyDoc = typeof o.docNo === 'string' ? o.docNo : ''
+  if (!docIssue && !docTitle && legacyDoc) {
+    const nl = legacyDoc.indexOf('\n')
+    if (nl >= 0) {
+      docIssue = legacyDoc.slice(0, nl).trim()
+      docTitle = legacyDoc.slice(nl + 1).trim()
+    } else {
+      docIssue = legacyDoc
+    }
+  }
   return {
     id: typeof o.id === 'string' && o.id ? o.id : `psr-${uid()}`,
     linkedSubRowId: typeof o.linkedSubRowId === 'string' ? o.linkedSubRowId : '',
     listPrice: num(o.listPrice),
     sub: typeof o.sub === 'string' ? o.sub : '',
-    docNo: typeof o.docNo === 'string' ? o.docNo : '',
+    docIssue,
+    docTitle,
     pricePerUnit: num(o.pricePerUnit),
     cost: num(o.cost),
     gpPct: num(o.gpPct),
@@ -120,11 +172,68 @@ function flattenBoqLinesForPlanLink(groups: Group[]): { subRowId: string; displa
   return out
 }
 
-function planSideRowDerived(r: PlanSideRow): { gpAmount: number; sellPrice: number } {
-  const c = Number(r.cost) || 0
+function planSideRowDerived(r: PlanSideRow, costOverride?: number): { gpAmount: number; sellPrice: number } {
+  const c = costOverride !== undefined ? Number(costOverride) || 0 : Number(r.cost) || 0
   const gpp = Number(r.gpPct) || 0
   const gpAmount = c * (gpp / 100)
   return { gpAmount, sellPrice: c + gpAmount }
+}
+
+/** Every BOQ `SubRow` by id (for tree / rollups). */
+function buildSubRowByIdFromGroups(groups: Group[]): Map<string, SubRow> {
+  const m = new Map<string, SubRow>()
+  const visit = (sr: SubRow) => {
+    m.set(sr.id, sr)
+    for (const c of sr.children ?? []) visit(c)
+  }
+  for (const g of groups) for (const sec of g.sections) for (const r of sec.subRows) visit(r)
+  return m
+}
+
+/** Effective cost for one plan row: pricePerUnit x BOQ quantity when available, else r.cost. */
+function effectiveLeafCost(pr: PlanSideRow, ch: SubRow): number {
+  const qty = ch.quantity === '' ? 0 : Number(ch.quantity) || 0
+  if (qty !== 0 && pr.pricePerUnit !== '') return (Number(pr.pricePerUnit) || 0) * qty
+  return Number(pr.cost) || 0
+}
+
+/** Sum of effective cost for every descendant BOQ line under `sr` (not including `sr`). */
+function sumDescendantPlanCosts(sr: SubRow, planBySubRow: Map<string, PlanSideRow>): number {
+  let sum = 0
+  const walk = (row: SubRow) => {
+    for (const ch of row.children ?? []) {
+      const pr = planBySubRow.get(ch.id)
+      sum += pr ? effectiveLeafCost(pr, ch) : 0
+      walk(ch)
+    }
+  }
+  walk(sr)
+  return sum
+}
+
+/** For each BOQ line that has nested children: total ราคา/หน่วย from all descendant plan rows. */
+function buildPlanCostRollupBySubRowId(groups: Group[], planBySubRow: Map<string, PlanSideRow>): Map<string, number> {
+  const out = new Map<string, number>()
+  const visit = (sr: SubRow) => {
+    if ((sr.children?.length ?? 0) > 0) {
+      out.set(sr.id, sumDescendantPlanCosts(sr, planBySubRow))
+    }
+    for (const c of sr.children ?? []) visit(c)
+  }
+  for (const g of groups) for (const sec of g.sections) for (const r of sec.subRows) visit(r)
+  return out
+}
+
+function effectivePlanCostForRow(
+  r: PlanSideRow,
+  rollupBySubRowId: Map<string, number> | undefined,
+  subRowById: Map<string, SubRow> | undefined,
+): number {
+  if (!subRowById || !r.linkedSubRowId) return Number(r.cost) || 0
+  const sr = subRowById.get(r.linkedSubRowId)
+  if (!sr) return Number(r.cost) || 0
+  if ((sr.children?.length ?? 0) > 0) return rollupBySubRowId?.get(r.linkedSubRowId) ?? 0
+  return effectiveLeafCost(r, sr)
 }
 /** BOQ money: จำนวนเงิน = จำนวน × ราคาต่อหน่วย; แถวรวม = วัสดุ + แรง (รวมลูกใน tree totals). */
 const calcMat  = (sr: SubRow) => (Number(sr.quantity)||0) * (Number(sr.materialPrice)||0)
@@ -260,7 +369,7 @@ function distributeProportionalAmounts(weights: number[], total: number): number
 }
 
 /* ── Default column widths — baseline saved in ../DEFAULTS.md (2026-04-04) ── */
-const DEFAULT_WIDTHS = { no: 60, refPage: 60, refCode: 60, desc: 380, qty: 64, unit: 48, matPrice: 95, matAmt: 95, laborPrice: 95, laborAmt: 95, total: 92, action: 100, note: 140 }
+const DEFAULT_WIDTHS = { no: 60, refPage: 60, refCode: 60, desc: 380, qty: 64, unit: 48, matPrice: 110, matAmt: 115, laborPrice: 110, laborAmt: 115, total: 120, action: 100, note: 140 }
 type ColKey = keyof typeof DEFAULT_WIDTHS
 
 /** Column visibility (กรอง). ราคาวัสดุ (4) ปิด → หัวคอลัมน์แรงแสดง ค่าวัสดุและแรงงาน แทน ค่าแรงงาน */
@@ -368,7 +477,7 @@ function NumInput({ value, onChange, className = '', readOnly = false, title, bl
     <input className={className} type="text" inputMode="decimal" value={display} readOnly={readOnly} title={title}
       onFocus={() => { if (!readOnly) setLoc(value==='' ? '' : String(value)) }}
       onBlur={e => { if (readOnly) return; const n=parseFloat(e.target.value.replace(/,/g,'')); onChange(isNaN(n)||e.target.value==='' ? '' : n); setLoc(null) }}
-      onChange={e => { if (readOnly) return; setLoc(e.target.value); const n=parseFloat(e.target.value.replace(/,/g,'')); if (e.target.value===''||e.target.value==='-') onChange(''); else if (!isNaN(n)) onChange(n) }}
+      onChange={e => { if (!readOnly) setLoc(e.target.value) }}
     />
   )
 }
@@ -475,9 +584,638 @@ function SummaryRow({
           </td>
         )
       )}
-      {tail.note && <td className={`boq-td${cellCls}${hl}`}/>}
       <td className={`boq-td${cellCls}${hl}`}/>
+      {tail.note && <td className={`boq-td${cellCls}${hl}`}/>}
     </tr>
+  )
+}
+
+type PlanSideFooterAgg = { sumList: number; sumCost: number; sumGp: number; sumSell: number; avgGpPct: number }
+
+function aggregatePlanSideFooter(
+  rows: PlanSideRow[],
+  opts?: { rollupBySubRowId: Map<string, number>; subRowById: Map<string, SubRow> },
+): PlanSideFooterAgg {
+  let sumList = 0
+  let sumCost = 0
+  let sumGp = 0
+  let sumSell = 0
+  let weightedGp = 0
+  for (const r of rows) {
+    const c = effectivePlanCostForRow(r, opts?.rollupBySubRowId, opts?.subRowById)
+    const gpp = Number(r.gpPct) || 0
+    const { gpAmount, sellPrice } = planSideRowDerived(r, c)
+    sumList += Number(r.listPrice) || 0
+    sumCost += c
+    sumGp += gpAmount
+    sumSell += sellPrice
+    weightedGp += c * gpp
+  }
+  const avgGpPct = sumCost > 0 ? weightedGp / sumCost : 0
+  return { sumList, sumCost, sumGp, sumSell, avgGpPct }
+}
+
+/** One Plan/Actual body row aligned to main BOQ (group / section / summary / line). */
+type BoqTriplexSlot =
+  | { kind: 'group'; key: string }
+  | { kind: 'section'; key: string }
+  | { kind: 'subrow'; subRowId: string; depth: number; key: string }
+  | { kind: 'groupSummary'; key: string; subRowIds: string[] }
+  | { kind: 'groupDiscount'; key: string }
+
+function buildBoqTriplexBodySlots(
+  groups: Group[],
+  showDesc: boolean,
+  tableShowTotal: boolean,
+  discountAmt: number,
+): BoqTriplexSlot[] {
+  const walkLines = (rows: SubRow[], depth: number, slots: BoqTriplexSlot[]) => {
+    for (const sr of rows) {
+      slots.push({ kind: 'subrow', subRowId: sr.id, depth, key: `l-${sr.id}` })
+      walkLines(sr.children ?? [], depth + 1, slots)
+    }
+  }
+  const collectSubRowIds = (rows: SubRow[]): string[] => {
+    const ids: string[] = []
+    for (const sr of rows) {
+      ids.push(sr.id)
+      ids.push(...collectSubRowIds(sr.children ?? []))
+    }
+    return ids
+  }
+  if (!showDesc) {
+    const slots: BoqTriplexSlot[] = []
+    for (const g of groups) {
+      for (const sec of g.sections) walkLines(sec.subRows, 0, slots)
+    }
+    return slots
+  }
+  const slots: BoqTriplexSlot[] = []
+  for (const g of groups) {
+    slots.push({ kind: 'group', key: `g-${g.id}` })
+    for (const sec of g.sections) {
+      slots.push({ kind: 'section', key: `s-${sec.id}` })
+      walkLines(sec.subRows, 0, slots)
+    }
+    const subRowIds = g.sections.flatMap(sec => sec.subRows.map(sr => sr.id))
+    slots.push({ kind: 'groupSummary', key: `gs-${g.id}`, subRowIds })
+    if (discountAmt > 0 && tableShowTotal) slots.push({ kind: 'groupDiscount', key: `gd-${g.id}` })
+  }
+  return slots
+}
+
+function planRowsBySubRowWithOrphans(rows: PlanSideRow[]): { bySubRow: Map<string, PlanSideRow>; orphans: PlanSideRow[] } {
+  const bySubRow = new Map<string, PlanSideRow>()
+  const orphans: PlanSideRow[] = []
+  for (const r of rows) {
+    const lid = r.linkedSubRowId
+    if (!lid) {
+      orphans.push(r)
+      continue
+    }
+    if (!bySubRow.has(lid)) bySubRow.set(lid, r)
+    else orphans.push(r)
+  }
+  return { bySubRow, orphans }
+}
+
+function PlanSidePricingDataRow({
+  r,
+  trClassName,
+  ro,
+  interactive,
+  boqRefLinkLocked,
+  rolledUpPlanCost,
+  linkedSubRowQuantity,
+  displayNoBySubRowId,
+  linkOptions,
+  onUpdateRow,
+  onDeleteRow,
+}: {
+  r: PlanSideRow
+  trClassName?: string
+  ro: boolean
+  interactive: boolean
+  /** Triplex: row is tied to one BOQ line — show ref as text only (no link `<select>`). */
+  boqRefLinkLocked?: boolean
+  /** Parent BOQ line: ราคา/หน่วย = sum of descendant plan rows' `cost` (read-only). */
+  rolledUpPlanCost?: number
+  /** BOQ quantity for the linked SubRow — used to compute ราคาทุน = pricePerUnit x quantity. */
+  linkedSubRowQuantity?: number
+  displayNoBySubRowId: Record<string, string>
+  linkOptions: { subRowId: string; displayNo: string }[]
+  onUpdateRow: (rowId: string, field: keyof PlanSideRow, val: string | number | '') => void
+  onDeleteRow?: (rowId: string) => void
+}) {
+  const useCostRollup = typeof rolledUpPlanCost === 'number'
+  const derivedCost =
+    !useCostRollup && linkedSubRowQuantity !== undefined
+      ? (Number(r.pricePerUnit) || 0) * linkedSubRowQuantity
+      : undefined
+  const effectiveCost = useCostRollup ? rolledUpPlanCost : derivedCost !== undefined ? derivedCost : Number(r.cost) || 0
+  const { gpAmount, sellPrice } = planSideRowDerived(r, effectiveCost)
+  const linkedDisp = r.linkedSubRowId ? displayNoBySubRowId[r.linkedSubRowId] ?? '' : ''
+  const linkOrphan = Boolean(r.linkedSubRowId && !linkedDisp)
+  const pctDisp =
+    ro && r.gpPct === ''
+      ? ''
+      : `${(Number(r.gpPct) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+  const locked = Boolean(boqRefLinkLocked)
+  const showSelectForBoqRef = interactive && !locked && !isTriplexPendingPlanRowId(r.id)
+  const showStaticBoqRefLabel = !showSelectForBoqRef
+  return (
+    <tr className={trClassName ?? 'boq-row'}>
+      <td className="boq-td boq-td-no boq-td-sub-no boq-side-td boq-side-td--boq-ref">
+        <div className="boq-side-boq-ref-cell boq-side-boq-ref-cell--compact">
+          {showStaticBoqRefLabel && linkedDisp ? (
+            <span className="boq-side-boq-ref-no">{linkedDisp}</span>
+          ) : showStaticBoqRefLabel && r.linkedSubRowId ? (
+            <span className="boq-side-boq-ref-orphan" title={r.linkedSubRowId}>
+              ไม่พบ
+            </span>
+          ) : null}
+          {showSelectForBoqRef && (
+            <select
+              className="boq-input boq-side-boq-ref-select"
+              aria-label="ผูกบรรทัด BOQ"
+              value={r.linkedSubRowId}
+              onChange={e => onUpdateRow(r.id, 'linkedSubRowId', e.target.value)}
+            >
+              <option value="">— เลือก —</option>
+              {linkOrphan && <option value={r.linkedSubRowId}>บรรทัดเดิม (ไม่พบใน BOQ)</option>}
+              {linkOptions.map(o => (
+                <option key={o.subRowId} value={o.subRowId}>
+                  {o.displayNo}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      </td>
+      <td className="boq-td boq-td-num boq-td-sub-no boq-side-td">
+        {ro ? (
+          r.listPrice === '' ? null : fmt(Number(r.listPrice))
+        ) : (
+          <NumInput
+            className="boq-input boq-input-num"
+            value={r.listPrice}
+            readOnly={false}
+            onChange={v => onUpdateRow(r.id, 'listPrice', v)}
+          />
+        )}
+      </td>
+      <td className="boq-td boq-side-td boq-side-td--text">
+        {ro ? (
+          r.sub || null
+        ) : (
+          <input type="text" className="boq-input" value={r.sub} onChange={e => onUpdateRow(r.id, 'sub', e.target.value)} />
+        )}
+      </td>
+      <td className="boq-td boq-side-td boq-side-td--text boq-side-td--doc-issue">
+        {ro ? (
+          r.docIssue || null
+        ) : (
+          <input
+            type="text"
+            className="boq-input boq-side-doc-field"
+            value={r.docIssue}
+            aria-label="เลขที่"
+            onChange={e => onUpdateRow(r.id, 'docIssue', e.target.value)}
+          />
+        )}
+      </td>
+      <td className="boq-td boq-side-td boq-side-td--text boq-side-td--doc-title">
+        {ro ? (
+          r.docTitle || null
+        ) : (
+          <input
+            type="text"
+            className="boq-input boq-side-doc-field"
+            value={r.docTitle}
+            aria-label="เอกสาร"
+            onChange={e => onUpdateRow(r.id, 'docTitle', e.target.value)}
+          />
+        )}
+      </td>
+      <td className="boq-td boq-td-num boq-side-td">
+        {ro ? (
+          r.pricePerUnit === '' ? null : fmt(Number(r.pricePerUnit))
+        ) : (
+          <NumInput
+            className="boq-input boq-input-num"
+            value={r.pricePerUnit}
+            readOnly={false}
+            onChange={v => onUpdateRow(r.id, 'pricePerUnit', v)}
+          />
+        )}
+      </td>
+      <td className="boq-td boq-td-num boq-side-td">
+        {useCostRollup ? (
+          <span className="boq-side-td--rollup-cost" title="รวมจากบรรทัดลูกใน BOQ">
+            {fmt(rolledUpPlanCost)}
+          </span>
+        ) : derivedCost !== undefined ? (
+          <span className="boq-side-td--rollup-cost" title="ราคา/หน่วย x จำนวน BOQ">
+            {fmt(derivedCost)}
+          </span>
+        ) : ro ? (
+          r.cost === '' ? null : fmt(Number(r.cost))
+        ) : (
+          <NumInput
+            className="boq-input boq-input-num"
+            value={r.cost}
+            readOnly={false}
+            onChange={v => onUpdateRow(r.id, 'cost', v)}
+          />
+        )}
+      </td>
+      <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell">
+        {ro ? (
+          pctDisp
+        ) : (
+          <span className="boq-side-pct-wrap">
+            <NumInput
+              className="boq-input boq-input-num boq-input-num--pct"
+              value={r.gpPct}
+              readOnly={false}
+              onChange={v => onUpdateRow(r.id, 'gpPct', v)}
+            />
+            <span className="boq-side-pct-suffix">%</span>
+          </span>
+        )}
+      </td>
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(gpAmount)}</td>
+      <td className="boq-td boq-td-num boq-td-total boq-side-td boq-side-td--last-cell">
+        <div className="boq-side-last-cell-inner">
+          <span className="boq-side-last-val">{fmt(sellPrice)}</span>
+          {interactive && onDeleteRow && !isTriplexPendingPlanRowId(r.id) && (
+            <button type="button" className="boq-side-row-del" title="ลบแถว" onClick={() => onDeleteRow(r.id)}>
+              ×
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+/** Shared PLAN / Actual pricing grid (read-only mirror or editable). */
+function PlanSidePricingTable({
+  boqMainHeadSubRow,
+  bandLabel,
+  rows,
+  footer,
+  displayNoBySubRowId,
+  linkOptions,
+  interactive,
+  onUpdateRow,
+  onDeleteRow,
+  emptyMessage,
+  planCostRollupBySubRowId,
+  subRowById,
+  triplex,
+}: {
+  boqMainHeadSubRow: boolean
+  bandLabel: string
+  rows: PlanSideRow[]
+  footer: PlanSideFooterAgg
+  displayNoBySubRowId: Record<string, string>
+  linkOptions: { subRowId: string; displayNo: string }[]
+  interactive: boolean
+  onUpdateRow: (rowId: string, field: keyof PlanSideRow, val: string | number | '') => void
+  onDeleteRow?: (rowId: string) => void
+  emptyMessage: string
+  /** Parent lines: sum of descendant plan `cost` for ราคา/หน่วย display. */
+  planCostRollupBySubRowId?: Map<string, number>
+  /** BOQ SubRow lookup — used to derive ราคาทุน = ราคา/หน่วย x BOQ quantity. */
+  subRowById?: Map<string, SubRow>
+  triplex?: {
+    tbodyRef: React.RefObject<HTMLTableSectionElement | null>
+    slots: BoqTriplexSlot[]
+    bySubRow: Map<string, PlanSideRow>
+    orphans: PlanSideRow[]
+    onEnsureRowForSubRow?: (subRowId: string) => void
+  }
+}) {
+  const ro = !interactive
+  const getLinkedQty = (subRowId: string): number | undefined => {
+    if (!subRowId || !subRowById) return undefined
+    const sr = subRowById.get(subRowId)
+    if (!sr || sr.quantity === '') return undefined
+    return Number(sr.quantity)
+  }
+  const dashRow = (
+    <>
+      <td className="boq-td boq-td-num boq-td-sub-no boq-side-td" />
+      <td className="boq-td boq-side-td boq-side-td--text" />
+      <td className="boq-td boq-side-td boq-side-td--text boq-side-td--doc-issue" />
+      <td className="boq-td boq-side-td boq-side-td--text boq-side-td--doc-title" />
+      <td className="boq-td boq-td-num boq-side-td" />
+      <td className="boq-td boq-td-num boq-side-td" />
+      <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell" />
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td" />
+      <td className="boq-td boq-td-num boq-td-total boq-side-td boq-side-td--last-cell" />
+    </>
+  )
+  const renderBody = () => {
+    if (triplex) {
+      const { slots, bySubRow, orphans, onEnsureRowForSubRow } = triplex
+      const lines: React.ReactNode[] = []
+      for (const s of slots) {
+        if (s.kind === 'group') {
+          lines.push(
+            <tr key={s.key} className="boq-row boq-group-header-row boq-side-triplex-ghost" aria-hidden>
+              <td colSpan={10} className="boq-td boq-side-triplex-ghost-cell boq-side-triplex-ghost-cell--group" />
+            </tr>,
+          )
+          continue
+        }
+        if (s.kind === 'section') {
+          lines.push(
+            <tr key={s.key} className="boq-row boq-section-header-row boq-side-triplex-ghost" aria-hidden>
+              <td colSpan={10} className="boq-td boq-side-triplex-ghost-cell boq-side-triplex-ghost-cell--section" />
+            </tr>,
+          )
+          continue
+        }
+        if (s.kind === 'groupSummary') {
+          let sumCost = 0, sumGp = 0, sumSell = 0, weightedGp = 0
+          for (const sid of s.subRowIds) {
+            const pr = bySubRow.get(sid)
+            if (!pr) continue
+            const c = effectivePlanCostForRow(pr, planCostRollupBySubRowId, subRowById)
+            const gpp = Number(pr.gpPct) || 0
+            const { gpAmount, sellPrice } = planSideRowDerived(pr, c)
+            sumCost += c
+            sumGp += gpAmount
+            sumSell += sellPrice
+            weightedGp += c * gpp
+          }
+          const avgGpPct = sumCost > 0 ? weightedGp / sumCost : 0
+          lines.push(
+            <tr key={s.key} className="boq-row boq-summary-row boq-side-summary-row">
+              <td className="boq-td boq-td-no boq-side-td boq-side-td--boq-ref" />
+              <td className="boq-td boq-td-num boq-side-td" />
+              <td className="boq-td boq-side-td" colSpan={4} />
+              <td className="boq-td boq-td-num boq-side-td">{fmt(sumCost)}</td>
+              <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell boq-side-td--gp-avg">
+                {sumCost > 0 ? `${avgGpPct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : ''}
+              </td>
+              <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(sumGp)}</td>
+              <td className="boq-td boq-td-num boq-td-total boq-side-td boq-side-td--last-cell">{fmt(sumSell)}</td>
+            </tr>,
+          )
+          continue
+        }
+        if (s.kind === 'groupDiscount') {
+          lines.push(
+            <tr key={s.key} className="boq-row boq-summary-row boq-summary-row--group-discount boq-side-triplex-ghost" aria-hidden>
+              <td colSpan={10} className="boq-td boq-side-triplex-ghost-cell boq-side-triplex-ghost-cell--discount" />
+            </tr>,
+          )
+          continue
+        }
+        const pr = bySubRow.get(s.subRowId)
+        const trCls = s.depth >= 1 ? 'boq-row boq-row--nested' : 'boq-row'
+        if (pr) {
+          lines.push(
+            <PlanSidePricingDataRow
+              key={s.key}
+              trClassName={trCls}
+              r={pr}
+              ro={ro}
+              interactive={interactive}
+              boqRefLinkLocked
+              rolledUpPlanCost={pr.linkedSubRowId ? planCostRollupBySubRowId?.get(pr.linkedSubRowId) : undefined}
+              linkedSubRowQuantity={getLinkedQty(s.subRowId)}
+              displayNoBySubRowId={displayNoBySubRowId}
+              linkOptions={linkOptions}
+              onUpdateRow={onUpdateRow}
+              onDeleteRow={onDeleteRow}
+            />,
+          )
+          continue
+        }
+        if (interactive && onEnsureRowForSubRow) {
+          lines.push(
+            <PlanSidePricingDataRow
+              key={s.key}
+              trClassName={trCls}
+              r={{
+                ...emptyPlanSideRow(),
+                id: triplexPendingPlanRowId(s.subRowId),
+                linkedSubRowId: s.subRowId,
+              }}
+              ro={false}
+              interactive={interactive}
+              boqRefLinkLocked
+              rolledUpPlanCost={planCostRollupBySubRowId?.get(s.subRowId)}
+              linkedSubRowQuantity={getLinkedQty(s.subRowId)}
+              displayNoBySubRowId={displayNoBySubRowId}
+              linkOptions={linkOptions}
+              onUpdateRow={onUpdateRow}
+              onDeleteRow={onDeleteRow}
+            />,
+          )
+          continue
+        }
+        const disp = displayNoBySubRowId[s.subRowId] ?? ''
+        lines.push(
+          <tr key={s.key} className={trCls}>
+            <td className="boq-td boq-td-no boq-td-sub-no boq-side-td boq-side-td--boq-ref">
+              <div className="boq-side-boq-ref-cell boq-side-boq-ref-cell--triplex-slot">
+                {disp ? <span className="boq-side-boq-ref-no">{disp}</span> : null}
+                {onEnsureRowForSubRow && (
+                  <button
+                    type="button"
+                    className="boq-btn boq-side-triplex-add-line"
+                    title="เพิ่มแถวในบรรทัด BOQ นี้"
+                    onClick={() => onEnsureRowForSubRow(s.subRowId)}
+                  >
+                    +
+                  </button>
+                )}
+              </div>
+            </td>
+            {dashRow}
+          </tr>,
+        )
+      }
+      for (const o of orphans) {
+        lines.push(
+          <PlanSidePricingDataRow
+            key={`orphan-${o.id}`}
+            r={o}
+            ro={ro}
+            interactive={interactive}
+            rolledUpPlanCost={o.linkedSubRowId ? planCostRollupBySubRowId?.get(o.linkedSubRowId) : undefined}
+            linkedSubRowQuantity={getLinkedQty(o.linkedSubRowId)}
+            displayNoBySubRowId={displayNoBySubRowId}
+            linkOptions={linkOptions}
+            onUpdateRow={onUpdateRow}
+            onDeleteRow={onDeleteRow}
+          />,
+        )
+      }
+      if (lines.length === 0) {
+        return (
+          <tr className="boq-row">
+            <td className="boq-td boq-side-td boq-side-td--muted" colSpan={10}>
+              {emptyMessage}
+            </td>
+          </tr>
+        )
+      }
+      return lines
+    }
+    if (rows.length === 0) {
+      return (
+        <tr className="boq-row">
+          <td className="boq-td boq-side-td boq-side-td--muted" colSpan={10}>
+            {emptyMessage}
+          </td>
+        </tr>
+      )
+    }
+    return rows.map(r => (
+      <PlanSidePricingDataRow
+        key={r.id}
+        r={r}
+        ro={ro}
+        interactive={interactive}
+        rolledUpPlanCost={r.linkedSubRowId ? planCostRollupBySubRowId?.get(r.linkedSubRowId) : undefined}
+        linkedSubRowQuantity={getLinkedQty(r.linkedSubRowId)}
+        displayNoBySubRowId={displayNoBySubRowId}
+        linkOptions={linkOptions}
+        onUpdateRow={onUpdateRow}
+        onDeleteRow={onDeleteRow}
+      />
+    ))
+  }
+  return (
+    <table className="boq-table boq-side-table">
+      <colgroup>
+        <col className="boq-side-col boq-side-col--boq-ref" />
+        <col className="boq-side-col boq-side-col--lead" />
+        <col className="boq-side-col" />
+        <col className="boq-side-col" />
+        <col className="boq-side-col" />
+        <col className="boq-side-col" />
+        <col className="boq-side-col" />
+        <col className="boq-side-col" />
+        <col className="boq-side-col" />
+        <col className="boq-side-col" />
+      </colgroup>
+      <thead
+        className={
+          boqMainHeadSubRow ? 'boq-side-thead--two-row boq-side-thead--doc-split' : 'boq-side-thead--doc-split-single'
+        }
+      >
+        {boqMainHeadSubRow ? (
+          <>
+            <tr>
+              <th colSpan={2} className="boq-th boq-side-th boq-side-th--plan-band" lang="en">
+                <span className="boq-side-th-r1-label">{bandLabel}</span>
+              </th>
+              <th colSpan={5} className="boq-th boq-side-th boq-side-th--cost-group">
+                <span className="boq-side-th-r1-label">ต้นทุน</span>
+              </th>
+              <th colSpan={3} className="boq-th boq-side-th boq-side-th--sell-group" title="ประเมินราคาขาย + กำไร">
+                <span className="boq-side-th-r1-label">ประเมิน + กำไร</span>
+              </th>
+            </tr>
+            <tr>
+              <th rowSpan={2} className="boq-th boq-side-th boq-side-th--boq-ref-head" title="ลำดับบรรทัด BOQ (เช่น 1.1.1)">
+                ลำดับ BOQ
+              </th>
+              <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead">
+                ราคาขาย
+              </th>
+              <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">
+                Sub
+              </th>
+              <th colSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-main">
+                เลขที่เอกสาร
+              </th>
+              <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">
+                ราคา/หน่วย
+              </th>
+              <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">
+                ราคาทุน
+              </th>
+              <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">
+                GP%
+              </th>
+              <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">
+                GP Amount
+              </th>
+              <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">
+                ราคาขาย
+              </th>
+            </tr>
+            <tr>
+              <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf">เลขที่</th>
+              <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf">เอกสาร</th>
+            </tr>
+          </>
+        ) : (
+          <tr>
+            <th className="boq-th boq-side-th boq-side-th--boq-ref-head">ลำดับ BOQ</th>
+            <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead">
+              <span className="boq-side-th__kind" lang="en">{bandLabel}</span>
+              <span className="boq-side-th__rowhead-label">ราคาขาย</span>
+            </th>
+            <th className="boq-th boq-side-th boq-side-th--cost-leaf" title="ต้นทุน">
+              Sub
+            </th>
+            <th colSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-main-merged" title="เลขที่เอกสาร">
+              <div className="boq-side-th-doc-merged-inner">
+                <span className="boq-side-th-doc-merged-parent">เลขที่เอกสาร</span>
+                <div className="boq-side-th-doc-merged-leaves" aria-hidden>
+                  <span>เลขที่</span>
+                  <span>เอกสาร</span>
+                </div>
+              </div>
+            </th>
+            <th className="boq-th boq-side-th boq-side-th--cost-leaf" title="ต้นทุน">
+              ราคา/หน่วย
+            </th>
+            <th className="boq-th boq-side-th boq-side-th--cost-leaf" title="ต้นทุน">
+              ราคาทุน
+            </th>
+            <th className="boq-th boq-side-th boq-side-th--sell-leaf" title="ประเมินราคาขาย + กำไร">
+              GP%
+            </th>
+            <th className="boq-th boq-side-th boq-side-th--sell-leaf" title="ประเมินราคาขาย + กำไร">
+              GP Amount
+            </th>
+            <th className="boq-th boq-side-th boq-side-th--sell-leaf" title="ประเมินราคาขาย + กำไร">
+              ราคาขาย
+            </th>
+          </tr>
+        )}
+      </thead>
+      <tbody ref={triplex?.tbodyRef}>{renderBody()}</tbody>
+      {rows.length > 0 && (
+        <tfoot>
+          <tr className="boq-summary-row boq-side-summary-row">
+            <td className="boq-td boq-td-no boq-td-sub-no boq-side-td boq-side-td--boq-ref" />
+            <td className="boq-td boq-td-num boq-td-sub-no boq-side-td">{fmt(footer.sumList)}</td>
+            <td className="boq-td boq-side-td boq-side-td--text" colSpan={4}>
+              รวม
+            </td>
+            <td className="boq-td boq-td-num boq-side-td">{fmt(footer.sumCost)}</td>
+            <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell boq-side-td--gp-avg">
+              {footer.sumCost > 0
+                ? `${footer.avgGpPct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+                : ''}
+            </td>
+            <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(footer.sumGp)}</td>
+            <td className="boq-td boq-td-num boq-td-total boq-side-td">{fmt(footer.sumSell)}</td>
+          </tr>
+        </tfoot>
+      )}
+    </table>
   )
 }
 
@@ -489,7 +1227,7 @@ function ConfirmModal({ message, onConfirm, onCancel }: { message:string; onConf
         <p className="boq-confirm-msg">{message}</p>
         <div className="boq-modal-actions">
           <button type="button" className="boq-modal-cancel" onClick={onCancel}>ยกเลิก</button>
-          <button type="button" className="boq-confirm-ok" onClick={() => onConfirm()}>ยืนยันลบ</button>
+          <button type="button" className="boq-confirm-ok" onClick={() => onConfirm()}>ยืนยัน</button>
         </div>
       </div>
     </div>
@@ -513,6 +1251,8 @@ export default function BoqEditorPage() {
   const [boqExists, setBoqExists] = useState(false)
   const [groups, setGroups]     = useState<Group[]>([emptyGroup()])
   const [planSideRows, setPlanSideRows] = useState<PlanSideRow[]>(() => [emptyPlanSideRow(), emptyPlanSideRow()])
+  /** Actual only: frozen copy of linked Plan's planSideRows (left strip). */
+  const [planMirrorSideRows, setPlanMirrorSideRows] = useState<PlanSideRow[]>([])
   /** คอลัมน์ราคาวัสดุ — บันทึกเป็น showMaterial */
   const [showMat, setShowMat]   = useState(true)
   /** UI only: กรองเปิดวัสดุแล้ว — ซ่อน ราคาต่อหน่วย/จำนวนเงิน เหลือคอลัมน์แคบ + คลิกคืน */
@@ -545,8 +1285,13 @@ export default function BoqEditorPage() {
   const historyRef = useRef<{ past: EditorSnapshot[]; future: EditorSnapshot[] }>({ past: [], future: [] })
   const isApplyingHistoryRef = useRef(false)
   const mainTheadRef = useRef<HTMLTableSectionElement>(null)
+  const mainTbodyRef = useRef<HTMLTableSectionElement>(null)
+  const planTriplexTbodyRef = useRef<HTMLTableSectionElement>(null)
+  const actualTriplexTbodyRef = useRef<HTMLTableSectionElement>(null)
   const boqSplitScrollRef = useRef<HTMLDivElement>(null)
   const [historyTick, setHistoryTick] = useState(0)
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle'|'pending'|'saving'|'saved'|'error'>('idle')
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /* Column widths */
   const [colW, setColW] = useState<typeof DEFAULT_WIDTHS>({ ...DEFAULT_WIDTHS })
@@ -675,10 +1420,11 @@ export default function BoqEditorPage() {
             | null
           const isWrapped = raw && !Array.isArray(raw)
           const loaded: Group[] = isWrapped ? (raw.groups?.length ? raw.groups : [emptyGroup()]) : (Array.isArray(raw) && raw.length ? raw as Group[] : [emptyGroup()])
-          setGroups(loaded.map(g => ({
+          const normalizedLoaded = loaded.map(g => ({
             ...g,
             sections: g.sections.map(s => ({ ...s, subRows: s.subRows.map(r => normalizeSubRow(r as SubRow & { children?: SubRow[] })) })),
-          })))
+          }))
+          setGroups(normalizedLoaded)
           if (isWrapped) {
             setOverheadPct((raw as { overheadPct?: number }).overheadPct ?? 12)
             setVatPct((raw as { vatPct?: number }).vatPct ?? 7)
@@ -710,6 +1456,7 @@ export default function BoqEditorPage() {
                 const praw = pd.boq?.data as (Group[] | { groups: Group[] }) | null | undefined
                 if (!praw) {
                   setPlanGroups([])
+                  setPlanMirrorSideRows([])
                   return
                 }
                 const pisWrapped = praw && !Array.isArray(praw)
@@ -725,10 +1472,18 @@ export default function BoqEditorPage() {
                     })),
                   }))
                 )
+                const pSide = pisWrapped ? (praw as { planSideRows?: unknown[] }).planSideRows : undefined
+                setPlanMirrorSideRows(
+                  Array.isArray(pSide) && pSide.length > 0 ? pSide.map(normalizePlanSideRow) : []
+                )
               })
-              .catch(() => setPlanGroups([]))
+              .catch(() => {
+                setPlanGroups([])
+                setPlanMirrorSideRows([])
+              })
           } else {
             setPlanGroups([])
+            setPlanMirrorSideRows([])
           }
         } else { router.replace('/dashboard/boq') }
       })
@@ -793,6 +1548,7 @@ export default function BoqEditorPage() {
   /* save */
   const handleSave = async () => {
     setSaving(true); setSaveError(null)
+    if (autoSaveTimerRef.current) { clearTimeout(autoSaveTimerRef.current); autoSaveTimerRef.current = null }
     try {
       const res = await fetch(`/api/boq/${id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -813,10 +1569,54 @@ export default function BoqEditorPage() {
       if (!res.ok) throw new Error()
       const d = await res.json()
       setJobName(d.boq?.job?.name || d.boq?.title || '')
+      setAutoSaveStatus('idle')
       setIsEditing(false)
     } catch { setSaveError('บันทึกไม่สำเร็จ กรุณาลองใหม่') }
     finally { setSaving(false) }
   }
+
+  /* autosave — always-fresh snapshot via ref; timer fires 30 s after last change */
+  const latestDataRef = useRef<{
+    groups: Group[]; overheadPct: number; vatPct: number; discount: number;
+    discountType: string; planSideRows: PlanSideRow[]; showMat: boolean;
+    jobId: string | null; boqTitle: string
+  } | null>(null)
+
+  useEffect(() => {
+    if (!editing || loading || !boqExists) return
+    latestDataRef.current = { groups, overheadPct, vatPct, discount: Number(discount) || 0, discountType, planSideRows, showMat, jobId: jobId || null, boqTitle }
+    setAutoSaveStatus('pending')
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = setTimeout(async () => {
+      autoSaveTimerRef.current = null
+      const snap = latestDataRef.current
+      if (!snap) return
+      setAutoSaveStatus('saving')
+      try {
+        const res = await fetch(`/api/boq/${id}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: { groups: snap.groups, overheadPct: snap.overheadPct, vatPct: snap.vatPct, discount: snap.discount, discountType: snap.discountType, planSideRows: snap.planSideRows }, showMaterial: snap.showMat, jobId: snap.jobId, title: snap.boqTitle }),
+        })
+        if (!res.ok) throw new Error()
+        setAutoSaveStatus('saved')
+        setTimeout(() => setAutoSaveStatus(s => s === 'saved' ? 'idle' : s), 4000)
+      } catch { setAutoSaveStatus('error') }
+    }, 30_000)
+  }, [groups, overheadPct, vatPct, discount, discountType, planSideRows, showMat, jobId, boqTitle, editing, loading, boqExists, id])
+
+  /* flush pending autosave when user closes/navigates away */
+  useEffect(() => {
+    const flush = () => {
+      const snap = latestDataRef.current
+      if (!snap || !autoSaveTimerRef.current) return
+      clearTimeout(autoSaveTimerRef.current)
+      autoSaveTimerRef.current = null
+      const payload = new Blob([JSON.stringify({ data: { groups: snap.groups, overheadPct: snap.overheadPct, vatPct: snap.vatPct, discount: snap.discount, discountType: snap.discountType, planSideRows: snap.planSideRows }, showMaterial: snap.showMat, jobId: snap.jobId, title: snap.boqTitle })], { type: 'application/json' })
+      navigator.sendBeacon(`/api/boq/${id}`, payload)
+    }
+    window.addEventListener('beforeunload', flush)
+    return () => window.removeEventListener('beforeunload', flush)
+  }, [id])
 
   const handleSubmit = async () => {
     setSubmitting(true)
@@ -947,8 +1747,32 @@ export default function BoqEditorPage() {
   const updPlanRow = (rowId: string, field: keyof PlanSideRow, val: string | number | '') => {
     setPlanSideRows(rows => rows.map(r => (r.id === rowId ? { ...r, [field]: val } : r)))
   }
+  /** Triplex blank slots: first edit materializes a real `PlanSideRow` linked to that BOQ line. */
+  const planRowUpdateForTriplexEditor = useCallback(
+    (rowId: string, field: keyof PlanSideRow, val: string | number | '') => {
+      if (isTriplexPendingPlanRowId(rowId)) {
+        const subRowId = rowId.slice(TRIPLEX_PENDING_PLAN_ROW_PREFIX.length)
+        setPlanSideRows(rows => {
+          const existing = rows.find(r => r.linkedSubRowId === subRowId)
+          if (existing) {
+            return rows.map(r => (r.id === existing.id ? { ...r, [field]: val } : r))
+          }
+          return [...rows, { ...emptyPlanSideRow(), linkedSubRowId: subRowId, [field]: val }]
+        })
+        return
+      }
+      setPlanSideRows(rows => rows.map(r => (r.id === rowId ? { ...r, [field]: val } : r)))
+    },
+    [],
+  )
   const addPlanRow = () => setPlanSideRows(p => [...p, emptyPlanSideRow()])
   const delPlanRow = (rowId: string) => setPlanSideRows(p => p.filter(r => r.id !== rowId))
+  const ensurePlanRowForSubRow = useCallback((subRowId: string) => {
+    setPlanSideRows(rows => {
+      if (rows.some(r => r.linkedSubRowId === subRowId)) return rows
+      return [...rows, { ...emptyPlanSideRow(), linkedSubRowId: subRowId }]
+    })
+  }, [])
 
   /* totals */
   const totalItems      = groups.reduce((s,g) => s + g.sections.length, 0)
@@ -968,6 +1792,34 @@ export default function BoqEditorPage() {
     showTotal: tableShowTotal,
     showNote,
   }
+  /** Main BOQ column count — matches `<colgroup>` (for PLAN-style band `colSpan`s). */
+  const boqMainTableColCount = useMemo(() => {
+    let n = 1
+    if (showRefId) n += 2
+    if (tableShowDesc) n += 1
+    if (showQtyUnit) n += 2
+    if (showMat && !matDetailHidden) n += 2
+    else if (showMat && matDetailHidden) n += 1
+    if (showLabor) n += 2
+    if (tableShowTotal) n += actualCompareMode ? 4 : 1
+    n += 1
+    if (showNote) n += 1
+    return n
+  }, [
+    showRefId,
+    tableShowDesc,
+    showQtyUnit,
+    showMat,
+    matDetailHidden,
+    showLabor,
+    tableShowTotal,
+    actualCompareMode,
+    showNote,
+  ])
+  const boqMainBandColSpans = useMemo(
+    () => planBandColSpansForMain(boqMainTableColCount),
+    [boqMainTableColCount],
+  )
   /** ราคาวัสดุสิ่งก่อสร้าง เปิด → ค่าแรงงาน; ปิด → ค่าวัสดุและแรงงาน (ความหมายรวมให้ทีมงาน) */
   const laborGroupHeaderLabel = showMat ? 'ค่าแรงงาน' : 'ค่าวัสดุและแรงงาน'
   const canMutateStructure = editing
@@ -1011,26 +1863,6 @@ export default function BoqEditorPage() {
     return distributeProportionalAmounts(weights, discountAmt)
   }, [groups, actualCompareMode, discountAmt])
 
-  const planSideFooter = useMemo(() => {
-    let sumList = 0
-    let sumCost = 0
-    let sumGp = 0
-    let sumSell = 0
-    let weightedGp = 0
-    for (const r of planSideRows) {
-      const c = Number(r.cost) || 0
-      const gpp = Number(r.gpPct) || 0
-      const { gpAmount, sellPrice } = planSideRowDerived(r)
-      sumList += Number(r.listPrice) || 0
-      sumCost += c
-      sumGp += gpAmount
-      sumSell += sellPrice
-      weightedGp += c * gpp
-    }
-    const avgGpPct = sumCost > 0 ? weightedGp / sumCost : 0
-    return { sumList, sumCost, sumGp, sumSell, avgGpPct }
-  }, [planSideRows])
-
   const { planBoqLinkOptions, planBoqDisplayNoBySubRowId } = useMemo(() => {
     const options = flattenBoqLinesForPlanLink(groups)
     const planBoqDisplayNoBySubRowId: Record<string, string> = {}
@@ -1038,42 +1870,80 @@ export default function BoqEditorPage() {
     return { planBoqLinkOptions: options, planBoqDisplayNoBySubRowId }
   }, [groups])
 
+  const { planMirrorLinkOptions, planMirrorDisplayNoBySubRowId } = useMemo(() => {
+    const options = flattenBoqLinesForPlanLink(planGroups)
+    const planMirrorDisplayNoBySubRowId: Record<string, string> = {}
+    for (const o of options) planMirrorDisplayNoBySubRowId[o.subRowId] = o.displayNo
+    return { planMirrorLinkOptions: options, planMirrorDisplayNoBySubRowId }
+  }, [planGroups])
+
+  const boqTriplexBodySlots = useMemo(
+    () => buildBoqTriplexBodySlots(groups, colVis.showDesc, tableShowTotal, discountAmt),
+    [groups, colVis.showDesc, tableShowTotal, discountAmt],
+  )
+  const { bySubRow: planBySubRow, orphans: planOrphans } = useMemo(
+    () => planRowsBySubRowWithOrphans(planSideRows),
+    [planSideRows],
+  )
+  const { bySubRow: mirrorBySubRow, orphans: mirrorOrphans } = useMemo(
+    () => planRowsBySubRowWithOrphans(planMirrorSideRows),
+    [planMirrorSideRows],
+  )
+
+  const subRowById = useMemo(() => buildSubRowByIdFromGroups(groups), [groups])
+  const planMirrorSubRowById = useMemo(() => buildSubRowByIdFromGroups(planGroups), [planGroups])
+  const planCostRollupBySubRowId = useMemo(
+    () => buildPlanCostRollupBySubRowId(groups, planBySubRow),
+    [groups, planBySubRow],
+  )
+  const mirrorPlanCostRollupBySubRowId = useMemo(
+    () => buildPlanCostRollupBySubRowId(planGroups, mirrorBySubRow),
+    [planGroups, mirrorBySubRow],
+  )
+  const planSideFooter = useMemo(
+    () =>
+      aggregatePlanSideFooter(planSideRows, {
+        rollupBySubRowId: planCostRollupBySubRowId,
+        subRowById,
+      }),
+    [planSideRows, planCostRollupBySubRowId, subRowById],
+  )
+  const planMirrorFooter = useMemo(
+    () =>
+      aggregatePlanSideFooter(planMirrorSideRows, {
+        rollupBySubRowId: mirrorPlanCostRollupBySubRowId,
+        subRowById: planMirrorSubRowById,
+      }),
+    [planMirrorSideRows, mirrorPlanCostRollupBySubRowId, planMirrorSubRowById],
+  )
+
   const planSideEditing = editing && boqKind === 'PLAN'
+  const actualSideEditing = editing && boqKind === 'ACTUAL'
   /** Same condition as main BOQ second header row — PLAN thead uses 1 or 2 rows to match height */
   const boqMainHeadSubRow = showRefId || (showMat && !matDetailHidden) || showLabor
+  /** Triplex: BOQ gains a 3rd thead row so row count matches PLAN/ACTUAL (less “magic” height math). */
+  const boqMainTheadSpan = boqMainHeadSubRow ? 3 : 1
 
   /** Match PLAN/ACTUAL thead row heights to main BOQ so body rows line up across the split. */
   useLayoutEffect(() => {
     const scroll = boqSplitScrollRef.current
     const thead = mainTheadRef.current
     if (!scroll) return
+    const clearTheadVars = () => {
+      for (let i = 1; i <= 10; i++) scroll.style.removeProperty(`--boq-thead-r${i}-height`)
+    }
     if (!thead || thead.rows.length < 1) {
-      scroll.style.removeProperty('--boq-thead-r1-height')
-      scroll.style.removeProperty('--boq-thead-r2-height')
+      clearTheadVars()
       return
     }
-    const r0 = thead.rows[0]
-    const r1 = thead.rows[1]
     const measure = () => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          if (!r1) {
-            const h0 = r0.getBoundingClientRect().height
-            if (h0 > 1) scroll.style.setProperty('--boq-thead-r1-height', `${Math.round(h0 * 100) / 100}px`)
-            else scroll.style.removeProperty('--boq-thead-r1-height')
-            scroll.style.removeProperty('--boq-thead-r2-height')
-            return
-          }
-          /* Equal row heights on PLAN: split main thead total 50/50 (main r1≠r2 but total still matches → body aligns). */
-          const total = thead.getBoundingClientRect().height
-          if (total > 2) {
-            const a = Math.round((total / 2) * 100) / 100
-            const b = Math.round((total - a) * 100) / 100
-            scroll.style.setProperty('--boq-thead-r1-height', `${a}px`)
-            scroll.style.setProperty('--boq-thead-r2-height', `${b}px`)
-          } else {
-            scroll.style.removeProperty('--boq-thead-r1-height')
-            scroll.style.removeProperty('--boq-thead-r2-height')
+          const rows = Array.from(thead.rows)
+          clearTheadVars()
+          for (let i = 0; i < rows.length; i++) {
+            const h = rows[i].getBoundingClientRect().height
+            if (h > 1) scroll.style.setProperty(`--boq-thead-r${i + 1}-height`, `${Math.ceil(h)}px`)
           }
         })
       })
@@ -1083,11 +1953,11 @@ export default function BoqEditorPage() {
     ro.observe(thead)
     return () => {
       ro.disconnect()
-      scroll.style.removeProperty('--boq-thead-r1-height')
-      scroll.style.removeProperty('--boq-thead-r2-height')
+      clearTheadVars()
     }
   }, [
     boqMainHeadSubRow,
+    boqMainTheadSpan,
     loading,
     showRefId,
     showMat,
@@ -1099,6 +1969,56 @@ export default function BoqEditorPage() {
     showNote,
     actualCompareMode,
     colW,
+    boqMainTableColCount,
+  ])
+
+  /** Triplex: each PLAN/ACTUAL tbody row height follows the parallel BOQ tbody row. */
+  useLayoutEffect(() => {
+    const main = mainTbodyRef.current
+    if (!main) return
+    const clearSide = (side: HTMLTableSectionElement | null) => {
+      if (!side) return
+      Array.from(side.rows).forEach(r => r.style.removeProperty('height'))
+    }
+    const sync = () => {
+      const mh = Array.from(main.rows)
+      const apply = (side: HTMLTableSectionElement | null) => {
+        if (!side) return
+        const sh = Array.from(side.rows)
+        const n = Math.min(mh.length, sh.length)
+        for (let i = 0; i < n; i++) {
+          const h = mh[i].getBoundingClientRect().height
+          /* Integer px avoids sub-pixel gaps between BOQ (หมายเหตุ) and PLAN/ACTUAL rows. */
+          if (h > 1) sh[i].style.height = `${Math.ceil(h)}px`
+          else sh[i].style.removeProperty('height')
+        }
+        for (let i = n; i < sh.length; i++) sh[i].style.removeProperty('height')
+      }
+      apply(planTriplexTbodyRef.current)
+      apply(actualTriplexTbodyRef.current)
+    }
+    sync()
+    const ro = new ResizeObserver(sync)
+    ro.observe(main)
+    const mainHead = mainTheadRef.current
+    if (mainHead) ro.observe(mainHead)
+    return () => {
+      ro.disconnect()
+      clearSide(planTriplexTbodyRef.current)
+      clearSide(actualTriplexTbodyRef.current)
+    }
+  }, [
+    groups,
+    planSideRows,
+    planMirrorSideRows,
+    colVis.showDesc,
+    tableShowTotal,
+    discountAmt,
+    boqTriplexBodySlots.length,
+    boqKind,
+    boqMainHeadSubRow,
+    editing,
+    loading,
   ])
 
   let globalSecIdx   = 0
@@ -1193,6 +2113,10 @@ export default function BoqEditorPage() {
                   <button type="button" className="boq-save-btn" onClick={handleSave} disabled={saving}>
                     {saving ? 'กำลังบันทึก...' : '💾 บันทึก'}
                   </button>
+                  {autoSaveStatus === 'pending' && <span className="boq-autosave-indicator boq-autosave-indicator--pending">จะบันทึกอัตโนมัติ...</span>}
+                  {autoSaveStatus === 'saving' && <span className="boq-autosave-indicator boq-autosave-indicator--saving">กำลังบันทึกอัตโนมัติ...</span>}
+                  {autoSaveStatus === 'saved' && <span className="boq-autosave-indicator boq-autosave-indicator--saved">✓ บันทึกอัตโนมัติแล้ว</span>}
+                  {autoSaveStatus === 'error' && <span className="boq-autosave-indicator boq-autosave-indicator--error">บันทึกอัตโนมัติล้มเหลว</span>}
                 </>
               ) : (
                 <button type="button" className="boq-edit-btn" onClick={() => setIsEditing(true)}>
@@ -1270,10 +2194,13 @@ export default function BoqEditorPage() {
         </div>
       </div>
 
-      <div className="boq-split-scroll" ref={boqSplitScrollRef}>
-      <div className="boq-split-layout">
-      <div className="boq-split-panel boq-split-panel--main">
-      <div className="boq-table-wrapper">
+      <div className="boq-split-scroll boq-split-scroll--triplex" ref={boqSplitScrollRef}>
+      <div className="boq-triplex-row">
+      <section className="boq-triplex__panel boq-triplex__panel--boq" aria-labelledby="boq-section-boq-heading">
+      <h2 id="boq-section-boq-heading" className="boq-triplex__heading">
+        BOQ
+      </h2>
+      <div className="boq-table-wrapper boq-table-wrapper--triplex">
         <table className="boq-table">
           <colgroup>
             <col style={{ width: colW.no }} />
@@ -1315,23 +2242,40 @@ export default function BoqEditorPage() {
                 <col style={{ width: colW.total }} />
               )
             )}
-            {showNote && <col style={{ width: colW.note }} />}
             <col style={{ width: colW.action }} />
+            {showNote && <col style={{ width: colW.note }} />}
           </colgroup>
 
           <thead ref={mainTheadRef}>
+            {boqMainHeadSubRow && boqMainTableColCount >= 3 && (
+              <tr className="boq-thead-triplex-band">
+                <th colSpan={boqMainBandColSpans[0]} className="boq-th boq-side-th boq-side-th--plan-band" lang="en">
+                  <span className="boq-side-th-r1-label">BOQ</span>
+                </th>
+                <th colSpan={boqMainBandColSpans[1]} className="boq-th boq-side-th boq-side-th--cost-group">
+                  <span className="boq-side-th-r1-label" aria-hidden>
+                    {'\u00a0'}
+                  </span>
+                </th>
+                <th colSpan={boqMainBandColSpans[2]} className="boq-th boq-side-th boq-side-th--sell-group">
+                  <span className="boq-side-th-r1-label" aria-hidden>
+                    {'\u00a0'}
+                  </span>
+                </th>
+              </tr>
+            )}
             <tr>
-              <th rowSpan={2} className="boq-th boq-th-no">ลำดับที่<RH col="no"/></th>
+              <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-no">ลำดับที่<RH col="no"/></th>
               {showRefId && (
                 <th colSpan={2} className="boq-th boq-th-ref-head">อ้างอิง ID</th>
               )}
               {tableShowDesc && (
-                <th rowSpan={2} className="boq-th boq-th-desc">รายการ<RH col="desc"/></th>
+                <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-desc">รายการ<RH col="desc"/></th>
               )}
               {showQtyUnit && (
                 <>
-                  <th rowSpan={2} className="boq-th boq-th-qty">จำนวน<RH col="qty"/></th>
-                  <th rowSpan={2} className="boq-th boq-th-unit">หน่วย<RH col="unit"/></th>
+                  <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-qty">จำนวน<RH col="qty"/></th>
+                  <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-unit">หน่วย<RH col="unit"/></th>
                 </>
               )}
               {showMat && !matDetailHidden && (
@@ -1349,7 +2293,7 @@ export default function BoqEditorPage() {
                 </th>
               )}
               {showMat && matDetailHidden && (
-                <th rowSpan={2} className="boq-th boq-th-mat-collapsed-head">
+                <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-mat-collapsed-head">
                   <button
                     type="button"
                     className="boq-ref-toggle-btn"
@@ -1367,45 +2311,61 @@ export default function BoqEditorPage() {
               {tableShowTotal && (
                 actualCompareMode ? (
                   <>
-                    <th rowSpan={2} className="boq-th boq-th-plan-mirror">แผน<br/><span className="boq-th-subhint">(รวม)</span></th>
-                    <th rowSpan={2} className="boq-th boq-th-var">งานลด</th>
-                    <th rowSpan={2} className="boq-th boq-th-var">งานเพิ่ม</th>
-                    <th rowSpan={2} className="boq-th boq-th-total">
+                    <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-plan-mirror">แผน<br/><span className="boq-th-subhint">(รวม)</span></th>
+                    <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-var">งานลด</th>
+                    <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-var">งานเพิ่ม</th>
+                    <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-total">
                       รวมค่าวัสดุและแรงงาน
                       <RH col="total" />
                     </th>
                   </>
                 ) : (
-                  <th rowSpan={2} className="boq-th boq-th-total">
+                  <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-total">
                     รวมค่าวัสดุและแรงงาน
                     <RH col="total" />
                   </th>
                 )
               )}
+              <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-action"><RH col="action"/></th>
               {showNote && (
-                <th rowSpan={2} className="boq-th boq-th-note">หมายเหตุ<RH col="note"/></th>
+                <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-note">หมายเหตุ<RH col="note"/></th>
               )}
-              <th rowSpan={2} className="boq-th boq-th-action"><RH col="action"/></th>
             </tr>
             {(showRefId || (showMat && !matDetailHidden) || showLabor) && (
-              <tr>
-                {showRefId && (<>
-                  <th className="boq-th boq-th-sub">เลขหน้า<RH col="refPage"/></th>
-                  <th className="boq-th boq-th-sub">รหัส<RH col="refCode"/></th>
-                </>)}
-                {showMat && !matDetailHidden && (<>
-                  <th className="boq-th boq-th-sub">ราคาต่อหน่วย<RH col="matPrice"/></th>
-                  <th className="boq-th boq-th-sub">จำนวนเงิน<RH col="matAmt"/></th>
-                </>)}
-                {showLabor && (<>
-                  <th className="boq-th boq-th-sub">ราคาต่อหน่วย<RH col="laborPrice"/></th>
-                  <th className="boq-th boq-th-sub">จำนวนเงิน<RH col="laborAmt"/></th>
-                </>)}
-              </tr>
+              <>
+                <tr>
+                  {showRefId && (<>
+                    <th className="boq-th boq-th-sub">เลขหน้า<RH col="refPage"/></th>
+                    <th className="boq-th boq-th-sub">รหัส<RH col="refCode"/></th>
+                  </>)}
+                  {showMat && !matDetailHidden && (<>
+                    <th className="boq-th boq-th-sub">ราคาต่อหน่วย<RH col="matPrice"/></th>
+                    <th className="boq-th boq-th-sub">จำนวนเงิน<RH col="matAmt"/></th>
+                  </>)}
+                  {showLabor && (<>
+                    <th className="boq-th boq-th-sub">ราคาต่อหน่วย<RH col="laborPrice"/></th>
+                    <th className="boq-th boq-th-sub">จำนวนเงิน<RH col="laborAmt"/></th>
+                  </>)}
+                </tr>
+                <tr className="boq-thead-triplex-bridge" aria-hidden>
+                  {showRefId && (<>
+                    <th className="boq-th boq-th-sub boq-thead-triplex-bridge-cell" />
+                    <th className="boq-th boq-th-sub boq-thead-triplex-bridge-cell" />
+                  </>)}
+                  {showMat && !matDetailHidden && (<>
+                    <th className="boq-th boq-th-sub boq-thead-triplex-bridge-cell" />
+                    <th className="boq-th boq-th-sub boq-thead-triplex-bridge-cell" />
+                  </>)}
+                  {showLabor && (<>
+                    <th className="boq-th boq-th-sub boq-thead-triplex-bridge-cell" />
+                    <th className="boq-th boq-th-sub boq-thead-triplex-bridge-cell" />
+                  </>)}
+                </tr>
+              </>
             )}
           </thead>
 
-          <tbody>
+          <tbody ref={mainTbodyRef}>
             {groups.map((group, groupIdx) => {
               const groupStartSec = globalSecIdx + 1
               globalSecIdx += group.sections.length
@@ -1445,7 +2405,6 @@ export default function BoqEditorPage() {
                     {rowTail.matSlots === 1 && <td className="boq-td"/>}
                     {rowTail.lab2 && <><td className="boq-td"/><td className="boq-td"/></>}
                     {rowTail.tot && (actualCompareMode ? <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/></> : <td className="boq-td"/>)}
-                    {rowTail.note && <td className="boq-td"/>}
                     <td className="boq-td boq-td-action">
                       {canMutateStructure && (
                         <div className="boq-action-cell">
@@ -1465,6 +2424,7 @@ export default function BoqEditorPage() {
                         </div>
                       )}
                     </td>
+                    {rowTail.note && <td className="boq-td"/>}
                   </tr>
                   )}
 
@@ -1495,8 +2455,8 @@ export default function BoqEditorPage() {
                           {secTail.matSlots === 1 && <td className="boq-td"/>}
                           {secTail.lab2 && <><td className="boq-td"/><td className="boq-td"/></>}
                           {secTail.tot && (actualCompareMode ? <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/></> : <td className="boq-td"/>)}
-                          {secTail.note && <td className="boq-td"/>}
                           <td className="boq-td boq-td-action"/>
+                          {secTail.note && <td className="boq-td"/>}
                         </tr>
                         )}
 
@@ -1590,12 +2550,6 @@ export default function BoqEditorPage() {
                                       <td className="boq-td boq-td-num boq-td-total">{fmt(calcRowMoneyTotal(sr))}</td>
                                     )
                                   )}
-                                  {showNote && (
-                                    <td className="boq-td boq-td-note">
-                                      <AutoTextarea className="boq-input boq-textarea" value={sr.note} readOnly={!editing}
-                                        onChange={v => editing && updSubRow(group.id,section.id,sr.id,'note',v)} />
-                                    </td>
-                                  )}
                                   <td className="boq-td boq-td-action">
                                     {canMutateStructure && (
                                       <div className="boq-action-cell">
@@ -1631,6 +2585,12 @@ export default function BoqEditorPage() {
                                       </div>
                                     )}
                                   </td>
+                                  {showNote && (
+                                    <td className="boq-td boq-td-note">
+                                      <AutoTextarea className="boq-input boq-textarea" value={sr.note} readOnly={!editing}
+                                        onChange={v => editing && updSubRow(group.id,section.id,sr.id,'note',v)} />
+                                    </td>
+                                  )}
                                 </tr>,
                                 ...renderBoqLines(sr.children ?? [], displayNo, depth + 1),
                               ]
@@ -1674,8 +2634,8 @@ export default function BoqEditorPage() {
                               </div>
                             </div>
                           </td>
-                          {showNote && <td className="boq-td boq-summary-cell" />}
                           <td className="boq-td boq-summary-cell" />
+                          {showNote && <td className="boq-td boq-summary-cell" />}
                         </tr>
                       )}
                     </>
@@ -1781,247 +2741,89 @@ export default function BoqEditorPage() {
           </tfoot>
         </table>
       </div>
-      </div>
-      <aside className="boq-split-panel boq-side-panel">
-        <div className="boq-side-table-wrapper">
-          <table className="boq-table boq-side-table">
-            <colgroup>
-              <col className="boq-side-col boq-side-col--boq-ref" />
-              <col className="boq-side-col boq-side-col--lead" />
-              <col className="boq-side-col" />
-              <col className="boq-side-col" />
-              <col className="boq-side-col" />
-              <col className="boq-side-col" />
-              <col className="boq-side-col" />
-              <col className="boq-side-col" />
-              <col className="boq-side-col" />
-            </colgroup>
-            <thead className={boqMainHeadSubRow ? 'boq-side-thead--two-row' : undefined}>
-              {boqMainHeadSubRow ? (
-                <>
-                  <tr>
-                    <th colSpan={2} className="boq-th boq-side-th boq-side-th--plan-band" lang="en">
-                      <span className="boq-side-th-r1-label">{boqKind === 'PLAN' ? 'PLAN' : 'ACTUAL'}</span>
-                    </th>
-                    <th colSpan={4} className="boq-th boq-side-th boq-side-th--cost-group">
-                      <span className="boq-side-th-r1-label">ต้นทุน</span>
-                    </th>
-                    <th colSpan={3} className="boq-th boq-side-th boq-side-th--sell-group" title="ประเมินราคาขาย + กำไร">
-                      <span className="boq-side-th-r1-label">ประเมิน + กำไร</span>
-                    </th>
-                  </tr>
-                  <tr>
-                    <th className="boq-th boq-side-th boq-side-th--boq-ref-head" title="ลำดับบรรทัด BOQ (เช่น 1.1.1)">
-                      ลำดับ BOQ
-                    </th>
-                    <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead">ราคาขาย</th>
-                    <th className="boq-th boq-side-th boq-side-th--cost-leaf">Sub</th>
-                    <th className="boq-th boq-side-th boq-side-th--cost-leaf">เลขที่เอกสาร</th>
-                    <th className="boq-th boq-side-th boq-side-th--cost-leaf">ราคา/หน่วย</th>
-                    <th className="boq-th boq-side-th boq-side-th--cost-leaf">ราคาทุน</th>
-                    <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP%</th>
-                    <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP Amount</th>
-                    <th className="boq-th boq-side-th boq-side-th--sell-leaf">ราคาขาย</th>
-                  </tr>
-                </>
-              ) : (
-                /* Same as main BOQ: one <tr> but every th rowSpan={2} so thead height matches หมายเหตุ / ลำดับที่ */
-                <tr>
-                  <th rowSpan={2} className="boq-th boq-side-th boq-side-th--boq-ref-head">ลำดับ BOQ</th>
-                  <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead">
-                    <span className="boq-side-th__kind" lang="en">{boqKind === 'PLAN' ? 'PLAN' : 'ACTUAL'}</span>
-                    <span className="boq-side-th__rowhead-label">ราคาขาย</span>
-                  </th>
-                  <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf" title="ต้นทุน">Sub</th>
-                  <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf" title="ต้นทุน">เลขที่เอกสาร</th>
-                  <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf" title="ต้นทุน">ราคา/หน่วย</th>
-                  <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf" title="ต้นทุน">ราคาทุน</th>
-                  <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf" title="ประเมินราคาขาย + กำไร">GP%</th>
-                  <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf" title="ประเมินราคาขาย + กำไร">GP Amount</th>
-                  <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf" title="ประเมินราคาขาย + กำไร">ราคาขาย</th>
-                </tr>
-              )}
-            </thead>
-            <tbody>
-              {planSideRows.length === 0 && boqKind === 'ACTUAL' ? (
-                <tr className="boq-row">
-                  <td className="boq-td boq-side-td boq-side-td--muted" colSpan={9}>
-                    พร้อมผูกรายการจริง / ใบเสนอราคา (Actual)
-                  </td>
-                </tr>
-              ) : planSideRows.length === 0 ? (
-                <tr className="boq-row">
-                  <td className="boq-td boq-side-td boq-side-td--muted" colSpan={9}>
-                    ยังไม่มีแถว — กด แก้ไข แล้วกด + เพิ่มแถวแผนราคา
-                  </td>
-                </tr>
-              ) : (
-                planSideRows.map(r => {
-                  const { gpAmount, sellPrice } = planSideRowDerived(r)
-                  const ro = !planSideEditing
-                  const linkedDisp = r.linkedSubRowId ? planBoqDisplayNoBySubRowId[r.linkedSubRowId] ?? '' : ''
-                  const linkOrphan = Boolean(r.linkedSubRowId && !linkedDisp)
-                  const pctDisp =
-                    ro && r.gpPct === ''
-                      ? '—'
-                      : `${(Number(r.gpPct) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
-                  return (
-                    <tr key={r.id} className="boq-row">
-                      <td className="boq-td boq-td-no boq-td-sub-no boq-side-td boq-side-td--boq-ref">
-                        <div className="boq-side-boq-ref-cell">
-                          {linkedDisp ? (
-                            <span className="boq-side-boq-ref-no">{linkedDisp}</span>
-                          ) : r.linkedSubRowId ? (
-                            <span className="boq-side-boq-ref-orphan" title={r.linkedSubRowId}>
-                              ไม่พบ
-                            </span>
-                          ) : (
-                            <span className="boq-side-td--muted">—</span>
-                          )}
-                          {planSideEditing && (
-                            <select
-                              className="boq-input boq-side-boq-ref-select"
-                              aria-label="ผูกบรรทัด BOQ"
-                              value={r.linkedSubRowId}
-                              onChange={e => updPlanRow(r.id, 'linkedSubRowId', e.target.value)}
-                            >
-                              <option value="">— เลือก —</option>
-                              {linkOrphan && (
-                                <option value={r.linkedSubRowId}>บรรทัดเดิม (ไม่พบใน BOQ)</option>
-                              )}
-                              {planBoqLinkOptions.map(o => (
-                                <option key={o.subRowId} value={o.subRowId}>
-                                  {o.displayNo}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </div>
-                      </td>
-                      <td className="boq-td boq-td-num boq-td-sub-no boq-side-td">
-                        {ro ? (
-                          r.listPrice === '' ? <span className="boq-side-td--muted">—</span> : fmt(Number(r.listPrice))
-                        ) : (
-                          <NumInput
-                            className="boq-input boq-input-num"
-                            value={r.listPrice}
-                            readOnly={false}
-                            onChange={v => updPlanRow(r.id, 'listPrice', v)}
-                          />
-                        )}
-                      </td>
-                      <td className="boq-td boq-side-td boq-side-td--text">
-                        {ro ? (
-                          r.sub || <span className="boq-side-td--muted">—</span>
-                        ) : (
-                          <input
-                            type="text"
-                            className="boq-input"
-                            value={r.sub}
-                            onChange={e => updPlanRow(r.id, 'sub', e.target.value)}
-                          />
-                        )}
-                      </td>
-                      <td className="boq-td boq-side-td boq-side-td--text">
-                        {ro ? (
-                          r.docNo || <span className="boq-side-td--muted">—</span>
-                        ) : (
-                          <input
-                            type="text"
-                            className="boq-input"
-                            value={r.docNo}
-                            onChange={e => updPlanRow(r.id, 'docNo', e.target.value)}
-                          />
-                        )}
-                      </td>
-                      <td className="boq-td boq-td-num boq-side-td">
-                        {ro ? (
-                          r.pricePerUnit === '' ? <span className="boq-side-td--muted">—</span> : fmt(Number(r.pricePerUnit))
-                        ) : (
-                          <NumInput
-                            className="boq-input boq-input-num"
-                            value={r.pricePerUnit}
-                            readOnly={false}
-                            onChange={v => updPlanRow(r.id, 'pricePerUnit', v)}
-                          />
-                        )}
-                      </td>
-                      <td className="boq-td boq-td-num boq-side-td">
-                        {ro ? (
-                          r.cost === '' ? <span className="boq-side-td--muted">—</span> : fmt(Number(r.cost))
-                        ) : (
-                          <NumInput
-                            className="boq-input boq-input-num"
-                            value={r.cost}
-                            readOnly={false}
-                            onChange={v => updPlanRow(r.id, 'cost', v)}
-                          />
-                        )}
-                      </td>
-                      <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell">
-                        {ro ? (
-                          pctDisp
-                        ) : (
-                          <NumInput
-                            className="boq-input boq-input-num"
-                            value={r.gpPct}
-                            readOnly={false}
-                            onChange={v => updPlanRow(r.id, 'gpPct', v)}
-                          />
-                        )}
-                      </td>
-                      <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(gpAmount)}</td>
-                      <td className="boq-td boq-td-num boq-td-total boq-side-td boq-side-td--last-cell">
-                        <div className="boq-side-last-cell-inner">
-                          <span className="boq-side-last-val">{fmt(sellPrice)}</span>
-                          {planSideEditing && (
-                            <button
-                              type="button"
-                              className="boq-side-row-del"
-                              title="ลบแถว"
-                              onClick={() => delPlanRow(r.id)}
-                            >
-                              ×
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-            {planSideRows.length > 0 && (
-              <tfoot>
-                <tr className="boq-summary-row boq-side-summary-row">
-                  <td className="boq-td boq-td-no boq-td-sub-no boq-side-td boq-side-td--boq-ref">
-                    <span className="boq-side-td--muted">—</span>
-                  </td>
-                  <td className="boq-td boq-td-num boq-td-sub-no boq-side-td">{fmt(planSideFooter.sumList)}</td>
-                  <td className="boq-td boq-side-td boq-side-td--text" colSpan={3}>
-                    รวม
-                  </td>
-                  <td className="boq-td boq-td-num boq-side-td">{fmt(planSideFooter.sumCost)}</td>
-                  <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell boq-side-td--gp-avg">
-                    {planSideFooter.sumCost > 0
-                      ? `${planSideFooter.avgGpPct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
-                      : '—'}
-                  </td>
-                  <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(planSideFooter.sumGp)}</td>
-                  <td className="boq-td boq-td-num boq-td-total boq-side-td">{fmt(planSideFooter.sumSell)}</td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
-        {planSideEditing && (
-          <div className="boq-side-panel__actions">
-            <button type="button" className="boq-add-row-btn boq-side-add-row-btn" onClick={addPlanRow}>
-              + เพิ่มแถวแผนราคา
-            </button>
+      </section>
+
+      <section className="boq-triplex__panel boq-triplex__panel--plan" aria-labelledby="boq-section-plan-heading">
+        <h2 id="boq-section-plan-heading" className="boq-triplex__heading">
+          แผน (Plan)
+        </h2>
+        <div className="boq-side-panel boq-side-panel--triplex">
+          <div className="boq-side-table-wrapper">
+            <PlanSidePricingTable
+              boqMainHeadSubRow={boqMainHeadSubRow}
+              bandLabel="PLAN"
+              rows={boqKind === 'ACTUAL' ? planMirrorSideRows : planSideRows}
+              footer={boqKind === 'ACTUAL' ? planMirrorFooter : planSideFooter}
+              displayNoBySubRowId={boqKind === 'ACTUAL' ? planMirrorDisplayNoBySubRowId : planBoqDisplayNoBySubRowId}
+              linkOptions={boqKind === 'ACTUAL' ? planMirrorLinkOptions : planBoqLinkOptions}
+              interactive={boqKind === 'PLAN' && planSideEditing}
+              onUpdateRow={planRowUpdateForTriplexEditor}
+              onDeleteRow={boqKind === 'PLAN' ? delPlanRow : undefined}
+              emptyMessage={
+                boqKind === 'ACTUAL'
+                  ? 'ไม่มีแถวแผนราคาจากแผนที่ผูก'
+                  : 'ยังไม่มีแถว — กด แก้ไข แล้วกด + เพิ่มแถวแผนราคา'
+              }
+              planCostRollupBySubRowId={boqKind === 'ACTUAL' ? mirrorPlanCostRollupBySubRowId : planCostRollupBySubRowId}
+              subRowById={boqKind === 'ACTUAL' ? planMirrorSubRowById : subRowById}
+              triplex={{
+                tbodyRef: planTriplexTbodyRef,
+                slots: boqTriplexBodySlots,
+                bySubRow: boqKind === 'ACTUAL' ? mirrorBySubRow : planBySubRow,
+                orphans: boqKind === 'ACTUAL' ? mirrorOrphans : planOrphans,
+                onEnsureRowForSubRow: boqKind === 'PLAN' && planSideEditing ? ensurePlanRowForSubRow : undefined,
+              }}
+            />
           </div>
-        )}
-      </aside>
+          {boqKind === 'PLAN' && planSideEditing && (
+            <div className="boq-side-panel__actions">
+              <button type="button" className="boq-add-row-btn boq-side-add-row-btn" onClick={addPlanRow}>
+                + เพิ่มแถวแผนราคา
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {boqKind === 'ACTUAL' && (
+        <section className="boq-triplex__panel boq-triplex__panel--actual" aria-labelledby="boq-section-actual-heading">
+          <h2 id="boq-section-actual-heading" className="boq-triplex__heading">
+            ทำจริง (Actual)
+          </h2>
+          <div className="boq-side-panel boq-side-panel--triplex">
+            <div className="boq-side-table-wrapper">
+              <PlanSidePricingTable
+                boqMainHeadSubRow={boqMainHeadSubRow}
+                bandLabel="ACTUAL"
+                rows={planSideRows}
+                footer={planSideFooter}
+                displayNoBySubRowId={planBoqDisplayNoBySubRowId}
+                linkOptions={planBoqLinkOptions}
+                interactive={actualSideEditing}
+                onUpdateRow={updPlanRow}
+                onDeleteRow={delPlanRow}
+                emptyMessage="พร้อมผูกรายการจริง / ใบเสนอราคา (Actual)"
+                planCostRollupBySubRowId={planCostRollupBySubRowId}
+                subRowById={subRowById}
+                triplex={{
+                  tbodyRef: actualTriplexTbodyRef,
+                  slots: boqTriplexBodySlots,
+                  bySubRow: planBySubRow,
+                  orphans: planOrphans,
+                  onEnsureRowForSubRow: actualSideEditing ? ensurePlanRowForSubRow : undefined,
+                }}
+              />
+            </div>
+            {actualSideEditing && (
+              <div className="boq-side-panel__actions">
+                <button type="button" className="boq-add-row-btn boq-side-add-row-btn" onClick={addPlanRow}>
+                  + เพิ่มแถวทำจริง
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
       </div>
       </div>
 

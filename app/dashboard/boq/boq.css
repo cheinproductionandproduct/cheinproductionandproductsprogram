@@ -31,64 +31,204 @@
   /* Set by BOQ page: main thead row heights → PLAN thead matches (body rows align) */
   --boq-thead-r1-height: auto;
   --boq-thead-r2-height: auto;
+  --boq-thead-r3-height: auto;
+  --boq-thead-r4-height: auto;
 }
 
 .boq-split-scroll .boq-table-wrapper {
-  overflow-x: visible;
+  overflow-x: auto;
 }
 
 .boq-split-scroll .boq-side-table-wrapper {
-  overflow-x: visible;
+  overflow-x: auto;
 }
 
-.boq-split-layout {
+/* Triplex: BOQ | Plan | Actual in one horizontal row; single scrollbar on .boq-split-scroll */
+.boq-triplex-row {
   display: flex;
+  flex-direction: row;
   flex-wrap: nowrap;
-  gap: 12px;
-  /* flex-start: both tables share the same top edge; stretch was stretching panels and could look “stepped” vs the main grid */
   align-items: flex-start;
+  gap: 14px;
   width: max-content;
   min-width: 100%;
   box-sizing: border-box;
 }
 
-.boq-split-panel {
-  min-width: 0;
-  margin: 0;
-}
-
-.boq-split-panel--main {
+.boq-triplex__panel {
   flex: 0 0 auto;
-  min-width: max-content;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #9e9e9e;
+  border-radius: 4px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.07);
+  overflow: visible;
 }
 
-@supports (width: 1cqi) {
-  .boq-split-panel--main {
-    /* Full visible scroll width when the table is narrow; flex min-size grows with wide tables */
-    min-width: 100cqi;
-  }
+.boq-triplex__panel--boq {
+  width: max-content;
+  max-width: none;
 }
 
-.boq-split-panel--main .boq-table-wrapper {
+.boq-triplex__panel--plan,
+.boq-triplex__panel--actual {
+  /* inline-flex shrink-wraps like max-content; heading width:100% matches table below */
+  display: inline-flex;
+  width: max-content;
+  max-width: none;
+}
+
+.boq-triplex__heading {
+  margin: 0;
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: #c8c8c8;
+  border-bottom: 1px solid #9e9e9e;
+  color: #1a1a1a;
+}
+
+/* Same band height above each table so BOQ / Plan / Actual tbody rows start on one baseline */
+.boq-split-scroll.boq-split-scroll--triplex .boq-triplex__heading {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+}
+
+.boq-triplex__panel--boq .boq-table-wrapper--triplex {
   margin-top: 0;
-  flex: 1 1 auto;
-  min-height: 0;
+}
+
+.boq-split-scroll.boq-split-scroll--triplex .boq-table-wrapper {
+  overflow-x: visible;
+}
+
+.boq-split-scroll.boq-split-scroll--triplex .boq-side-table-wrapper {
+  overflow-x: visible;
+}
+
+/* Triplex: Plan/Actual read as continuation after BOQ’s last column (หมายเหตุ or จัดการ) */
+.boq-split-scroll.boq-split-scroll--triplex .boq-triplex__panel--boq table.boq-table thead tr:first-child > .boq-th:last-child,
+.boq-split-scroll.boq-split-scroll--triplex .boq-triplex__panel--boq table.boq-table tbody tr > .boq-td:last-child,
+.boq-split-scroll.boq-split-scroll--triplex .boq-triplex__panel--boq table.boq-table tfoot tr > .boq-td:last-child {
+  border-right: 2px solid #6d6d6d;
+}
+
+.boq-split-scroll.boq-split-scroll--triplex .boq-triplex-row {
+  gap: 0;
+}
+
+.boq-split-scroll.boq-split-scroll--triplex .boq-triplex__panel {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.boq-split-scroll.boq-split-scroll--triplex .boq-triplex__panel--boq {
+  border-radius: 4px 0 0 4px;
+  border-right: none;
+}
+
+.boq-split-scroll.boq-split-scroll--triplex .boq-triplex__panel--plan {
+  border-left: none;
+  border-right: none;
+}
+
+.boq-split-scroll.boq-split-scroll--triplex .boq-triplex__panel--actual {
+  border-radius: 0 4px 4px 0;
+  border-left: none;
+}
+
+/* Triplex: PLAN/ACTUAL tbody mirrors BOQ group / section / summary / line rows */
+.boq-side-triplex-ghost-cell {
+  padding: 0;
+  line-height: 0;
+  font-size: 0;
+  border: 1px solid #bbb;
+  vertical-align: middle;
+}
+
+.boq-side-triplex-ghost-cell--group {
+  background: #b0bec5;
+}
+
+.boq-side-triplex-ghost-cell--section {
+  background: #e8e8e8;
+}
+
+.boq-side-triplex-ghost-cell--summary {
+  background: #e6e6e6;
+}
+
+.boq-side-triplex-ghost-cell--discount {
+  background: #fafafa;
+}
+
+.boq-side-boq-ref-cell--compact {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+}
+
+.boq-side-boq-ref-cell--triplex-slot {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+}
+
+.boq-split-scroll.boq-split-scroll--triplex .boq-side-boq-ref-select {
+  padding: 1px 4px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.boq-side-triplex-add-line {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 4px;
+  border: 1px solid #66bb6a;
+  background: #e8f5e9;
+  color: #2e7d32;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.boq-side-triplex-add-line:hover {
+  background: #c8e6c9;
 }
 
 .boq-side-panel {
-  flex: 0 0 auto;
-  /* Wider PLAN strip — main table scrolls horizontally; side wrapper scrolls if needed */
-  width: clamp(720px, 54vw, 1040px);
-  min-width: min(100%, 640px);
-  max-width: 1200px;
-  /* No border here — .boq-table already draws the outer grid; panel+table borders stacked as “double” lines */
-  border: none;
-  background: #fff;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+  border: none;
+  background: #fff;
+}
+
+/* Triplex: shrink-wrap to table (base .boq-side-panel is width:100% which fights max-content panels) */
+.boq-side-panel--triplex {
+  width: auto;
+  max-width: none;
+  flex: 0 0 auto;
+  align-self: flex-start;
 }
 
 .boq-side-table-wrapper {
@@ -100,26 +240,23 @@
 }
 
 .boq-side-table {
-  width: 100%;
-  min-width: 920px;
-  table-layout: fixed;
+  /* auto layout: columns stretch to fit content */
+  width: max-content;
+  min-width: 1020px;
+  max-width: none;
+  table-layout: auto;
 }
 
 .boq-side-table .boq-side-col {
-  width: calc((100% - 88px - 120px) / 7);
-  min-width: 56px;
+  min-width: 120px;
 }
 
 .boq-side-table .boq-side-col--boq-ref {
-  width: 120px;
   min-width: 100px;
-  max-width: none;
 }
 
 .boq-side-table .boq-side-col--lead {
-  width: 88px;
-  min-width: 72px;
-  max-width: 120px;
+  min-width: 80px;
 }
 
 .boq-side-th--rowhead {
@@ -135,6 +272,20 @@
   padding-right: 8px;
   color: #222;
   font-size: 13px;
+}
+
+.boq-side-td--doc-issue,
+.boq-side-td--doc-title {
+  vertical-align: middle;
+}
+
+.boq-table.boq-side-table tbody .boq-side-td--doc-issue,
+.boq-table.boq-side-table tbody .boq-side-td--doc-title {
+  text-align: left;
+}
+
+.boq-table.boq-side-table tbody .boq-side-doc-field {
+  text-align: left;
 }
 
 .boq-side-td--num {
@@ -217,6 +368,11 @@
   color: #b45309;
 }
 
+/* Parent BOQ line: ราคาทุน = sum of child plan costs (not editable). */
+.boq-side-td--rollup-cost {
+  font-variant-numeric: tabular-nums;
+}
+
 .boq-side-boq-ref-select {
   width: 100%;
   max-width: 100%;
@@ -242,6 +398,43 @@
   font-size: 11px;
   line-height: 1.15;
   white-space: normal;
+}
+
+/* PLAN/ACTUAL: หัวกลุ่ม “เลขที่เอกสาร” + คอลัมน์ลูก เลขที่ | เอกสาร */
+.boq-side-th--doc-main {
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+
+.boq-side-th--doc-leaf {
+  font-size: 11px;
+  line-height: 1.15;
+}
+
+.boq-side-th-doc-merged-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1.1;
+}
+
+.boq-side-th-doc-merged-parent {
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.boq-side-th-doc-merged-leaves {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 10px;
+  color: #333;
 }
 
 .boq-side-th--cost-group {
@@ -317,19 +510,40 @@
   background-color: #fafafa;
 }
 
-/* PLAN/ACTUAL grid: center cell text (headers already centered via .boq-th) */
+/* Nested rows (x.x.x) in PLAN/ACTUAL: match BOQ blue band — placed after even-row rules to win */
+.boq-side-table tbody > tr.boq-row.boq-row--nested > .boq-td {
+  background-color: #d6defa;
+}
+.boq-side-table tbody > tr.boq-row:nth-child(even).boq-row--nested > .boq-td {
+  background-color: #cdd6f3;
+}
+
+/* PLAN/ACTUAL grid: center non-numeric cells; keep numeric cells right-aligned */
 .boq-table.boq-side-table tbody .boq-td,
 .boq-table.boq-side-table tfoot .boq-td {
   text-align: center;
 }
+.boq-table.boq-side-table tbody .boq-td-num,
+.boq-table.boq-side-table tfoot .boq-td-num {
+  text-align: right;
+  white-space: nowrap;
+}
 
-.boq-table.boq-side-table tbody .boq-input,
-.boq-table.boq-side-table tbody .boq-input-num {
+.boq-table.boq-side-table tbody .boq-input {
   text-align: center;
+}
+.boq-table.boq-side-table tbody .boq-input-num {
+  text-align: right;
+  white-space: nowrap;
+  width: 100%;
 }
 
 .boq-table.boq-side-table tbody .boq-side-td--text .boq-input {
   text-align: center;
+}
+
+.boq-table.boq-side-table tbody .boq-input.boq-side-doc-field {
+  text-align: left;
 }
 
 .boq-table.boq-side-table tbody .boq-side-last-cell-inner {
@@ -380,6 +594,18 @@
   overflow: hidden;
 }
 
+/* Third PLAN row spans BOQ “sub” + “bridge” when main table has the extra band row (four measured rows). */
+.boq-table.boq-side-table thead.boq-side-thead--doc-split.boq-side-thead--two-row tr:nth-child(3) {
+  height: calc(var(--boq-thead-r3-height, 0px) + var(--boq-thead-r4-height, 0px));
+}
+
+.boq-table.boq-side-table thead.boq-side-thead--doc-split.boq-side-thead--two-row tr:nth-child(3) > .boq-th {
+  height: 100%;
+  box-sizing: border-box;
+  vertical-align: middle;
+  overflow: hidden;
+}
+
 /* Keep “ลำดับ BOQ” on one line inside the fixed half-row height (column widened in colgroup). */
 .boq-table.boq-side-table thead.boq-side-thead--two-row .boq-side-th--boq-ref-head {
   white-space: nowrap;
@@ -422,6 +648,26 @@
 
 .boq-side-input--pct {
   text-align: right;
+}
+
+/* GP% edit mode: input + % suffix inline */
+.boq-side-pct-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.boq-side-pct-wrap .boq-input-num--pct {
+  flex: 1;
+  min-width: 0;
+  width: 0;
+}
+
+.boq-side-pct-suffix {
+  font-size: 12px;
+  color: #555;
+  flex-shrink: 0;
 }
 
 .boq-side-td--last-cell {
@@ -467,21 +713,8 @@
 }
 
 @media (max-width: 1280px) {
-  .boq-split-layout {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .boq-split-panel--main {
-    flex: 0 0 auto;
-    min-width: max-content;
-    width: 100%;
-  }
-
-  .boq-side-panel {
-    width: 100%;
-    max-width: none;
-    align-self: stretch;
+  .boq-triplex-row {
+    gap: 10px;
   }
 }
 
@@ -496,10 +729,10 @@
   border: 1px solid #bbb;
 }
 
-/* PLAN/ACTUAL side table: wins over .boq-table width:max-content (later rule) so col % widths and thead/tbody columns stay aligned */
+/* PLAN/ACTUAL side table: wins over .boq-table width:max-content */
 .boq-table.boq-side-table {
-  width: 100%;
-  min-width: 920px;
+  width: max-content;
+  min-width: 1020px;
   box-sizing: border-box;
 }
 
@@ -533,6 +766,37 @@
   font-weight: 500;
   font-size: 11px;
   opacity: 0.88;
+}
+
+/* Main BOQ: same band strip as PLAN/ACTUAL (`boq-side-th--*` reused for one visual row). */
+.boq-triplex__panel--boq .boq-table thead .boq-thead-triplex-band > .boq-th {
+  padding: 0;
+  vertical-align: middle;
+}
+
+.boq-triplex__panel--boq .boq-table thead .boq-thead-triplex-band > .boq-th > .boq-side-th-r1-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.25;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* Triplex: extra BOQ thead row so column count matches PLAN (3 header rows); keeps grid lines even */
+.boq-thead-triplex-bridge .boq-thead-triplex-bridge-cell {
+  padding: 0 4px;
+  font-size: 0;
+  line-height: 0;
+  background: #ececec;
+  border-top: none;
 }
 
 .boq-td--plan-mirror {
@@ -1824,6 +2088,36 @@ h1.page-title.boq-page-title-row {
   font-size: 13px;
   color: #c62828;
   font-weight: 500;
+}
+
+.boq-autosave-indicator {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.boq-autosave-indicator--pending {
+  color: #78909c;
+}
+
+.boq-autosave-indicator--saving {
+  color: #1565c0;
+  animation: boq-autosave-pulse 1s ease-in-out infinite;
+}
+
+.boq-autosave-indicator--saved {
+  color: #2e7d32;
+}
+
+.boq-autosave-indicator--error {
+  color: #c62828;
+}
+
+@keyframes boq-autosave-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 /* Alternating row shading */
