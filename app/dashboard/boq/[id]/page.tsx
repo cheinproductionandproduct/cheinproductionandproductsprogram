@@ -373,7 +373,7 @@ function distributeProportionalAmounts(weights: number[], total: number): number
 }
 
 /* ── Default column widths — baseline saved in ../DEFAULTS.md (2026-04-04) ── */
-const DEFAULT_WIDTHS = { no: 60, refPage: 60, refCode: 60, desc: 380, qty: 64, unit: 48, matPrice: 110, matAmt: 115, laborPrice: 110, laborAmt: 115, total: 120, action: 100, note: 140 }
+const DEFAULT_WIDTHS = { no: 60, refPage: 60, refCode: 60, desc: 380, qty: 64, unit: 48, matPrice: 110, matAmt: 115, laborPrice: 110, laborAmt: 115, total: 120, action: 100, secDiscount: 120, secNet: 130, note: 140 }
 type ColKey = keyof typeof DEFAULT_WIDTHS
 
 /** Column visibility (กรอง). ราคาวัสดุ (4) ปิด → หัวคอลัมน์แรงแสดง ค่าวัสดุและแรงงาน แทน ค่าแรงงาน */
@@ -588,6 +588,8 @@ function SummaryRow({
           </td>
         )
       )}
+      <td className={`boq-td${cellCls}${hl}`}/>
+      <td className={`boq-td${cellCls}${hl}`}/>
       <td className={`boq-td${cellCls}${hl}`}/>
       {tail.note && <td className={`boq-td${cellCls}${hl}`}/>}
     </tr>
@@ -1806,7 +1808,8 @@ export default function BoqEditorPage() {
     else if (showMat && matDetailHidden) n += 1
     if (showLabor) n += 2
     if (tableShowTotal) n += actualCompareMode ? 4 : 1
-    n += 1
+    n += 1  // action
+    n += 2  // ส่วนลดแต่ละข้อ + ยอดงานหลังส่วนลด
     if (showNote) n += 1
     return n
   }, [
@@ -2247,6 +2250,8 @@ export default function BoqEditorPage() {
               )
             )}
             <col style={{ width: colW.action }} />
+            <col style={{ width: colW.secDiscount }} />
+            <col style={{ width: colW.secNet }} />
             {showNote && <col style={{ width: colW.note }} />}
           </colgroup>
 
@@ -2331,6 +2336,8 @@ export default function BoqEditorPage() {
                 )
               )}
               <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-action"><RH col="action"/></th>
+              <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-sec-discount">ส่วนลดแต่ละข้อ<RH col="secDiscount"/></th>
+              <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-sec-net">ยอดงานหลังส่วนลด<RH col="secNet"/></th>
               {showNote && (
                 <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-note">หมายเหตุ<RH col="note"/></th>
               )}
@@ -2428,6 +2435,7 @@ export default function BoqEditorPage() {
                         </div>
                       )}
                     </td>
+                    {(() => { const gd = groupDiscountAlloc[groupIdx] ?? 0; return (<><td className="boq-td boq-td-num boq-td-sec-discount">{discountAmt > 0 ? fmt(gd) : ''}</td><td className="boq-td boq-td-num boq-td-sec-net">{discountAmt > 0 ? fmt(groupTotal - gd) : fmt(groupTotal)}</td></>) })()}
                     {rowTail.note && <td className="boq-td"/>}
                   </tr>
                   )}
@@ -2460,6 +2468,7 @@ export default function BoqEditorPage() {
                           {secTail.lab2 && <><td className="boq-td"/><td className="boq-td"/></>}
                           {secTail.tot && (actualCompareMode ? <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/></> : <td className="boq-td"/>)}
                           <td className="boq-td boq-td-action"/>
+                          {(() => { const st = actualCompareMode ? calcSecAdjustedMoneyTotal(section) : calcSecMoneyTotal(section); const sd = grandTotal > 0 ? (st / grandTotal) * discountAmt : 0; return (<><td className="boq-td boq-td-num boq-td-sec-discount">{discountAmt > 0 ? fmt(sd) : ''}</td><td className="boq-td boq-td-num boq-td-sec-net">{discountAmt > 0 ? fmt(st - sd) : fmt(st)}</td></>) })()}
                           {secTail.note && <td className="boq-td"/>}
                         </tr>
                         )}
@@ -2589,6 +2598,7 @@ export default function BoqEditorPage() {
                                       </div>
                                     )}
                                   </td>
+                                  {(() => { const rt = actualCompareMode ? calcRowTreeAdjusted(sr) : calcRowTreeTotal(sr, true); const rd = grandTotal > 0 ? (rt / grandTotal) * discountAmt : 0; return (<><td className="boq-td boq-td-num boq-td-sec-discount">{discountAmt > 0 ? fmt(rd) : ''}</td><td className="boq-td boq-td-num boq-td-sec-net">{discountAmt > 0 ? fmt(rt - rd) : fmt(rt)}</td></>) })()}
                                   {showNote && (
                                     <td className="boq-td boq-td-note">
                                       <AutoTextarea className="boq-input boq-textarea" value={sr.note} readOnly={!editing}
@@ -2635,6 +2645,8 @@ export default function BoqEditorPage() {
                                 </div>
                               </td>
                               <td className="boq-td boq-summary-cell" />
+                              <td className="boq-td boq-summary-cell" />
+                              <td className="boq-td boq-summary-cell" />
                               {showNote && <td className="boq-td boq-summary-cell" />}
                             </tr>
                           )
@@ -2676,6 +2688,8 @@ export default function BoqEditorPage() {
                               </div>
                             </div>
                           </td>
+                          <td className="boq-td boq-summary-cell" />
+                          <td className="boq-td boq-summary-cell" />
                           <td className="boq-td boq-summary-cell" />
                           {showNote && <td className="boq-td boq-summary-cell" />}
                         </tr>

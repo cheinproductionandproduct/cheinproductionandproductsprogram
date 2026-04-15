@@ -939,6 +939,16 @@
   line-height: 1.25;
 }
 .boq-th-action { width: 100px; min-width: 100px; }
+.boq-th-sec-discount,
+.boq-th-sec-net {
+  white-space: normal;
+  line-height: 1.25;
+  min-width: 100px;
+  background: #e8f0fe;
+  color: #1a237e;
+}
+.boq-th-sec-discount { width: 120px; }
+.boq-th-sec-net      { width: 130px; }
 
 /* ID reference sub-cols: keep short */
 .boq-th-sub    { width: 60px; }
@@ -960,6 +970,16 @@
 .boq-td-desc { min-width: 300px; }
 
 .boq-td-note { min-width: 100px; }
+.boq-td-sec-discount {
+  font-variant-numeric: tabular-nums;
+  color: #c62828;
+  font-weight: 600;
+}
+.boq-td-sec-net {
+  font-variant-numeric: tabular-nums;
+  color: #1565c0;
+  font-weight: 700;
+}
 
 .boq-td-total {
   background: #f9f9f9;
