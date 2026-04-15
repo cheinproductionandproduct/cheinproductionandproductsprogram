@@ -255,6 +255,10 @@ const calcGrpTotal = (g: Group, mat = true) =>
   g.sections.flatMap(s => s.subRows).reduce((s, r) => s + calcRowTreeTotal(r, mat), 0)
 /** Group total for display (always includes material + labor). */
 const calcGrpMoneyTotal = (g: Group) => calcGrpTotal(g, true)
+/** Section total — mat + labor across all nested rows. */
+const calcSecMoneyTotal = (s: Section) => s.subRows.reduce((sum, r) => sum + calcRowTreeTotal(r, true), 0)
+/** Section total in actual-compare mode (applies workDecrease/workIncrease adjustments). */
+const calcSecAdjustedMoneyTotal = (s: Section) => s.subRows.reduce((sum, r) => sum + calcRowTreeAdjusted(r), 0)
 
 function normalizeSubRow(r: SubRow & { children?: SubRow[] }): SubRow {
   const kids = Array.isArray(r.children) ? r.children.map(normalizeSubRow) : []
@@ -2596,6 +2600,44 @@ export default function BoqEditorPage() {
                               ]
                             })
                           return renderBoqLines(section.subRows, String(globalNum), 0)
+                        })()}
+                        {colVis.showDesc && discountAmt > 0 && tableShowTotal && (() => {
+                          const secTotal = actualCompareMode ? calcSecAdjustedMoneyTotal(section) : calcSecMoneyTotal(section)
+                          const secPct = grandTotal > 0 ? (secTotal / grandTotal) * 100 : 0
+                          const secDiscount = grandTotal > 0 ? (secTotal / grandTotal) * discountAmt : 0
+                          const secNet = secTotal - secDiscount
+                          return (
+                            <tr className="boq-summary-row boq-summary-row--section-discount">
+                              <td className="boq-td boq-summary-cell" />
+                              {showRefId && (<><td className="boq-td boq-summary-cell" /><td className="boq-td boq-summary-cell" /></>)}
+                              <td
+                                colSpan={boqGroupDiscountWideColSpan(colVis, actualCompareMode)}
+                                className="boq-td boq-summary-cell boq-group-discount-span-cell"
+                              >
+                                <div className="boq-section-discount-addon">
+                                  <span className="boq-section-discount-addon__title">ข้อ {globalNum} {section.title ? `— ${section.title}` : ''}</span>
+                                  <span className="boq-section-discount-addon__item">
+                                    <span className="boq-section-discount-addon__label">ยอดรวม</span>
+                                    <span className="boq-section-discount-addon__value">{fmt(secTotal)}</span>
+                                  </span>
+                                  <span className="boq-section-discount-addon__item">
+                                    <span className="boq-section-discount-addon__label">สัดส่วน</span>
+                                    <span className="boq-section-discount-addon__value">{secPct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span>
+                                  </span>
+                                  <span className="boq-section-discount-addon__item">
+                                    <span className="boq-section-discount-addon__label">ส่วนลด</span>
+                                    <span className="boq-section-discount-addon__value boq-section-discount-addon__value--discount">−{fmt(secDiscount)}</span>
+                                  </span>
+                                  <span className="boq-section-discount-addon__item boq-section-discount-addon__item--net">
+                                    <span className="boq-section-discount-addon__label">หลังหักส่วนลด</span>
+                                    <span className="boq-section-discount-addon__value boq-section-discount-addon__value--net">{fmt(secNet)}</span>
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="boq-td boq-summary-cell" />
+                              {showNote && <td className="boq-td boq-summary-cell" />}
+                            </tr>
+                          )
                         })()}
                       </React.Fragment>
                     )
