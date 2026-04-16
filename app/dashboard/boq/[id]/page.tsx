@@ -1982,40 +1982,64 @@ export default function BoqEditorPage() {
     boqMainTableColCount,
   ])
 
-  /** Triplex: each PLAN/ACTUAL tbody row height follows the parallel BOQ tbody row. */
+  /** Triplex: BOQ / PLAN / ACTUAL tbody rows are height-locked in both directions.
+   *  We clear PLAN/ACTUAL heights first to read their natural height, then apply
+   *  max(BOQ, PLAN, ACTUAL) to all three so no panel can silently overflow its
+   *  neighbour and cause cumulative drift when scrolling down. */
   useLayoutEffect(() => {
     const main = mainTbodyRef.current
     if (!main) return
-    const clearSide = (side: HTMLTableSectionElement | null) => {
-      if (!side) return
-      Array.from(side.rows).forEach(r => r.style.removeProperty('height'))
+    const clearRows = (tbody: HTMLTableSectionElement | null) => {
+      if (!tbody) return
+      Array.from(tbody.rows).forEach(r => r.style.removeProperty('height'))
+    }
+    let rafId: number | null = null
+    const scheduleSync = () => {
+      if (rafId !== null) return
+      rafId = requestAnimationFrame(() => { rafId = null; sync() })
     }
     const sync = () => {
-      const mh = Array.from(main.rows)
-      const apply = (side: HTMLTableSectionElement | null) => {
-        if (!side) return
-        const sh = Array.from(side.rows)
-        const n = Math.min(mh.length, sh.length)
-        for (let i = 0; i < n; i++) {
-          const h = mh[i].getBoundingClientRect().height
-          /* Integer px avoids sub-pixel gaps between BOQ (หมายเหตุ) and PLAN/ACTUAL rows. */
-          if (h > 1) sh[i].style.height = `${Math.ceil(h)}px`
-          else sh[i].style.removeProperty('height')
+      const pSide = planTriplexTbodyRef.current
+      const aSide = actualTriplexTbodyRef.current
+      /* Clear PLAN/ACTUAL first so getBoundingClientRect returns natural height,
+         not a previously-constrained value masking content growth. */
+      clearRows(pSide)
+      clearRows(aSide)
+      const mRows = Array.from(main.rows)
+      const pRows = pSide ? Array.from(pSide.rows) : []
+      const aRows = aSide ? Array.from(aSide.rows) : []
+      const n = mRows.length
+      for (let i = 0; i < n; i++) {
+        const bH = Math.ceil(mRows[i].getBoundingClientRect().height)
+        const pH = pRows[i] ? Math.ceil(pRows[i].getBoundingClientRect().height) : 0
+        const aH = aRows[i] ? Math.ceil(aRows[i].getBoundingClientRect().height) : 0
+        const maxH = Math.max(bH, pH, aH)
+        if (maxH > 1) {
+          if (pRows[i]) pRows[i].style.height = `${maxH}px`
+          if (aRows[i]) aRows[i].style.height = `${maxH}px`
+          /* Grow the BOQ row only when PLAN/ACTUAL content is taller */
+          if (maxH > bH) mRows[i].style.height = `${maxH}px`
         }
-        for (let i = n; i < sh.length; i++) sh[i].style.removeProperty('height')
       }
-      apply(planTriplexTbodyRef.current)
-      apply(actualTriplexTbodyRef.current)
+      /* Orphan PLAN/ACTUAL rows beyond BOQ count — leave unsized */
+      for (let i = n; i < pRows.length; i++) pRows[i].style.removeProperty('height')
+      for (let i = n; i < aRows.length; i++) aRows[i].style.removeProperty('height')
     }
     sync()
-    const ro = new ResizeObserver(sync)
+    const ro = new ResizeObserver(scheduleSync)
     ro.observe(main)
+    const pSide = planTriplexTbodyRef.current
+    const aSide = actualTriplexTbodyRef.current
+    if (pSide) ro.observe(pSide)
+    if (aSide) ro.observe(aSide)
     const mainHead = mainTheadRef.current
     if (mainHead) ro.observe(mainHead)
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId)
       ro.disconnect()
-      clearSide(planTriplexTbodyRef.current)
-      clearSide(actualTriplexTbodyRef.current)
+      clearRows(planTriplexTbodyRef.current)
+      clearRows(actualTriplexTbodyRef.current)
+      Array.from(main.rows).forEach(r => r.style.removeProperty('height'))
     }
   }, [
     groups,
