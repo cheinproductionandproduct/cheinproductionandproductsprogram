@@ -588,8 +588,9 @@ function SummaryRow({
           </td>
         )
       )}
+      {/* action | ส่วนลดแต่ละข้อ | ยอดงานหลังส่วนลด */}
       <td className={`boq-td${cellCls}${hl}`}/>
-      <td className={`boq-td${cellCls}${hl}`}/>
+      <td className={`boq-td boq-td-sec-discount${cellCls}${hl}`}/>
       <td className={`boq-td${cellCls}${hl}`}/>
       {tail.note && <td className={`boq-td${cellCls}${hl}`}/>}
     </tr>
@@ -640,14 +641,6 @@ function buildBoqTriplexBodySlots(
       slots.push({ kind: 'subrow', subRowId: sr.id, depth, key: `l-${sr.id}` })
       walkLines(sr.children ?? [], depth + 1, slots)
     }
-  }
-  const collectSubRowIds = (rows: SubRow[]): string[] => {
-    const ids: string[] = []
-    for (const sr of rows) {
-      ids.push(sr.id)
-      ids.push(...collectSubRowIds(sr.children ?? []))
-    }
-    return ids
   }
   if (!showDesc) {
     const slots: BoqTriplexSlot[] = []
@@ -2035,6 +2028,14 @@ export default function BoqEditorPage() {
     <div className="boq-col-resize" onMouseDown={e => startResize(col, e)} />
   )
 
+  /** Discount pair cells: ส่วนลดแต่ละข้อ + ยอดงานหลังส่วนลด */
+  const DiscountCells = ({ rowTotal, discountShare }: { rowTotal: number; discountShare: number }) => (
+    <>
+      <td className="boq-td boq-td-num boq-td-sec-discount">{discountAmt > 0 ? fmt(discountShare) : ''}</td>
+      <td className="boq-td boq-td-num boq-td-sec-net">{discountAmt > 0 ? fmt(rowTotal - discountShare) : fmt(rowTotal)}</td>
+    </>
+  )
+
   if (loading) return <div className="list-page boq-page"><p style={{ padding:32, color:'#888' }}>กำลังโหลด...</p></div>
 
   return (
@@ -2435,7 +2436,7 @@ export default function BoqEditorPage() {
                         </div>
                       )}
                     </td>
-                    {(() => { const gd = groupDiscountAlloc[groupIdx] ?? 0; return (<><td className="boq-td boq-td-num boq-td-sec-discount">{discountAmt > 0 ? fmt(gd) : ''}</td><td className="boq-td boq-td-num boq-td-sec-net">{discountAmt > 0 ? fmt(groupTotal - gd) : fmt(groupTotal)}</td></>) })()}
+                    <DiscountCells rowTotal={groupTotal} discountShare={groupDiscountAlloc[groupIdx] ?? 0} />
                     {rowTail.note && <td className="boq-td"/>}
                   </tr>
                   )}
@@ -2468,7 +2469,7 @@ export default function BoqEditorPage() {
                           {secTail.lab2 && <><td className="boq-td"/><td className="boq-td"/></>}
                           {secTail.tot && (actualCompareMode ? <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/></> : <td className="boq-td"/>)}
                           <td className="boq-td boq-td-action"/>
-                          {(() => { const st = actualCompareMode ? calcSecAdjustedMoneyTotal(section) : calcSecMoneyTotal(section); const sd = grandTotal > 0 ? (st / grandTotal) * discountAmt : 0; return (<><td className="boq-td boq-td-num boq-td-sec-discount">{discountAmt > 0 ? fmt(sd) : ''}</td><td className="boq-td boq-td-num boq-td-sec-net">{discountAmt > 0 ? fmt(st - sd) : fmt(st)}</td></>) })()}
+                          {(() => { const st = actualCompareMode ? calcSecAdjustedMoneyTotal(section) : calcSecMoneyTotal(section); const sd = grandTotal > 0 ? (st / grandTotal) * discountAmt : 0; return <DiscountCells rowTotal={st} discountShare={sd} /> })()}
                           {secTail.note && <td className="boq-td"/>}
                         </tr>
                         )}
@@ -2598,7 +2599,7 @@ export default function BoqEditorPage() {
                                       </div>
                                     )}
                                   </td>
-                                  {(() => { const rt = actualCompareMode ? calcRowTreeAdjusted(sr) : calcRowTreeTotal(sr, true); const rd = grandTotal > 0 ? (rt / grandTotal) * discountAmt : 0; return (<><td className="boq-td boq-td-num boq-td-sec-discount">{discountAmt > 0 ? fmt(rd) : ''}</td><td className="boq-td boq-td-num boq-td-sec-net">{discountAmt > 0 ? fmt(rt - rd) : fmt(rt)}</td></>) })()}
+                                  {(() => { const rt = actualCompareMode ? calcRowTreeAdjusted(sr) : calcRowTreeTotal(sr, true); const rd = grandTotal > 0 ? (rt / grandTotal) * discountAmt : 0; return <DiscountCells rowTotal={rt} discountShare={rd} /> })()}
                                   {showNote && (
                                     <td className="boq-td boq-td-note">
                                       <AutoTextarea className="boq-input boq-textarea" value={sr.note} readOnly={!editing}
@@ -2645,7 +2646,7 @@ export default function BoqEditorPage() {
                                 </div>
                               </td>
                               <td className="boq-td boq-summary-cell" />
-                              <td className="boq-td boq-summary-cell" />
+                              <td className="boq-td boq-summary-cell boq-td-sec-discount" />
                               <td className="boq-td boq-summary-cell" />
                               {showNote && <td className="boq-td boq-summary-cell" />}
                             </tr>
@@ -2689,7 +2690,7 @@ export default function BoqEditorPage() {
                             </div>
                           </td>
                           <td className="boq-td boq-summary-cell" />
-                          <td className="boq-td boq-summary-cell" />
+                          <td className="boq-td boq-summary-cell boq-td-sec-discount" />
                           <td className="boq-td boq-summary-cell" />
                           {showNote && <td className="boq-td boq-summary-cell" />}
                         </tr>

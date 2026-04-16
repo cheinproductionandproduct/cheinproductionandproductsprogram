@@ -944,10 +944,14 @@
   white-space: normal;
   line-height: 1.25;
   min-width: 100px;
-  background: #e8f0fe;
-  color: #1a237e;
+  background: #d9d9d9;
+  color: #1a1a1a;
 }
-.boq-th-sec-discount { width: 120px; }
+/* Left accent: visually groups the two discount columns away from Action */
+.boq-th-sec-discount {
+  width: 120px;
+  border-left: 2px solid #78909c !important;
+}
 .boq-th-sec-net      { width: 130px; }
 
 /* ID reference sub-cols: keep short */
@@ -974,11 +978,18 @@
   font-variant-numeric: tabular-nums;
   color: #c62828;
   font-weight: 600;
+  border-left: 2px solid #b0bec5 !important;
 }
 .boq-td-sec-net {
   font-variant-numeric: tabular-nums;
   color: #1565c0;
   font-weight: 700;
+}
+/* Discount cols in summary/header rows: inherit separator */
+.boq-summary-row > .boq-td.boq-td-sec-discount,
+.boq-group-header-row > .boq-td.boq-td-sec-discount,
+.boq-section-header-row > .boq-td.boq-td-sec-discount {
+  border-left: 2px solid #78909c !important;
 }
 
 .boq-td-total {
@@ -1181,26 +1192,26 @@
 .boq-summary-row--group-discount > .boq-td {
   border-top: none;
   padding-top: 0;
-  padding-bottom: 8px;
+  padding-bottom: 4px;
   vertical-align: top;
+  background: #f5f5f5;
 }
 
 .boq-group-discount-span-cell {
-  padding: 4px 10px 10px !important;
+  padding: 2px 8px 6px !important;
 }
 
 .boq-group-discount-addon {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  padding: 10px 14px;
-  border: 1px solid #b0b0b0;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #ffffff 0%, #f4f4f4 100%);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fafafa;
   font-size: 12px;
   line-height: 1.45;
-  color: #2a2a2a;
+  color: #333;
 }
 
 .boq-group-discount-addon__row {
@@ -1208,7 +1219,7 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 14px;
-  padding: 6px 0;
+  padding: 4px 0;
 }
 
 .boq-group-discount-addon__row:first-child {
@@ -1216,13 +1227,13 @@
 }
 
 .boq-group-discount-addon__row + .boq-group-discount-addon__row {
-  border-top: 1px solid #e5e5e5;
+  border-top: 1px solid #efefef;
 }
 
 .boq-group-discount-addon__row--net {
   margin-top: 2px;
-  padding-top: 10px;
-  border-top: 1px solid #bdbdbd;
+  padding-top: 6px;
+  border-top: 1px solid #ccc !important;
 }
 
 .boq-group-discount-addon__label {
@@ -1230,7 +1241,7 @@
   min-width: 0;
   text-align: left;
   font-weight: 500;
-  color: #4a4a4a;
+  color: #666;
 }
 
 .boq-group-discount-addon__value {
@@ -1248,16 +1259,16 @@
 
 .boq-group-discount-addon__row--net .boq-group-discount-addon__value {
   font-size: 13px;
-  color: #0d47a1;
+  color: #1565c0;
 }
 
-/* Per-section discount detail strip — lighter, more compact than group-level addon */
+/* Per-section discount detail strip */
 .boq-summary-row--section-discount > .boq-td {
   border-top: none;
   padding-top: 0;
-  padding-bottom: 4px;
+  padding-bottom: 3px;
   vertical-align: top;
-  background: #f9f9f9;
+  background: #f5f5f5;
 }
 
 .boq-section-discount-addon {
@@ -1265,33 +1276,43 @@
   flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 18px;
-  padding: 5px 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  gap: 0 0;
+  padding: 4px 8px;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
   background: #fafafa;
   font-size: 11.5px;
-  color: #333;
+  color: #444;
 }
 
 .boq-section-discount-addon__title {
   font-weight: 700;
-  font-size: 12px;
-  color: #1a1a1a;
-  margin-right: 4px;
+  font-size: 11.5px;
+  color: #555;
+  margin-right: 10px;
   white-space: nowrap;
+  opacity: 0.75;
 }
 
 .boq-section-discount-addon__item {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   white-space: nowrap;
+  padding: 0 10px;
+  border-left: 1px solid #e0e0e0;
+}
+
+.boq-section-discount-addon__item:first-of-type {
+  border-left: none;
+  padding-left: 0;
 }
 
 .boq-section-discount-addon__label {
-  color: #666;
+  color: #888;
   font-weight: 500;
+  font-size: 11px;
 }
 
 .boq-section-discount-addon__label::after {
@@ -1309,13 +1330,15 @@
 
 .boq-section-discount-addon__item--net {
   border-left: 1px solid #ccc;
-  padding-left: 14px;
-  margin-left: 4px;
+  padding-left: 10px;
+  margin-left: 0;
+  background: #f0f4ff;
+  border-radius: 3px;
 }
 
 .boq-section-discount-addon__value--net {
-  color: #0d47a1;
-  font-size: 12.5px;
+  color: #1565c0;
+  font-size: 12px;
 }
 
 .boq-summary-editable-label {
