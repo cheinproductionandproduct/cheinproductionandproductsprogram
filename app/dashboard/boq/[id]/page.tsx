@@ -2005,7 +2005,8 @@ export default function BoqEditorPage() {
       syncing = true
       const pSide = planTriplexTbodyRef.current
       const aSide = actualTriplexTbodyRef.current
-      /* Clear PLAN/ACTUAL forced heights so we can measure their natural size */
+      /* Remove ALL forced heights first so every panel shows its true natural size */
+      clearRows(main)
       clearRows(pSide)
       clearRows(aSide)
       const mRows = Array.from(main.rows)
@@ -2013,16 +2014,15 @@ export default function BoqEditorPage() {
       const aRows = aSide ? Array.from(aSide.rows) : []
       const n = mRows.length
       for (let i = 0; i < n; i++) {
-        const bH = Math.ceil(mRows[i].getBoundingClientRect().height)
-        const pH = pRows[i] ? Math.ceil(pRows[i].getBoundingClientRect().height) : 0
-        const aH = aRows[i] ? Math.ceil(aRows[i].getBoundingClientRect().height) : 0
-        const maxH = Math.max(bH, pH, aH)
-        if (maxH > 1) {
-          if (pRows[i]) pRows[i].style.height = `${maxH}px`
-          if (aRows[i]) aRows[i].style.height = `${maxH}px`
-          /* Grow the BOQ row only when PLAN/ACTUAL content is taller */
-          if (maxH > bH) mRows[i].style.height = `${maxH}px`
-        }
+        const bH = mRows[i].getBoundingClientRect().height
+        const pH = pRows[i] ? pRows[i].getBoundingClientRect().height : 0
+        const aH = aRows[i] ? aRows[i].getBoundingClientRect().height : 0
+        /* Math.ceil snaps sub-pixel heights to a whole pixel; the same string
+           is stamped on all three rows so they are guaranteed pixel-identical */
+        const h = `${Math.ceil(Math.max(bH, pH, aH))}px`
+        mRows[i].style.height = h
+        if (pRows[i]) pRows[i].style.height = h
+        if (aRows[i]) aRows[i].style.height = h
       }
       /* Orphan PLAN/ACTUAL rows beyond BOQ count — leave unsized */
       for (let i = n; i < pRows.length; i++) pRows[i].style.removeProperty('height')
