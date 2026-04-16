@@ -1983,9 +1983,10 @@ export default function BoqEditorPage() {
   ])
 
   /** Triplex: BOQ / PLAN / ACTUAL tbody rows are height-locked in both directions.
-   *  We clear PLAN/ACTUAL heights first to read their natural height, then apply
-   *  max(BOQ, PLAN, ACTUAL) to all three so no panel can silently overflow its
-   *  neighbour and cause cumulative drift when scrolling down. */
+   *  Strategy: clear PLAN/ACTUAL forced heights first so each panel's natural
+   *  content height is visible, measure all three, apply max to all three.
+   *  Only BOQ main tbody + thead are observed — observing PLAN/ACTUAL would
+   *  create an infinite loop because clearRows() itself triggers their observer. */
   useLayoutEffect(() => {
     const main = mainTbodyRef.current
     if (!main) return
@@ -1994,15 +1995,17 @@ export default function BoqEditorPage() {
       Array.from(tbody.rows).forEach(r => r.style.removeProperty('height'))
     }
     let rafId: number | null = null
+    let syncing = false
     const scheduleSync = () => {
       if (rafId !== null) return
       rafId = requestAnimationFrame(() => { rafId = null; sync() })
     }
     const sync = () => {
+      if (syncing) return
+      syncing = true
       const pSide = planTriplexTbodyRef.current
       const aSide = actualTriplexTbodyRef.current
-      /* Clear PLAN/ACTUAL first so getBoundingClientRect returns natural height,
-         not a previously-constrained value masking content growth. */
+      /* Clear PLAN/ACTUAL forced heights so we can measure their natural size */
       clearRows(pSide)
       clearRows(aSide)
       const mRows = Array.from(main.rows)
@@ -2024,14 +2027,12 @@ export default function BoqEditorPage() {
       /* Orphan PLAN/ACTUAL rows beyond BOQ count — leave unsized */
       for (let i = n; i < pRows.length; i++) pRows[i].style.removeProperty('height')
       for (let i = n; i < aRows.length; i++) aRows[i].style.removeProperty('height')
+      syncing = false
     }
     sync()
+    /* Only observe BOQ main tbody and thead — NOT pSide/aSide (would cause loop) */
     const ro = new ResizeObserver(scheduleSync)
     ro.observe(main)
-    const pSide = planTriplexTbodyRef.current
-    const aSide = actualTriplexTbodyRef.current
-    if (pSide) ro.observe(pSide)
-    if (aSide) ro.observe(aSide)
     const mainHead = mainTheadRef.current
     if (mainHead) ro.observe(mainHead)
     return () => {
