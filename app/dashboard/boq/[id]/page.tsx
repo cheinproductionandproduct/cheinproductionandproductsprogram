@@ -628,6 +628,7 @@ type BoqTriplexSlot =
   | { kind: 'section'; key: string }
   | { kind: 'subrow'; subRowId: string; depth: number; key: string }
   | { kind: 'groupSummary'; key: string; subRowIds: string[] }
+  | { kind: 'sectionDiscount'; key: string }
   | { kind: 'groupDiscount'; key: string }
 
 function buildBoqTriplexBodySlots(
@@ -655,6 +656,7 @@ function buildBoqTriplexBodySlots(
     for (const sec of g.sections) {
       slots.push({ kind: 'section', key: `s-${sec.id}` })
       walkLines(sec.subRows, 0, slots)
+      if (discountAmt > 0 && tableShowTotal) slots.push({ kind: 'sectionDiscount', key: `sd-${sec.id}` })
     }
     const subRowIds = g.sections.flatMap(sec => sec.subRows.map(sr => sr.id))
     slots.push({ kind: 'groupSummary', key: `gs-${g.id}`, subRowIds })
@@ -962,6 +964,14 @@ function PlanSidePricingTable({
               </td>
               <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(sumGp)}</td>
               <td className="boq-td boq-td-num boq-td-total boq-side-td boq-side-td--last-cell">{fmt(sumSell)}</td>
+            </tr>,
+          )
+          continue
+        }
+        if (s.kind === 'sectionDiscount') {
+          lines.push(
+            <tr key={s.key} className="boq-row boq-summary-row boq-summary-row--section-discount boq-side-triplex-ghost" aria-hidden>
+              <td colSpan={10} className="boq-td boq-side-triplex-ghost-cell boq-side-triplex-ghost-cell--discount" />
             </tr>,
           )
           continue
