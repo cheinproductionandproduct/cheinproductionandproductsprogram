@@ -3319,9 +3319,8 @@ input.form-input[type='number'] {
 
 /* Requester info section */
 .adv-info {
-  border-left: 1px solid #000;
-  border-right: 1px solid #000;
-  border-bottom: 1px solid #000;
+  border: 1px solid #000;
+  margin-top: -1px; /* collapse double border with title-box bottom */
 }
 
 .adv-info-row {
@@ -3861,6 +3860,23 @@ input.form-input[type='number'] {
   /* Keep logo and company details visible when printing */
   .adv-header img,
   .adc-header img {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Ensure all borders render in print (don't let browser suppress them) */
+  .adv-sheet,
+  .adv-title-box,
+  .adv-info,
+  .adv-info-row,
+  .adv-info-cell,
+  .adv-tbl,
+  .adv-tbl th,
+  .adv-tbl td,
+  .adc-tbl,
+  .adc-tbl th,
+  .adc-tbl td,
+  .adv-sig-line {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
