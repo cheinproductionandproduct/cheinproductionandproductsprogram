@@ -768,12 +768,14 @@
   opacity: 0.88;
 }
 
-/* Main BOQ: same band strip as PLAN/ACTUAL (`boq-side-th--*` reused for one visual row). */
+/* Band row header cells — unified table (no wrapper) + legacy triplex panel */
+.boq-table thead .boq-thead-triplex-band > .boq-th,
 .boq-triplex__panel--boq .boq-table thead .boq-thead-triplex-band > .boq-th {
   padding: 0;
   vertical-align: middle;
 }
 
+.boq-table thead .boq-thead-triplex-band > .boq-th > .boq-side-th-r1-label,
 .boq-triplex__panel--boq .boq-table thead .boq-thead-triplex-band > .boq-th > .boq-side-th-r1-label {
   display: flex;
   align-items: center;
@@ -2295,5 +2297,82 @@ h1.page-title.boq-page-title-row {
 .boq-td-sub-no {
   box-shadow: none;
   background: #f5f5f5;
+}
+
+/* ── Unified-table: PLAN/ACTUAL panel cells ───────────────────────────────── */
+
+/* Panel-start separator: left border between BOQ and PLAN, and between PLAN and ACTUAL */
+.boq-side-td--panel-start {
+  border-left: 2px solid #7986cb !important;
+}
+
+/* Numeric cells in unified table: right-align + no-wrap + tabular nums */
+.boq-table tbody .boq-side-td.boq-td-num,
+.boq-table tfoot .boq-side-td.boq-td-num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* GP% / sell-group column left separator */
+.boq-table tbody .boq-side-td--segment-sell,
+.boq-table tfoot .boq-side-td--segment-sell {
+  border-left: 1px dashed #a0b4d6;
+}
+
+/* Inputs inside unified-table PLAN/ACTUAL cells */
+.boq-table tbody .boq-side-td .boq-input-num {
+  text-align: right;
+  white-space: nowrap;
+  width: 100%;
+}
+
+/* Last-cell inner (sell price + delete btn): right-aligned in unified table */
+.boq-table tbody .boq-side-last-cell-inner {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+/* Calc column background in PLAN/ACTUAL cells */
+.boq-table tbody .boq-side-td.boq-td-calc {
+  background: #f5f8ff;
+  border-left: 1px dashed #a0b4d6;
+}
+
+/* Even-row zebra for PLAN/ACTUAL cells */
+.boq-table tbody > tr.boq-row:nth-child(even) > .boq-side-td {
+  background-color: #fafafa;
+}
+.boq-table tbody > tr.boq-row.boq-row--nested > .boq-side-td {
+  background-color: #d6defa;
+}
+.boq-table tbody > tr.boq-row:nth-child(even).boq-row--nested > .boq-side-td {
+  background-color: #cdd6f3;
+}
+
+/* Summary rows: top border + bold for PLAN/ACTUAL side summary cells */
+.boq-table tbody .boq-side-summary-row > .boq-side-td {
+  border-top: 1px solid #757575;
+  font-weight: 700;
+}
+
+/* Group/section ghost rows: muted background for PLAN/ACTUAL cells */
+.boq-table tbody .boq-group-header-row > .boq-side-td,
+.boq-table tbody .boq-section-header-row > .boq-side-td {
+  background: #f5f0e8;
+}
+
+/* PLAN/ACTUAL header th in unified table: match boq-side-table header style */
+.boq-table thead .boq-side-th {
+  background: #e8eaf6;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 4px 6px;
+  white-space: nowrap;
+  text-align: center;
+  border: 1px solid #bbb;
+  vertical-align: middle;
 }
 
