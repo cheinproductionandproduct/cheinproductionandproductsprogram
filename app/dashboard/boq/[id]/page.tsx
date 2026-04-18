@@ -2275,7 +2275,7 @@ export default function BoqEditorPage() {
 
       <div className="boq-split-scroll boq-split-scroll--triplex" ref={boqSplitScrollRef}>
       <div className="boq-table-wrapper boq-table-wrapper--triplex">
-        <table className="boq-table">
+        <table className={`boq-table${editing ? '' : ' boq-table--readonly'}`}>
           <colgroup>
             {/* ── BOQ cols ── */}
             <col style={{ width: colW.no }} />

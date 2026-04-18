@@ -2293,6 +2293,12 @@ h1.page-title.boq-page-title-row {
   font-style: italic;
 }
 
+/* Hide action column when not editing */
+.boq-table--readonly .boq-th-action,
+.boq-table--readonly .boq-td-action {
+  display: none;
+}
+
 /* Lead / ลำดับ-style cols: flat fill only (no left stripe — gradients read as thick bars inside cells) */
 .boq-td-sub-no {
   box-shadow: none;
