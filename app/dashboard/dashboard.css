@@ -3898,6 +3898,14 @@ input.form-input[type='number'] {
     margin-bottom: 0;
   }
 
+  /* Keep the signature block together — never split it across pages */
+  .adv-sigs {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    page-break-before: avoid;
+    break-before: avoid;
+  }
+
   .adv-tbl thead,
   .adc-tbl thead {
     display: table-header-group;

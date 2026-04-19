@@ -259,6 +259,10 @@
   min-width: 80px;
 }
 
+.boq-side-table .boq-side-col--sub {
+  min-width: 220px;
+}
+
 .boq-side-th--rowhead {
   vertical-align: middle;
   white-space: normal;
@@ -1127,6 +1131,7 @@
   font-family: 'Sarabun', system-ui, sans-serif;
   font-size: 13px;
   padding: 2px 4px;
+  vertical-align: middle;
 }
 .boq-input:focus { background: #fff9e6; }
 
@@ -1229,7 +1234,6 @@
 }
 
 .boq-group-discount-addon__row--net {
-  margin-left: auto;
   border-left: 1px solid #b0b0b0;
 }
 
@@ -1273,7 +1277,7 @@
 .boq-section-discount-addon {
   display: flex;
   flex-direction: row;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0;
   padding: 0 12px;
@@ -1327,7 +1331,6 @@
 
 .boq-section-discount-addon__item--net {
   border-left: 1px solid #b0b0b0;
-  margin-left: auto;
 }
 
 .boq-section-discount-addon__value--net {
@@ -2368,6 +2371,23 @@ h1.page-title.boq-page-title-row {
 .boq-table tbody .boq-group-header-row > .boq-side-td,
 .boq-table tbody .boq-section-header-row > .boq-side-td {
   background: #f5f0e8;
+}
+
+/* Unified triplex table: don't stretch to fill container width — each col has explicit width */
+.boq-table-wrapper--triplex > .boq-table {
+  min-width: 0;
+}
+
+/* Unified table: give PLAN/ACTUAL cols explicit widths so table-layout:fixed doesn't
+   absorb container extra space into them (which creates a white strip at the right end) */
+.boq-table-wrapper--triplex .boq-side-col {
+  width: 100px;
+}
+.boq-table-wrapper--triplex .boq-side-col--boq-ref {
+  width: 65px;
+}
+.boq-table-wrapper--triplex .boq-side-col--lead {
+  width: 90px;
 }
 
 /* PLAN/ACTUAL header th in unified table: match boq-side-table header style */

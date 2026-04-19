@@ -590,10 +590,8 @@ function SummaryRow({
           </td>
         )
       )}
-      {/* action | ส่วนลดแต่ละข้อ | ยอดงานหลังส่วนลด */}
-      <td className={`boq-td${cellCls}${hl}`}/>
-      <td className={`boq-td boq-td-sec-discount${cellCls}${hl}`}/>
-      <td className={`boq-td${cellCls}${hl}`}/>
+      {/* action | หมายเหตุ */}
+      <td className={`boq-td boq-td-action${cellCls}${hl}`}/>
       {tail.note && <td className={`boq-td${cellCls}${hl}`}/>}
       {extraCells}
     </tr>
@@ -1218,7 +1216,7 @@ function PlanSidePricingTable({
       <colgroup>
         <col className="boq-side-col boq-side-col--boq-ref" />
         <col className="boq-side-col boq-side-col--lead" />
-        <col className="boq-side-col" />
+        <col className="boq-side-col boq-side-col--sub" />
         <col className="boq-side-col" />
         <col className="boq-side-col" />
         <col className="boq-side-col" />
@@ -1775,6 +1773,17 @@ export default function BoqEditorPage() {
     // Remove nested lines like 1.1.1 / 2.3.1 etc.
     clone.querySelectorAll('tr.boq-row--nested').forEach(el => el.remove())
 
+    // Remove PLAN/ACTUAL side panel columns (customer export: BOQ columns only)
+    clone.querySelectorAll('th.boq-side-th, td.boq-side-td').forEach(el => el.remove())
+
+    // Remove thead rows that became empty after stripping PLAN/ACTUAL headers (e.g. band row)
+    clone.querySelectorAll('thead tr').forEach(tr => {
+      if (!tr.querySelector('th, td')) tr.remove()
+    })
+
+    // Remove PLAN/ACTUAL col widths from colgroup
+    clone.querySelectorAll('col.boq-side-col').forEach(col => col.remove())
+
     // Remove action column width from colgroup (last col)
     clone.querySelectorAll('colgroup').forEach(cg => {
       const cols = cg.querySelectorAll('col')
@@ -1820,6 +1829,169 @@ export default function BoqEditorPage() {
     w.document.close()
     w.focus()
     setTimeout(() => w.print(), 150)
+  }
+
+  const handleDownloadPDF = async () => {
+    const pageEl = document.querySelector('.boq-page') as HTMLElement | null
+    if (!pageEl) return
+
+    // ── Step 1: flush JS input state → DOM attributes so cloneNode copies values ─
+    pageEl.querySelectorAll('input').forEach(el => {
+      const inp = el as HTMLInputElement
+      if (inp.type === 'checkbox') {
+        inp.checked ? inp.setAttribute('checked', '') : inp.removeAttribute('checked')
+      } else {
+        inp.setAttribute('value', inp.value)
+      }
+    })
+    pageEl.querySelectorAll('textarea').forEach(el => {
+      const ta = el as HTMLTextAreaElement
+      ta.textContent = ta.value
+    })
+
+    // ── Step 2: inject CSS that hides PLAN/ACTUAL cols and UI chrome ─────────────
+    const tempStyle = document.createElement('style')
+    tempStyle.textContent = `
+      .boq-pdf-mode .boq-side-th,
+      .boq-pdf-mode .boq-side-td           { display: none !important; }
+      .boq-pdf-mode .boq-top-bar,
+      .boq-pdf-mode .boq-actions,
+      .boq-pdf-mode .boq-modal-overlay,
+      .boq-pdf-mode .boq-filter-dropdown,
+      .boq-pdf-mode .boq-col-resize,
+      .boq-pdf-mode .boq-side-panel        { display: none !important; }
+      .boq-pdf-mode tr.boq-row--nested          { display: none !important; }
+      .boq-pdf-mode tr.boq-thead-triplex-band   { display: none !important; }
+      .boq-pdf-mode col.boq-side-col       { width: 0 !important; }
+      .boq-pdf-mode .boq-table {
+        table-layout: auto  !important;
+        width:        100%  !important;
+        min-width:    0     !important;
+      }
+      .boq-pdf-mode .boq-split-scroll,
+      .boq-pdf-mode .boq-table-wrapper,
+      .boq-pdf-mode .boq-side-table-wrapper {
+        overflow:       visible !important;
+        max-width:      none    !important;
+        container-type: normal  !important;
+      }
+      .boq-pdf-mode .boq-td,
+      .boq-pdf-mode .boq-th { vertical-align: middle !important; }
+      .boq-pdf-mode .boq-document-page-header { display: none !important; }
+    `
+    document.head.appendChild(tempStyle)
+    pageEl.classList.add('boq-pdf-mode')
+
+    await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())))
+
+    const liveTableEl = pageEl.querySelector('.boq-table') as HTMLElement | null
+    const liveTableWidth = liveTableEl ? liveTableEl.scrollWidth : 1600
+
+    // Clone after CSS + value flush — clone looks exactly like the live page
+    const clone = pageEl.cloneNode(true) as HTMLElement
+
+    // Restore live page immediately
+    pageEl.classList.remove('boq-pdf-mode')
+
+    // Replace inputs/textareas with spans — html2canvas clips text inside <input>
+    // elements to the element's visible area, so we must replace them with spans
+    // that let the text flow naturally.
+    clone.querySelectorAll('input, textarea, select').forEach(el => {
+      const span = document.createElement('span')
+      span.className = (el as HTMLElement).className
+      span.style.display = el.tagName === 'TEXTAREA' ? 'block' : 'inline-block'
+      span.style.width = '100%'
+      span.style.boxSizing = 'border-box'
+      span.style.whiteSpace = el.tagName === 'TEXTAREA' ? 'pre-wrap' : 'normal'
+      if (el instanceof HTMLInputElement) {
+        span.textContent = el.type === 'checkbox' ? (el.checked ? '✓' : '') : (el.value || '')
+      } else {
+        span.textContent = (el as HTMLTextAreaElement | HTMLSelectElement).value || ''
+      }
+      el.replaceWith(span)
+    })
+
+    // Remove interactive chrome from clone (not visible in PDF anyway)
+    clone.querySelectorAll('button').forEach(el => el.remove())
+
+    // ── Step 3: build PDF header (company info left, BOQ title right) ────────────
+    const header = document.createElement('div')
+    header.style.cssText = `
+      display:flex;justify-content:space-between;align-items:flex-start;
+      padding:0 0 12px 0;margin-bottom:12px;border-bottom:2px solid #333;
+      font-family:'Sarabun',system-ui,sans-serif;
+    `
+    header.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:14px;max-width:55%;">
+        <img src="/cheinprodlogo-removebg-preview.png"
+             style="height:64px;width:auto;object-fit:contain;flex-shrink:0;" />
+        <div style="font-size:12px;line-height:1.6;color:#222;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:2px;">
+            บริษัท เชน โปรดักชั่น แอนด์ โปรดักส์ จำกัด (สำนักงานใหญ่)
+          </div>
+          <div>159/25 ถ.สุวินทวงศ์ แขวงแสนแสบ เขตมีนบุรี กรุงเทพมหานคร 10510</div>
+          <div>เลขประจำตัวผู้เสียภาษี 0105559081883</div>
+          <div>โทร. +666 2635 9647 &nbsp;|&nbsp; +669 0897 9955, +668 3242 2380</div>
+        </div>
+      </div>
+      <div style="text-align:right;font-family:'Sarabun',system-ui,sans-serif;">
+        <div style="font-size:26px;font-weight:800;color:#111;margin-bottom:6px;letter-spacing:-0.5px;">ใบถอดแบบ (BOQ)</div>
+        ${jobName  ? `<div style="font-size:16px;font-weight:700;color:#333;margin-bottom:2px;">${jobName}</div>`  : ''}
+        ${boqTitle ? `<div style="font-size:14px;font-weight:500;color:#555;">${boqTitle}</div>` : ''}
+      </div>
+    `
+
+    // ── Step 4: mount clone off-screen ───────────────────────────────────────────
+    const wrapperW = Math.max(liveTableWidth + 40, 1400)
+    const wrapper = document.createElement('div')
+    wrapper.style.cssText = `position:fixed;top:0;left:-${wrapperW + 10}px;width:${wrapperW}px;background:#fff;padding:20px;box-sizing:border-box;overflow:visible;pointer-events:none;z-index:-1;`
+    wrapper.appendChild(header)
+    wrapper.appendChild(clone)
+    document.body.appendChild(wrapper)
+
+    // Strip triplex row-sync inline heights so rows collapse to natural content size
+    clone.querySelectorAll('tr').forEach(row => {
+      ;(row as HTMLElement).style.height = ''
+      ;(row as HTMLElement).style.minHeight = ''
+    })
+
+    await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())))
+
+    const naturalWidth  = wrapper.scrollWidth
+    const naturalHeight = wrapper.scrollHeight
+
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ])
+
+      const canvas = await html2canvas(wrapper, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        windowWidth:  naturalWidth,
+        windowHeight: naturalHeight,
+        width:  naturalWidth,
+        height: naturalHeight,
+        x: 0,
+        y: 0,
+      })
+
+      const pxToMm = 25.4 / (96 * 2)
+      const pdfW = canvas.width  * pxToMm
+      const pdfH = canvas.height * pxToMm
+
+      const pdf = new jsPDF({ unit: 'mm', format: [pdfW, pdfH] })
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfW, pdfH)
+
+      const docTitle = (document.querySelector('.boq-doc-title, .boq-page h1') as HTMLElement)?.textContent?.trim() || 'BOQ'
+      pdf.save(`${docTitle}.pdf`)
+    } finally {
+      document.body.removeChild(wrapper)
+      document.head.removeChild(tempStyle)
+    }
   }
 
   /* mutations */
@@ -1907,7 +2079,7 @@ export default function BoqEditorPage() {
     materialCollapsed: showMat && matDetailHidden,
     showLabor,
     showTotal: tableShowTotal,
-    showNote,
+    showNote: true,
   }
   /** Main BOQ column count — matches `<colgroup>` (for PLAN-style band `colSpan`s). */
   const boqMainTableColCount = useMemo(() => {
@@ -1920,8 +2092,7 @@ export default function BoqEditorPage() {
     if (showLabor) n += 2
     if (tableShowTotal) n += actualCompareMode ? 4 : 1
     n += 1  // action
-    n += 2  // ส่วนลดแต่ละข้อ + ยอดงานหลังส่วนลด
-    if (showNote) n += 1
+    n += 1  // หมายเหตุ
     return n
   }, [
     showRefId,
@@ -1932,7 +2103,6 @@ export default function BoqEditorPage() {
     showLabor,
     tableShowTotal,
     actualCompareMode,
-    showNote,
   ])
   const boqMainBandColSpans = useMemo(
     () => planBandColSpansForMain(boqMainTableColCount),
@@ -2215,8 +2385,8 @@ export default function BoqEditorPage() {
               {signing ? 'กำลังอนุมัติ...' : 'อนุมัติ / ลงนาม'}
             </button>
           )}
-          <button type="button" className="boq-submit-btn" onClick={handleExportClean}>
-            Export
+          <button type="button" className="boq-submit-btn" onClick={() => { void handleDownloadPDF() }}>
+            Export PDF
           </button>
           <div className="boq-filter-wrap" ref={filterDocWrapRef}>
             <button
@@ -2260,10 +2430,7 @@ export default function BoqEditorPage() {
                   <input type="checkbox" checked={tableShowTotal} disabled={actualCompareMode} onChange={e => { if (!actualCompareMode) setShowTotal(e.target.checked) }} />
                   <span>6. รวมค่าวัสดุและแรงงาน</span>
                 </label>
-                <label className="boq-filter-dropdown__option">
-                  <input type="checkbox" checked={showNote} onChange={e => setShowNote(e.target.checked)} />
-                  <span>7. หมายเหตุ</span>
-                </label>
+
                 <button type="button" className="boq-filter-dropdown__close" onClick={() => setFilterOpen(false)}>
                   ปิด
                 </button>
@@ -2317,14 +2484,12 @@ export default function BoqEditorPage() {
                 <col style={{ width: colW.total }} />
               )
             )}
-            <col style={{ width: colW.action }} />
-            <col style={{ width: colW.secDiscount }} />
-            <col style={{ width: colW.secNet }} />
-            {showNote && <col style={{ width: colW.note }} />}
+            {editing && <col style={{ width: colW.action }} />}
+            <col style={{ width: colW.note }} />
             {/* ── PLAN cols (10) ── */}
             <col className="boq-side-col boq-side-col--boq-ref" />
             <col className="boq-side-col boq-side-col--lead" />
-            <col className="boq-side-col" />
+            <col className="boq-side-col boq-side-col--sub" />
             <col className="boq-side-col" />
             <col className="boq-side-col" />
             <col className="boq-side-col" />
@@ -2351,37 +2516,17 @@ export default function BoqEditorPage() {
             {/* ── Band row (only when multi-row thead) ── */}
             {boqMainHeadSubRow && (
               <tr className="boq-thead-triplex-band">
-                <th colSpan={boqMainBandColSpans[0]} className="boq-th boq-side-th boq-side-th--plan-band" lang="en">
-                  <span className="boq-side-th-r1-label">BOQ</span>
+                <th colSpan={boqMainTableColCount - (editing ? 0 : 1)} className="boq-th boq-side-th boq-side-th--plan-band" lang="en">
+                  BOQ
                 </th>
-                <th colSpan={boqMainBandColSpans[1]} className="boq-th boq-side-th boq-side-th--cost-group">
-                  <span className="boq-side-th-r1-label" aria-hidden>{'\u00a0'}</span>
+                <th colSpan={10} className="boq-th boq-side-th boq-side-th--plan-band boq-side-td--panel-start" lang="en">
+                  PLAN
                 </th>
-                <th colSpan={boqMainBandColSpans[2]} className="boq-th boq-side-th boq-side-th--sell-group">
-                  <span className="boq-side-th-r1-label" aria-hidden>{'\u00a0'}</span>
-                </th>
-                {/* PLAN band */}
-                <th colSpan={2} className="boq-th boq-side-th boq-side-th--plan-band boq-side-td--panel-start" lang="en">
-                  <span className="boq-side-th-r1-label">PLAN</span>
-                </th>
-                <th colSpan={5} className="boq-th boq-side-th boq-side-th--cost-group">
-                  <span className="boq-side-th-r1-label">ต้นทุน</span>
-                </th>
-                <th colSpan={3} className="boq-th boq-side-th boq-side-th--sell-group">
-                  <span className="boq-side-th-r1-label">ประเมิน + กำไร</span>
-                </th>
-                {/* ACTUAL band */}
-                {boqKind === 'ACTUAL' && (<>
-                  <th colSpan={2} className="boq-th boq-side-th boq-side-th--plan-band boq-side-td--panel-start" lang="en">
-                    <span className="boq-side-th-r1-label">ACTUAL</span>
+                {boqKind === 'ACTUAL' && (
+                  <th colSpan={10} className="boq-th boq-side-th boq-side-th--plan-band boq-side-td--panel-start" lang="en">
+                    ACTUAL
                   </th>
-                  <th colSpan={5} className="boq-th boq-side-th boq-side-th--cost-group">
-                    <span className="boq-side-th-r1-label">ต้นทุน</span>
-                  </th>
-                  <th colSpan={3} className="boq-th boq-side-th boq-side-th--sell-group">
-                    <span className="boq-side-th-r1-label">ประเมิน + กำไร</span>
-                  </th>
-                </>)}
+                )}
               </tr>
             )}
             {/* ── Main headers row ── */}
@@ -2447,12 +2592,8 @@ export default function BoqEditorPage() {
                   </th>
                 )
               )}
-              <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-action"><RH col="action"/></th>
-              <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-sec-discount">ส่วนลดแต่ละข้อ<RH col="secDiscount"/></th>
-              <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-sec-net">ยอดงานหลังส่วนลด<RH col="secNet"/></th>
-              {showNote && (
-                <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-note">หมายเหตุ<RH col="note"/></th>
-              )}
+              {editing && <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-action"><RH col="action"/></th>}
+              <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-note">หมายเหตุ<RH col="note"/></th>
               {/* ── PLAN main headers ── */}
               {boqMainHeadSubRow ? (<>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--boq-ref-head boq-side-td--panel-start" title="ลำดับบรรทัด BOQ">ลำดับ BOQ</th>
@@ -2643,7 +2784,6 @@ export default function BoqEditorPage() {
                         </div>
                       )}
                     </td>
-                    <DiscountCells rowTotal={groupTotal} discountShare={groupDiscountAlloc[groupIdx] ?? 0} />
                     {rowTail.note && <td className="boq-td"/>}
                     <PlanEmptyCells panelStart />
                     {boqKind === 'ACTUAL' && <PlanEmptyCells panelStart />}
@@ -2678,7 +2818,6 @@ export default function BoqEditorPage() {
                           {secTail.lab2 && <><td className="boq-td"/><td className="boq-td"/></>}
                           {secTail.tot && (actualCompareMode ? <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/></> : <td className="boq-td"/>)}
                           <td className="boq-td boq-td-action"/>
-                          {(() => { const st = actualCompareMode ? calcSecAdjustedMoneyTotal(section) : calcSecMoneyTotal(section); const sd = grandTotal > 0 ? (st / grandTotal) * discountAmt : 0; return <DiscountCells rowTotal={st} discountShare={sd} /> })()}
                           {secTail.note && <td className="boq-td"/>}
                           <PlanEmptyCells panelStart />
                           {boqKind === 'ACTUAL' && <PlanEmptyCells panelStart />}
@@ -2842,13 +2981,10 @@ export default function BoqEditorPage() {
                                       </div>
                                     )}
                                   </td>
-                                  {(() => { const rt = actualCompareMode ? calcRowTreeAdjusted(sr) : calcRowTreeTotal(sr, true); const rd = grandTotal > 0 ? (rt / grandTotal) * discountAmt : 0; return <DiscountCells rowTotal={rt} discountShare={rd} /> })()}
-                                  {showNote && (
-                                    <td className="boq-td boq-td-note">
-                                      <AutoTextarea className="boq-input boq-textarea" value={sr.note} readOnly={!editing}
-                                        onChange={v => editing && updSubRow(group.id,section.id,sr.id,'note',v)} />
-                                    </td>
-                                  )}
+                                  <td className="boq-td boq-td-note">
+                                    <AutoTextarea className="boq-input boq-textarea" value={sr.note} readOnly={!editing}
+                                      onChange={v => editing && updSubRow(group.id,section.id,sr.id,'note',v)} />
+                                  </td>
                                   {planCells}
                                   {actCells}
                                 </tr>,
@@ -2890,10 +3026,8 @@ export default function BoqEditorPage() {
                                   </span>
                                 </div>
                               </td>
+                              <td className="boq-td boq-summary-cell boq-td-action" />
                               <td className="boq-td boq-summary-cell" />
-                              <td className="boq-td boq-summary-cell boq-td-sec-discount" />
-                              <td className="boq-td boq-summary-cell" />
-                              {showNote && <td className="boq-td boq-summary-cell" />}
                               <PlanEmptyCells panelStart />
                               {boqKind === 'ACTUAL' && <PlanEmptyCells panelStart />}
                             </tr>
@@ -2937,10 +3071,8 @@ export default function BoqEditorPage() {
                               </div>
                             </div>
                           </td>
+                          <td className="boq-td boq-summary-cell boq-td-action" />
                           <td className="boq-td boq-summary-cell" />
-                          <td className="boq-td boq-summary-cell boq-td-sec-discount" />
-                          <td className="boq-td boq-summary-cell" />
-                          {showNote && <td className="boq-td boq-summary-cell" />}
                           <PlanEmptyCells panelStart />
                           {boqKind === 'ACTUAL' && <PlanEmptyCells panelStart />}
                         </tr>

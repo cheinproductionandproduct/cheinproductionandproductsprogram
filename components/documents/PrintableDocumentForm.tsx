@@ -20,7 +20,7 @@ export function PrintableDocumentFormAPR({ document, assignedUsers }: { document
   const rows = items.filter((item: any) => item.description || item.amount)
 
   const fmtAmt = (v: any) => formatMoneyValue(v)
-  const rowsPerPage = 14
+  const rowsPerPage = 11
   const pages = Array.from({ length: Math.max(1, Math.ceil(rows.length / rowsPerPage)) }, (_, i) =>
     rows.slice(i * rowsPerPage, (i + 1) * rowsPerPage)
   )
@@ -194,7 +194,7 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
     ''
 
   const fmtAmt = (v: any) => formatMoneyValue(v)
-  const rowsPerPage = 12
+  const rowsPerPage = 9
   const pages = Array.from({ length: Math.max(1, Math.ceil(rows.length / rowsPerPage)) }, (_, i) =>
     rows.slice(i * rowsPerPage, (i + 1) * rowsPerPage)
   )
@@ -359,12 +359,12 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
                     <span className="adv-sig-date">{data.recipientSignatureDate ? formatDateDMY(data.recipientSignatureDate) : '__/__/__'}</span>
                   </div>
                   <div className="adv-sig-col">
-                    <span className="adv-sig-label">ผู้จัดการฝ่ายเงิน</span>
+                    <span className="adv-sig-label">ฝ่ายบัญชี/การเงิน</span>
                     <div className="adv-sig-area">
                       {sig.financeManagerSignature && <img src={sig.financeManagerSignature} alt="" />}
                     </div>
                     <div className="adv-sig-line" />
-                    <span className="adv-sig-name">{data.financeManagerSignatureName || assignedUsers?.payer?.fullName || assignedUsers?.payer?.email || ''}</span>
+                    <span className="adv-sig-name">{data.financeManagerSignatureName || assignedUsers?.payer?.fullName || assignedUsers?.payer?.email || 'tassanee@cheinproduction.co.th'}</span>
                     <span className="adv-sig-date">{data.financeManagerSignatureDate ? formatDateDMY(data.financeManagerSignatureDate) : '__/__/__'}</span>
                   </div>
                 </div>
