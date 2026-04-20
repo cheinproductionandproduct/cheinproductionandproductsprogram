@@ -1932,12 +1932,19 @@ export default function BoqEditorPage() {
       </div>
     `
 
-    // ── Step 4: mount clone off-screen ───────────────────────────────────────────
+    // ── Step 4: loading overlay + render wrapper ─────────────────────────────────
+    // Wrapper must be in-viewport and fully visible so the browser paints it.
+    // A loading overlay sits on top (higher z-index) so the user sees "กำลัง Export"
+    // instead of the raw BOQ content. html2canvas ignores the overlay via ignoreElements.
+    const loadingOverlay = document.createElement('div')
+    loadingOverlay.setAttribute('data-pdf-overlay', '1')
+    loadingOverlay.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.92);z-index:100000;display:flex;align-items:center;justify-content:center;font-size:18px;font-family:'Sarabun',system-ui,sans-serif;color:#333;pointer-events:none;`
+    loadingOverlay.textContent = 'กำลัง Export PDF...'
+    document.body.appendChild(loadingOverlay)
+
     const wrapperW = Math.max(liveTableWidth + 40, 1400)
     const wrapper = document.createElement('div')
-    // opacity:0 + position:fixed at top-left keeps element in the viewport so the
-    // browser paints it fully — off-screen fixed elements get clipped on Windows
-    wrapper.style.cssText = `position:fixed;top:0;left:0;width:${wrapperW}px;background:#fff;padding:20px;box-sizing:border-box;overflow:visible;pointer-events:none;z-index:99999;opacity:0;`
+    wrapper.style.cssText = `position:fixed;top:0;left:0;width:${wrapperW}px;background:#fff;padding:20px;box-sizing:border-box;overflow:visible;pointer-events:none;z-index:99999;`
     wrapper.appendChild(header)
     wrapper.appendChild(clone)
     document.body.appendChild(wrapper)
@@ -1972,6 +1979,7 @@ export default function BoqEditorPage() {
         scrollY: 0,
         x: 0,
         y: 0,
+        ignoreElements: el => el.getAttribute('data-pdf-overlay') === '1',
       })
 
       const pxToMm = 25.4 / (96 * 2)
@@ -1985,6 +1993,7 @@ export default function BoqEditorPage() {
       pdf.save(`${docTitle}.pdf`)
     } finally {
       document.body.removeChild(wrapper)
+      document.body.removeChild(loadingOverlay)
       document.head.removeChild(tempStyle)
     }
   }
