@@ -1856,7 +1856,7 @@ export default function BoqEditorPage() {
       .boq-pdf-mode col.boq-side-col       { width: 0 !important; }
       .boq-pdf-mode .boq-table {
         table-layout: auto  !important;
-        width:        100%  !important;
+        width:        auto  !important;
         min-width:    0     !important;
       }
       .boq-pdf-mode .boq-split-scroll,
@@ -1876,13 +1876,17 @@ export default function BoqEditorPage() {
     await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())))
 
     const liveTableEl = pageEl.querySelector('.boq-table') as HTMLElement | null
-    const liveTableWidth = liveTableEl ? liveTableEl.scrollWidth : 1600
+    // Use natural content width (table-layout:auto, width:auto) — no forced 1400px minimum
+    const liveTableWidth = liveTableEl ? liveTableEl.scrollWidth : 900
 
     // Clone after CSS + value flush — clone looks exactly like the live page
     const clone = pageEl.cloneNode(true) as HTMLElement
 
     // Restore live page immediately
     pageEl.classList.remove('boq-pdf-mode')
+
+    // Make clone's table fill the wrapper exactly (wrapper = natural table width)
+    clone.querySelectorAll<HTMLElement>('.boq-table').forEach(t => { t.style.width = '100%' })
 
     // Replace inputs/textareas with spans — html2canvas clips text inside <input>
     // elements to the element's visible area, so we must replace them with spans
@@ -1942,7 +1946,7 @@ export default function BoqEditorPage() {
     loadingOverlay.textContent = 'กำลัง Export PDF...'
     document.body.appendChild(loadingOverlay)
 
-    const wrapperW = Math.max(liveTableWidth + 40, 1400)
+    const wrapperW = Math.max(liveTableWidth + 40, 600)
     const wrapper = document.createElement('div')
     wrapper.style.cssText = `position:fixed;top:0;left:0;width:${wrapperW}px;background:#fff;padding:20px;box-sizing:border-box;overflow:visible;pointer-events:none;z-index:99999;`
     wrapper.appendChild(header)
