@@ -1935,7 +1935,9 @@ export default function BoqEditorPage() {
     // ── Step 4: mount clone off-screen ───────────────────────────────────────────
     const wrapperW = Math.max(liveTableWidth + 40, 1400)
     const wrapper = document.createElement('div')
-    wrapper.style.cssText = `position:fixed;top:0;left:-${wrapperW + 10}px;width:${wrapperW}px;background:#fff;padding:20px;box-sizing:border-box;overflow:visible;pointer-events:none;z-index:-1;`
+    // opacity:0 + position:fixed at top-left keeps element in the viewport so the
+    // browser paints it fully — off-screen fixed elements get clipped on Windows
+    wrapper.style.cssText = `position:fixed;top:0;left:0;width:${wrapperW}px;background:#fff;padding:20px;box-sizing:border-box;overflow:visible;pointer-events:none;z-index:99999;opacity:0;`
     wrapper.appendChild(header)
     wrapper.appendChild(clone)
     document.body.appendChild(wrapper)
@@ -1966,6 +1968,8 @@ export default function BoqEditorPage() {
         windowHeight: naturalHeight,
         width:  naturalWidth,
         height: naturalHeight,
+        scrollX: 0,
+        scrollY: 0,
         x: 0,
         y: 0,
       })
