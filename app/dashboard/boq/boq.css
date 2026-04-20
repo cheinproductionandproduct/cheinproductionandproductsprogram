@@ -951,7 +951,7 @@
   text-align: center;
 }
 
-.boq-th-no     { width: 60px; }
+.boq-th-no     { min-width: 40px; }
 .boq-th-desc   { max-width: 480px; white-space: normal; word-break: break-word; }
 .boq-th-qty    { width: 64px; }
 .boq-th-unit   { width: 48px; }
