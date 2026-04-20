@@ -240,11 +240,10 @@
 }
 
 .boq-side-table {
-  /* auto layout: columns stretch to fit content */
   width: max-content;
   min-width: 1020px;
   max-width: none;
-  table-layout: auto;
+  table-layout: fixed;
 }
 
 .boq-side-table .boq-side-col {
@@ -729,8 +728,27 @@
   border-spacing: 0;
   font-size: 13px;
   font-family: 'Sarabun', system-ui, sans-serif;
-  table-layout: fixed;
+  table-layout: auto;
   border: 1px solid #bbb;
+}
+
+.boq-table--fixed {
+  table-layout: fixed;
+}
+
+.boq-table--fixed .boq-td {
+  overflow: hidden;
+}
+
+.boq-table--fixed .boq-td-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.boq-table--fixed .boq-td-desc:focus-within {
+  white-space: normal;
+  overflow: visible;
 }
 
 /* PLAN/ACTUAL side table: wins over .boq-table width:max-content */
@@ -934,7 +952,7 @@
 }
 
 .boq-th-no     { width: 60px; }
-.boq-th-desc   { min-width: 380px; width: 42%; }
+.boq-th-desc   { max-width: 480px; white-space: normal; word-break: break-word; }
 .boq-th-qty    { width: 64px; }
 .boq-th-unit   { width: 48px; }
 .boq-th-note   { width: 140px; min-width: 100px; }
@@ -977,7 +995,7 @@
 }
 
 .boq-td-num  { text-align: right; }
-.boq-td-desc { min-width: 300px; }
+.boq-td-desc { max-width: 480px; white-space: normal; word-break: break-word; }
 
 .boq-td-note { min-width: 100px; }
 .boq-td-sec-discount {
@@ -2059,13 +2077,18 @@ h1.page-title.boq-page-title-row {
   right: 0;
   top: 0;
   bottom: 0;
-  width: 5px;
+  width: 6px;
   cursor: col-resize;
   background: transparent;
+  border-right: 2px solid rgba(0,0,0,0.15);
   z-index: 2;
   user-select: none;
+  transition: border-color 0.1s, background 0.1s;
 }
-.boq-col-resize:hover { background: rgba(80, 120, 255, 0.35); }
+.boq-col-resize:hover {
+  background: rgba(80, 120, 255, 0.2);
+  border-right-color: rgba(80, 120, 255, 0.7);
+}
 
 /* ── Auto-expanding textarea ─────────────────── */
 .boq-textarea {
@@ -2080,6 +2103,9 @@ h1.page-title.boq-page-title-row {
   font-size: 13px;
   display: block;
   vertical-align: top;
+  field-sizing: content; /* Chrome 123+/Edge 123+: textarea auto-shrinks without JS */
+  resize: none;
+  overflow: hidden;
 }
 .boq-textarea:focus { background: #fff9e6; }
 

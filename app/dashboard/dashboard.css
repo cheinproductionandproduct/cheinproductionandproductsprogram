@@ -2348,19 +2348,22 @@ input.form-input[type='number'] {
   font-weight: 600;
 }
 
-.adv-reg-status.cleared {
+.adv-reg-status.cleared,
+.adv-reg-status--cleared {
   background: #d4edda;
   color: #155724;
   border: 1px solid #c3e6cb;
 }
 
-.adv-reg-status.pending {
+.adv-reg-status.pending,
+.adv-reg-status--pending {
   background: #fff3cd;
   color: #856404;
   border: 1px solid #ffeaa7;
 }
 
-.adv-reg-status.not-cleared {
+.adv-reg-status.not-cleared,
+.adv-reg-status--not-cleared {
   background: #f8d7da;
   color: #721c24;
   border: 1px solid #f5c6cb;

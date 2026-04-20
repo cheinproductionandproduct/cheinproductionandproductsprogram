@@ -239,6 +239,7 @@ export default function AdvanceRegisterPage() {
                         <th>จำนวนเงินเงินทดรอง</th>
                         <th>รวมค่าใช้จ่าย</th>
                         <th>เหลือส่งคืน/เบิกเพิ่ม</th>
+                        <th>สถานะ</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -364,6 +365,15 @@ export default function AdvanceRegisterPage() {
                             <td className="adv-reg-amount">{getAmount(apr)}</td>
                             <td className="adv-reg-amount">{totalExpenses}</td>
                             <td className="adv-reg-amount">{remaining}</td>
+                            <td className="adv-reg-cell-status">
+                              {clearanceStatus === 'cleared' ? (
+                                <span className="adv-reg-status adv-reg-status--cleared">เคลียร์แล้ว</span>
+                              ) : clearanceStatus === 'pending_clearance' ? (
+                                <span className="adv-reg-status adv-reg-status--pending">รอเคลียร์</span>
+                              ) : (
+                                <span className="adv-reg-status adv-reg-status--not-cleared">ยังไม่เคลียร์</span>
+                              )}
+                            </td>
                           </tr>
                         )
                       })}

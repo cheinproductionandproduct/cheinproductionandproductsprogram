@@ -181,18 +181,19 @@ export function AdvancePaymentClearanceForm({
     }
   }, [])
 
-  // Default assignees (APC): ผู้อนุมัติ = tassanee@cheinproduction.co.th, ผู้รับเคลียร์เงิน = pc@cheinprod, ผู้จัดการฝ่ายเงิน = tassanee@cheinproduction.co.th
+  // Default assignees (APC): ผู้อนุมัติ/ตรวจสอบ = tassanee, ผู้รับเคลียร์เงิน = pc, ผู้อนุมัติ = bee
   useEffect(() => {
     if (users.length === 0) return
     const existingApprover = defaultValues.userAssignments?.approver || defaultValues.approverUserId
     const existingRecipient = defaultValues.userAssignments?.recipient || defaultValues.recipientUserId
     const existingPayer = defaultValues.userAssignments?.payer || defaultValues.payerUserId
     const email = (u: any) => (u.email || '').toLowerCase()
-    const pc = users.find((u: any) => /^pc@chein/.test(email(u)))
     const tassanee = users.find((u: any) => email(u) === 'tassanee@cheinproduction.co.th')
-    if (tassanee && !existingApprover) setValue('approverUserId', tassanee.id)
-    if (pc && !existingRecipient) setValue('recipientUserId', pc.id)
-    if (tassanee && !existingPayer) setValue('payerUserId', tassanee.id)
+    const pc       = users.find((u: any) => /^pc@chein/.test(email(u)))
+    const bee      = users.find((u: any) => /^bee@chein/.test(email(u)))
+    if (tassanee && !existingApprover)  setValue('approverUserId',  tassanee.id)
+    if (pc       && !existingRecipient) setValue('recipientUserId', pc.id)
+    if (bee      && !existingPayer)     setValue('payerUserId',     bee.id)
   }, [users, setValue, defaultValues.userAssignments, defaultValues.approverUserId, defaultValues.recipientUserId, defaultValues.payerUserId])
 
   // When "from" APR is in URL, load that document and pre-fill
@@ -763,7 +764,7 @@ export function AdvancePaymentClearanceForm({
               { label: 'ผู้ขอเคลียร์', name: 'requesterSignature', userIdField: null as string | null, selectPlaceholder: '' },
               { label: 'ผู้อนุมัติ/ตรวจสอบ', name: 'approverSignature', userIdField: 'approverUserId', selectPlaceholder: 'เลือกผู้ใช้' },
               { label: 'ผู้รับเคลียร์เงิน', name: 'recipientSignature', userIdField: 'recipientUserId', selectPlaceholder: 'เลือกผู้รับเคลียร์เงิน' },
-              { label: 'ผู้จัดการฝ่ายเงิน', name: 'financeManagerSignature', userIdField: 'payerUserId', selectPlaceholder: 'เลือกผู้ใช้' },
+              { label: 'ผู้อนุมัติ', name: 'financeManagerSignature', userIdField: 'payerUserId', selectPlaceholder: 'เลือกผู้ใช้' },
             ].map(({ label, name, userIdField, selectPlaceholder }) => {
               const assignedUserId = userIdField ? watch(userIdField) : null
               const canSign = userIdField
@@ -864,7 +865,7 @@ export function AdvancePaymentClearanceForm({
             isOpen={!!openSignatureModal}
             onClose={() => setOpenSignatureModal(null)}
             onSave={(data) => handleSignatureSave(openSignatureModal, data)}
-            label={['ผู้ขอเคลียร์', 'ผู้อนุมัติ/ตรวจสอบ', 'ผู้รับเคลียร์เงิน', 'ผู้จัดการฝ่ายเงิน'][
+            label={['ผู้ขอเคลียร์', 'ผู้อนุมัติ/ตรวจสอบ', 'ผู้รับเคลียร์เงิน', 'ผู้อนุมัติ'][
               ['requesterSignature', 'approverSignature', 'recipientSignature', 'financeManagerSignature'].indexOf(openSignatureModal)
             ] || openSignatureModal}
           />

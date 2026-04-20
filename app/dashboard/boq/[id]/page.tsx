@@ -376,6 +376,9 @@ function distributeProportionalAmounts(weights: number[], total: number): number
 const DEFAULT_WIDTHS = { no: 60, refPage: 60, refCode: 60, desc: 380, qty: 64, unit: 48, matPrice: 110, matAmt: 115, laborPrice: 110, laborAmt: 115, total: 120, action: 100, secDiscount: 120, secNet: 130, note: 140 }
 type ColKey = keyof typeof DEFAULT_WIDTHS
 
+const DEFAULT_SIDE_WIDTHS = { ref: 100, lead: 80, sub: 220, docIssue: 120, docTitle: 140, pricePerUnit: 110, cost: 110, gpPct: 80, gpAmt: 110, sell: 120 }
+type SideColKey = keyof typeof DEFAULT_SIDE_WIDTHS
+
 /** Column visibility (กรอง). ราคาวัสดุ (4) ปิด → หัวคอลัมน์แรงแสดง ค่าวัสดุและแรงงาน แทน ค่าแรงงาน */
 type BoqColVis = {
   showRefId: boolean
@@ -1408,22 +1411,82 @@ export default function BoqEditorPage() {
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle'|'pending'|'saving'|'saved'|'error'>('idle')
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  /* Column widths */
+  /* Column widths — auto layout by default, switches to fixed on first drag */
   const [colW, setColW] = useState<typeof DEFAULT_WIDTHS>({ ...DEFAULT_WIDTHS })
+  const [mainTableFixed, setMainTableFixed] = useState(false)
+  const mainTableRef = useRef<HTMLTableElement>(null)
   const resizing = useRef<{ key: ColKey; startX: number; startW: number }|null>(null)
+
+  const resetColLayout = useCallback(() => {
+    setMainTableFixed(false)
+    setColW({ ...DEFAULT_WIDTHS })
+  }, [])
+
+  // Re-measure textareas when table is in auto mode and container resizes
+  // (handles the case where column width changes without a drag event)
+  useEffect(() => {
+    const remeasure = () => {
+      mainTableRef.current?.querySelectorAll<HTMLTextAreaElement>('textarea').forEach(ta => {
+        ta.style.height = 'auto'
+        ta.style.height = ta.scrollHeight + 'px'
+      })
+    }
+    const container = boqSplitScrollRef.current
+    if (!container) return
+    const ro = new ResizeObserver(remeasure)
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [])
 
   const startResize = useCallback((key: ColKey, e: React.MouseEvent) => {
     e.preventDefault()
-    resizing.current = { key, startX: e.clientX, startW: colW[key] }
+    let startW = colW[key]
+    if (!mainTableFixed && mainTableRef.current) {
+      // Snapshot current auto-sized widths from DOM before switching to fixed
+      const newWidths = { ...DEFAULT_WIDTHS }
+      mainTableRef.current.querySelectorAll<HTMLElement>('th[data-col]').forEach(th => {
+        const k = th.dataset.col as ColKey
+        if (k in newWidths) newWidths[k] = Math.round(th.getBoundingClientRect().width)
+      })
+      startW = newWidths[key]
+      setColW(newWidths)
+      setMainTableFixed(true)
+    }
+    resizing.current = { key, startX: e.clientX, startW }
     const onMove = (ev: MouseEvent) => {
       if (!resizing.current) return
-      const { key: k, startX, startW } = resizing.current
-      setColW(p => ({ ...p, [k]: Math.max(40, startW + ev.clientX - startX) }))
+      const { key: k, startX, startW: sw } = resizing.current
+      setColW(p => ({ ...p, [k]: Math.max(40, sw + ev.clientX - startX) }))
     }
-    const onUp = () => { resizing.current = null; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+    const onUp = () => {
+      resizing.current = null
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      // Re-measure textarea heights after column width change
+      mainTableRef.current?.querySelectorAll<HTMLTextAreaElement>('textarea').forEach(ta => {
+        ta.style.height = 'auto'
+        ta.style.height = ta.scrollHeight + 'px'
+      })
+    }
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
-  }, [colW])
+  }, [colW, mainTableFixed])
+
+  const [sideColW, setSideColW] = useState<typeof DEFAULT_SIDE_WIDTHS>({ ...DEFAULT_SIDE_WIDTHS })
+  const resizingSide = useRef<{ key: SideColKey; startX: number; startW: number }|null>(null)
+
+  const startResizeSide = useCallback((key: SideColKey, e: React.MouseEvent) => {
+    e.preventDefault()
+    resizingSide.current = { key, startX: e.clientX, startW: sideColW[key] }
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingSide.current) return
+      const { key: k, startX, startW } = resizingSide.current
+      setSideColW(p => ({ ...p, [k]: Math.max(40, startW + ev.clientX - startX) }))
+    }
+    const onUp = () => { resizingSide.current = null; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [sideColW])
 
   const editing = canEdit && isEditing
 
@@ -2264,10 +2327,9 @@ export default function BoqEditorPage() {
 
   let globalSecIdx   = 0
 
-  /* Resize handle element */
-  const RH = ({ col }: { col: ColKey }) => (
-    <div className="boq-col-resize" onMouseDown={e => startResize(col, e)} />
-  )
+  /* Resize handle elements — double-click RH to reset columns to auto */
+  const RH  = ({ col }: { col: ColKey })     => <div className="boq-col-resize" onMouseDown={e => startResize(col, e)} onDoubleClick={resetColLayout} title="ลาก: ปรับขนาด | ดับเบิลคลิก: รีเซ็ต" />
+  const RHS = ({ col }: { col: SideColKey }) => <div className="boq-col-resize" onMouseDown={e => startResizeSide(col, e)} />
 
   /** Discount pair cells: ส่วนลดแต่ละข้อ + ยอดงานหลังส่วนลด */
   const DiscountCells = ({ rowTotal, discountShare }: { rowTotal: number; discountShare: number }) => (
@@ -2442,34 +2504,34 @@ export default function BoqEditorPage() {
 
       <div className="boq-split-scroll boq-split-scroll--triplex" ref={boqSplitScrollRef}>
       <div className="boq-table-wrapper boq-table-wrapper--triplex">
-        <table className={`boq-table${editing ? '' : ' boq-table--readonly'}`}>
+        <table ref={mainTableRef} className={`boq-table${mainTableFixed ? ' boq-table--fixed' : ''}${editing ? '' : ' boq-table--readonly'}`}>
           <colgroup>
             {/* ── BOQ cols ── */}
-            <col style={{ width: colW.no }} />
+            <col style={mainTableFixed ? { width: colW.no } : undefined} />
             {showRefId && (
               <>
-                <col style={{ width: colW.refPage }} />
-                <col style={{ width: colW.refCode }} />
+                <col style={mainTableFixed ? { width: colW.refPage } : undefined} />
+                <col style={mainTableFixed ? { width: colW.refCode } : undefined} />
               </>
             )}
-            {tableShowDesc && <col style={{ width: colW.desc }} />}
+            {tableShowDesc && <col style={mainTableFixed ? { width: colW.desc } : undefined} />}
             {showQtyUnit && (
               <>
-                <col style={{ width: colW.qty }} />
-                <col style={{ width: colW.unit }} />
+                <col style={mainTableFixed ? { width: colW.qty } : undefined} />
+                <col style={mainTableFixed ? { width: colW.unit } : undefined} />
               </>
             )}
             {showMat && !matDetailHidden && (
               <>
-                <col style={{ width: colW.matPrice }} />
-                <col style={{ width: colW.matAmt }} />
+                <col style={mainTableFixed ? { width: colW.matPrice } : undefined} />
+                <col style={mainTableFixed ? { width: colW.matAmt } : undefined} />
               </>
             )}
             {showMat && matDetailHidden && <col style={{ width: 36 }} />}
             {showLabor && (
               <>
-                <col style={{ width: colW.laborPrice }} />
-                <col style={{ width: colW.laborAmt }} />
+                <col style={mainTableFixed ? { width: colW.laborPrice } : undefined} />
+                <col style={mainTableFixed ? { width: colW.laborAmt } : undefined} />
               </>
             )}
             {tableShowTotal && (
@@ -2478,25 +2540,25 @@ export default function BoqEditorPage() {
                   <col style={{ width: 88 }} />
                   <col style={{ width: 88 }} />
                   <col style={{ width: 88 }} />
-                  <col style={{ width: colW.total }} />
+                  <col style={mainTableFixed ? { width: colW.total } : undefined} />
                 </>
               ) : (
-                <col style={{ width: colW.total }} />
+                <col style={mainTableFixed ? { width: colW.total } : undefined} />
               )
             )}
-            {editing && <col style={{ width: colW.action }} />}
-            <col style={{ width: colW.note }} />
+            {editing && <col style={mainTableFixed ? { width: colW.action } : undefined} />}
+            <col style={mainTableFixed ? { width: colW.note } : undefined} />
             {/* ── PLAN cols (10) ── */}
-            <col className="boq-side-col boq-side-col--boq-ref" />
-            <col className="boq-side-col boq-side-col--lead" />
-            <col className="boq-side-col boq-side-col--sub" />
-            <col className="boq-side-col" />
-            <col className="boq-side-col" />
-            <col className="boq-side-col" />
-            <col className="boq-side-col" />
-            <col className="boq-side-col" />
-            <col className="boq-side-col" />
-            <col className="boq-side-col" />
+            <col className="boq-side-col boq-side-col--boq-ref" style={{ width: sideColW.ref }} />
+            <col className="boq-side-col boq-side-col--lead"    style={{ width: sideColW.lead }} />
+            <col className="boq-side-col boq-side-col--sub"     style={{ width: sideColW.sub }} />
+            <col className="boq-side-col" style={{ width: sideColW.docIssue }} />
+            <col className="boq-side-col" style={{ width: sideColW.docTitle }} />
+            <col className="boq-side-col" style={{ width: sideColW.pricePerUnit }} />
+            <col className="boq-side-col" style={{ width: sideColW.cost }} />
+            <col className="boq-side-col" style={{ width: sideColW.gpPct }} />
+            <col className="boq-side-col" style={{ width: sideColW.gpAmt }} />
+            <col className="boq-side-col" style={{ width: sideColW.sell }} />
             {/* ── ACTUAL cols (10, only when boqKind==='ACTUAL') ── */}
             {boqKind === 'ACTUAL' && (<>
               <col className="boq-side-col boq-side-col--boq-ref" />
@@ -2531,17 +2593,17 @@ export default function BoqEditorPage() {
             )}
             {/* ── Main headers row ── */}
             <tr>
-              <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-no">ลำดับที่<RH col="no"/></th>
+              <th data-col="no" rowSpan={boqMainTheadSpan} className="boq-th boq-th-no">ลำดับที่<RH col="no"/></th>
               {showRefId && (
                 <th colSpan={2} className="boq-th boq-th-ref-head">อ้างอิง ID</th>
               )}
               {tableShowDesc && (
-                <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-desc">รายการ<RH col="desc"/></th>
+                <th data-col="desc" rowSpan={boqMainTheadSpan} className="boq-th boq-th-desc">รายการ<RH col="desc"/></th>
               )}
               {showQtyUnit && (
                 <>
-                  <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-qty">จำนวน<RH col="qty"/></th>
-                  <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-unit">หน่วย<RH col="unit"/></th>
+                  <th data-col="qty" rowSpan={boqMainTheadSpan} className="boq-th boq-th-qty">จำนวน<RH col="qty"/></th>
+                  <th data-col="unit" rowSpan={boqMainTheadSpan} className="boq-th boq-th-unit">หน่วย<RH col="unit"/></th>
                 </>
               )}
               {showMat && !matDetailHidden && (
@@ -2580,41 +2642,41 @@ export default function BoqEditorPage() {
                     <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-plan-mirror">แผน<br/><span className="boq-th-subhint">(รวม)</span></th>
                     <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-var">งานลด</th>
                     <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-var">งานเพิ่ม</th>
-                    <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-total">
+                    <th data-col="total" rowSpan={boqMainTheadSpan} className="boq-th boq-th-total">
                       รวมค่าวัสดุและแรงงาน
                       <RH col="total" />
                     </th>
                   </>
                 ) : (
-                  <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-total">
+                  <th data-col="total" rowSpan={boqMainTheadSpan} className="boq-th boq-th-total">
                     รวมค่าวัสดุและแรงงาน
                     <RH col="total" />
                   </th>
                 )
               )}
-              {editing && <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-action"><RH col="action"/></th>}
-              <th rowSpan={boqMainTheadSpan} className="boq-th boq-th-note">หมายเหตุ<RH col="note"/></th>
+              {editing && <th data-col="action" rowSpan={boqMainTheadSpan} className="boq-th boq-th-action"><RH col="action"/></th>}
+              <th data-col="note" rowSpan={boqMainTheadSpan} className="boq-th boq-th-note">หมายเหตุ<RH col="note"/></th>
               {/* ── PLAN main headers ── */}
               {boqMainHeadSubRow ? (<>
-                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--boq-ref-head boq-side-td--panel-start" title="ลำดับบรรทัด BOQ">ลำดับ BOQ</th>
-                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead">ราคาขาย</th>
-                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">Sub</th>
+                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--boq-ref-head boq-side-td--panel-start" title="ลำดับบรรทัด BOQ">ลำดับ BOQ<RHS col="ref"/></th>
+                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead">ราคาขาย<RHS col="lead"/></th>
+                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">Sub<RHS col="sub"/></th>
                 <th colSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-main">เลขที่เอกสาร</th>
-                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">ราคา/หน่วย</th>
-                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">ราคาทุน</th>
-                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">GP%</th>
-                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">GP Amount</th>
-                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">ราคาขาย</th>
+                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">ราคา/หน่วย<RHS col="pricePerUnit"/></th>
+                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">ราคาทุน<RHS col="cost"/></th>
+                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">GP%<RHS col="gpPct"/></th>
+                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">GP Amount<RHS col="gpAmt"/></th>
+                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">ราคาขาย<RHS col="sell"/></th>
               </>) : (<>
-                <th className="boq-th boq-side-th boq-side-th--boq-ref-head boq-side-td--panel-start">ลำดับ BOQ</th>
-                <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead"><span className="boq-side-th__kind" lang="en">PLAN</span><span className="boq-side-th__rowhead-label">ราคาขาย</span></th>
-                <th className="boq-th boq-side-th boq-side-th--cost-leaf">Sub</th>
+                <th className="boq-th boq-side-th boq-side-th--boq-ref-head boq-side-td--panel-start">ลำดับ BOQ<RHS col="ref"/></th>
+                <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead"><span className="boq-side-th__kind" lang="en">PLAN</span><span className="boq-side-th__rowhead-label">ราคาขาย</span><RHS col="lead"/></th>
+                <th className="boq-th boq-side-th boq-side-th--cost-leaf">Sub<RHS col="sub"/></th>
                 <th colSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-main-merged">เลขที่เอกสาร</th>
-                <th className="boq-th boq-side-th boq-side-th--cost-leaf">ราคา/หน่วย</th>
-                <th className="boq-th boq-side-th boq-side-th--cost-leaf">ราคาทุน</th>
-                <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP%</th>
-                <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP Amount</th>
-                <th className="boq-th boq-side-th boq-side-th--sell-leaf">ราคาขาย</th>
+                <th className="boq-th boq-side-th boq-side-th--cost-leaf">ราคา/หน่วย<RHS col="pricePerUnit"/></th>
+                <th className="boq-th boq-side-th boq-side-th--cost-leaf">ราคาทุน<RHS col="cost"/></th>
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP%<RHS col="gpPct"/></th>
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP Amount<RHS col="gpAmt"/></th>
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf">ราคาขาย<RHS col="sell"/></th>
               </>)}
               {/* ── ACTUAL main headers ── */}
               {boqKind === 'ACTUAL' && (boqMainHeadSubRow ? (<>
@@ -2643,20 +2705,20 @@ export default function BoqEditorPage() {
             {boqMainHeadSubRow && (
               <tr>
                 {showRefId && (<>
-                  <th className="boq-th boq-th-sub">เลขหน้า<RH col="refPage"/></th>
-                  <th className="boq-th boq-th-sub">รหัส<RH col="refCode"/></th>
+                  <th data-col="refPage" className="boq-th boq-th-sub">เลขหน้า<RH col="refPage"/></th>
+                  <th data-col="refCode" className="boq-th boq-th-sub">รหัส<RH col="refCode"/></th>
                 </>)}
                 {showMat && !matDetailHidden && (<>
-                  <th className="boq-th boq-th-sub">ราคาต่อหน่วย<RH col="matPrice"/></th>
-                  <th className="boq-th boq-th-sub">จำนวนเงิน<RH col="matAmt"/></th>
+                  <th data-col="matPrice" className="boq-th boq-th-sub">ราคาต่อหน่วย<RH col="matPrice"/></th>
+                  <th data-col="matAmt" className="boq-th boq-th-sub">จำนวนเงิน<RH col="matAmt"/></th>
                 </>)}
                 {showLabor && (<>
-                  <th className="boq-th boq-th-sub">ราคาต่อหน่วย<RH col="laborPrice"/></th>
-                  <th className="boq-th boq-th-sub">จำนวนเงิน<RH col="laborAmt"/></th>
+                  <th data-col="laborPrice" className="boq-th boq-th-sub">ราคาต่อหน่วย<RH col="laborPrice"/></th>
+                  <th data-col="laborAmt" className="boq-th boq-th-sub">จำนวนเงิน<RH col="laborAmt"/></th>
                 </>)}
                 {/* PLAN doc sub-headers */}
-                <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf">เลขที่</th>
-                <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf">เอกสาร</th>
+                <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf">เลขที่<RHS col="docIssue"/></th>
+                <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf">เอกสาร<RHS col="docTitle"/></th>
                 {/* ACTUAL doc sub-headers */}
                 {boqKind === 'ACTUAL' && (<>
                   <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf">เลขที่</th>
