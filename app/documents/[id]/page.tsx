@@ -446,9 +446,6 @@ export default function DocumentDetailPage() {
                 ลงนาม (Sign)
               </button>
             )}
-            <button type="button" onClick={() => window.print()} className="doc-btn-secondary">
-              พิมพ์
-            </button>
             <button
               type="button"
               onClick={handleSaveAsPdf}

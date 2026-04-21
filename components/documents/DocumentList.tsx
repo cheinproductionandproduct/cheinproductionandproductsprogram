@@ -159,16 +159,16 @@ export function DocumentList({
     setOtherFormTemplateId(id)
   }
 
-  const getStatusBadge = (status: DocumentStatus) => {
-    const badges: Record<DocumentStatus, string> = {
-      DRAFT: 'bg-white text-black border border-black',
-      PENDING: 'bg-white text-black border border-black',
-      APPROVED: 'bg-white text-black border border-black',
-      CLEARED: 'bg-white text-black border border-black',
-      REJECTED: 'bg-white text-black border border-black',
-      CANCELLED: 'bg-white text-black border border-black',
+  const getStatusMod = (status: DocumentStatus) => {
+    const map: Record<DocumentStatus, string> = {
+      DRAFT:     'doc-status-badge--draft',
+      PENDING:   'doc-status-badge--pending',
+      APPROVED:  'doc-status-badge--approved',
+      CLEARED:   'doc-status-badge--cleared',
+      REJECTED:  'doc-status-badge--rejected',
+      CANCELLED: 'doc-status-badge--cancelled',
     }
-    return badges[status] || badges.DRAFT
+    return map[status] || 'doc-status-badge--draft'
   }
 
   const getJobDisplay = (doc: any): string | null => {
@@ -310,7 +310,25 @@ export function DocumentList({
 
       {/* Documents List */}
       {loading ? (
-        <div className="list-loading">โหลด...</div>
+        <div className="list-cards">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="doc-card doc-card--skeleton">
+              <div className="doc-card-top">
+                <span className="skel skel--sm" />
+                <div className="doc-card-badges">
+                  <span className="skel skel--badge" />
+                  <span className="skel skel--badge" />
+                </div>
+              </div>
+              <span className="skel skel--lg" />
+              <span className="skel skel--md" />
+              <div className="doc-card-footer">
+                <span className="skel skel--sm" />
+                <span className="skel skel--amt" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : documents.length === 0 ? (
         <div className="list-empty">
           <p className="list-empty-text">ไม่พบเอกสาร</p>
@@ -333,40 +351,39 @@ export function DocumentList({
                 href={`/documents/${doc.id}`}
                 className="doc-card"
               >
-                <div className="doc-card-main">
-                  <div className="doc-card-title-row">
-                    <h3 className="doc-card-title">{doc.title}</h3>
+                {/* Top row: doc number + badges */}
+                <div className="doc-card-top">
+                  <span className="doc-card-number">{doc.documentNumber || '—'}</span>
+                  <div className="doc-card-badges">
                     {doc.formTemplate?.slug === 'advance-payment-request' && (
-                      <span className="doc-card-kind doc-card-kind--apr" title="ใบเบิกเงินทดรองจ่าย">
-                        ใบเบิก
-                      </span>
+                      <span className="doc-card-kind doc-card-kind--apr">ใบเบิก</span>
                     )}
                     {doc.formTemplate?.slug === 'advance-payment-clearance' && (
-                      <span className="doc-card-kind doc-card-kind--apc" title="ใบเคลียร์เงินทดรองจ่าย">
-                        ใบเคลียร์
-                      </span>
+                      <span className="doc-card-kind doc-card-kind--apc">ใบเคลียร์</span>
                     )}
-                    <span className={`doc-status-badge ${getStatusBadge(doc.status)}`}>
+                    <span className={`doc-status-badge ${getStatusMod(doc.status)}`}>
                       {documentStatusLabelTh(doc.status)}
                     </span>
                   </div>
-                  <p className="doc-card-meta">
-                    {doc.formTemplate?.name} • {doc.documentNumber || 'No number'}
-                  </p>
-                  {getJobDisplay(doc) && (
-                    <p className="doc-card-job">
-                      งาน: {getJobDisplay(doc)}
-                    </p>
-                  )}
-                  <p className="doc-card-meta">
-                    Created by {doc.creator?.fullName || doc.creator?.email} •{' '}
-                    {formatDateDMY(doc.createdAt)}
-                  </p>
+                </div>
+
+                {/* Title */}
+                <h3 className="doc-card-title">{doc.title}</h3>
+
+                {/* Job */}
+                {getJobDisplay(doc) && (
+                  <p className="doc-card-job">งาน: {getJobDisplay(doc)}</p>
+                )}
+
+                {/* Footer: creator + date on left, amount on right */}
+                <div className="doc-card-footer">
+                  <span className="doc-card-creator">
+                    {doc.creator?.fullName || doc.creator?.email} · {formatDateDMY(doc.createdAt)}
+                  </span>
                   {getDocumentAmount(doc) != null && (
-                    <p className="doc-card-amount">
-                      <span className="doc-card-amount-label">จำนวนเงินรวม</span>{' '}
-                      <span className="doc-card-amount-value">{formatNumber(getDocumentAmount(doc)!)} บาท</span>
-                    </p>
+                    <span className="doc-card-amount-value">
+                      {formatNumber(getDocumentAmount(doc)!)} <span className="doc-card-currency">บาท</span>
+                    </span>
                   )}
                 </div>
               </Link>

@@ -266,7 +266,30 @@ export default function BoqDashboardPage() {
       )}
 
       {loading ? (
-        <p style={{ color: '#888', padding: '24px 0' }}>กำลังโหลด...</p>
+        <div className="boq-list-table-wrapper" style={{ marginTop: 16 }}>
+          <table className="boq-list-table">
+            <thead>
+              <tr>
+                <th>ชื่อ / งาน</th>
+                <th>สถานะ</th>
+                <th>อัปเดตล่าสุด</th>
+                <th>สร้างเมื่อ</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} style={{ height: 48 }}>
+                  <td><span className="skel skel--line" style={{ width: '65%' }} /></td>
+                  <td><span className="skel skel--badge" /></td>
+                  <td><span className="skel skel--line" style={{ width: 80 }} /></td>
+                  <td><span className="skel skel--line" style={{ width: 80 }} /></td>
+                  <td></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <>
           <section className="boq-dash-section">

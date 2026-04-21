@@ -233,32 +233,31 @@ export function ApprovalCard({ approval, onUpdate }: ApprovalCardProps) {
 
   return (
     <>
-      <div className="doc-card">
-        <div className="doc-card-main">
-          <div className="doc-card-title-row">
-            <h3 className="doc-card-title">
-              {approval.document.title}
-            </h3>
-            <span className="doc-status-badge">
-              Step {approval.workflowStep.stepNumber}: {approval.workflowStep.name}
-            </span>
-          </div>
-          <p className="doc-card-meta">
-            {approval.document.formTemplate.name} • {approval.document.documentNumber || 'No number'}
-          </p>
-          <p className="doc-card-meta">
-            Created by {approval.document.creator.fullName || approval.document.creator.email} •{' '}
-            {formatDateDMY(approval.document.createdAt)}
-          </p>
-          {approval.workflowStep.description && (
-            <p className="doc-card-meta">
-              {approval.workflowStep.description}
-            </p>
-          )}
+      <div className="doc-card doc-card--pending">
+        {/* Top row: doc number + step badge */}
+        <div className="doc-card-top">
+          <span className="doc-card-number">{approval.document.documentNumber || '—'}</span>
+          <span className="doc-status-badge doc-status-badge--pending">
+            ขั้น {approval.workflowStep.stepNumber}: {approval.workflowStep.name}
+          </span>
         </div>
-        <div className="doc-card-side doc-card-side--buttons">
-          <Link href={`/documents/${approval.documentId}`} className="form-button list-page-btn">
-            View &amp; Sign
+
+        {/* Title */}
+        <h3 className="doc-card-title">{approval.document.title}</h3>
+
+        {/* Form template */}
+        <p className="doc-card-job">{approval.document.formTemplate.name}</p>
+
+        {/* Footer: creator + date on left, CTA on right */}
+        <div className="doc-card-footer">
+          <span className="doc-card-creator">
+            {approval.document.creator.fullName || approval.document.creator.email}
+            {' · '}
+            {formatDateDMY(approval.document.createdAt)}
+            {approval.workflowStep.description && <> · {approval.workflowStep.description}</>}
+          </span>
+          <Link href={`/documents/${approval.documentId}`} className="approval-card-cta">
+            ดู &amp; ลงนาม →
           </Link>
         </div>
       </div>

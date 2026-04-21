@@ -7,6 +7,34 @@
   padding: 0;
 }
 
+/* ===== SKELETON LOADING ===== */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.skel {
+  background: linear-gradient(90deg, #efefef 25%, #e4e4e4 50%, #efefef 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 4px;
+  display: block;
+}
+.skel--xs  { height: 10px; width: 60px; }
+.skel--sm  { height: 12px; width: 120px; }
+.skel--md  { height: 14px; width: 220px; }
+.skel--lg  { height: 16px; width: 80%; }
+.skel--amt { height: 18px; width: 100px; border-radius: 4px; }
+.skel--badge { height: 20px; width: 54px; border-radius: 999px; }
+.skel--line { height: 13px; border-radius: 4px; }
+
+/* skeleton card — matches .doc-card shape */
+.doc-card--skeleton {
+  pointer-events: none;
+  gap: 10px;
+}
+.doc-card--skeleton .doc-card-top  { align-items: center; }
+.doc-card--skeleton .doc-card-footer { margin-top: 6px; }
+
 /* ===== FONTS ===== */
 body,
 .enter-btn,
@@ -304,14 +332,21 @@ body,
 
 .card {
   background: #fff;
-  border: 1.5px solid #d0d0d0;
-  border-radius: 12px;
-  padding: 14px;
+  border: 1px solid #e0e0e0;
+  border-radius: 14px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  width: 220px;
+  gap: 10px;
+  width: 200px;
   flex-shrink: 0;
+  transition: box-shadow 0.18s, border-color 0.18s, transform 0.18s;
+  cursor: pointer;
+}
+.card:hover {
+  border-color: #c0392b;
+  box-shadow: 0 4px 16px rgba(192,57,43,0.10);
+  transform: translateY(-2px);
 }
 
 .card-image {
@@ -1607,9 +1642,10 @@ input.form-input[type='number'] {
 
 .list-panel {
   background: #fff;
-  border: 1px solid #000;
-  border-radius: 10px;
-  padding: 18px 20px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
 
 .list-filters {
@@ -1723,18 +1759,19 @@ input.form-input[type='number'] {
 .list-select {
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid #000;
-  border-radius: 6px;
+  border: 1.5px solid #d0d0d0;
+  border-radius: 7px;
   background: #fff;
   font-size: 13px;
-  color: #000;
+  color: #1a1a1a;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .list-input:focus,
 .list-select:focus {
   outline: none;
   border-color: #c0392b;
-  box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.2);
+  box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.12);
 }
 
 .list-filter-actions {
@@ -1748,10 +1785,10 @@ input.form-input[type='number'] {
 }
 
 .list-loading {
-  text-align: center;
-  font-size: 14px;
-  color: #555;
-  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
 }
 
 .list-loading--centered {
@@ -1771,10 +1808,10 @@ input.form-input[type='number'] {
 }
 
 .list-empty {
-  background: #fff;
-  border: 1px solid #000;
+  background: #fafafa;
+  border: 1.5px dashed #d0d0d0;
   border-radius: 10px;
-  padding: 24px;
+  padding: 32px 24px;
   text-align: center;
 }
 
@@ -1837,6 +1874,10 @@ input.form-input[type='number'] {
   border-color: #a93226;
 }
 
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 .list-cards {
   display: flex;
   flex-direction: column;
@@ -1849,95 +1890,142 @@ input.form-input[type='number'] {
 
 .doc-card {
   display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 18px 20px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 18px;
   background: #fff;
   border: 1px solid #e5e5e5;
-  border-radius: 12px;
+  border-left: 4px solid #e5e5e5;
+  border-radius: 10px;
   text-decoration: none;
   color: inherit;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.15s, box-shadow 0.15s;
   font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+  animation: fadeUp 0.2s ease both;
 }
-
 .doc-card:hover {
   border-color: #c0392b;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-left-color: #c0392b;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.07);
 }
 
-.doc-card-main {
-  flex: 1;
-  min-width: 0;
-  width: 100%;
-}
-
-.doc-card-title-row {
+/* Top row */
+.doc-card-top {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  margin-bottom: 6px;
+}
+.doc-card-number {
+  font-size: 12px;
+  font-weight: 700;
+  color: #888;
+  letter-spacing: 0.04em;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.doc-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
+/* Title */
 .doc-card-title {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 700;
   color: #1a1a1a;
   line-height: 1.4;
   font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* Job */
+.doc-card-job {
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+  line-height: 1.4;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Footer */
+.doc-card-footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+.doc-card-creator {
+  font-size: 12px;
+  color: #999;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.doc-card-amount-value {
+  font-size: 17px;
+  font-weight: 800;
+  color: #1a1a1a;
+  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.doc-card-currency {
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+}
+
+/* Status badges */
 .doc-status-badge {
-  padding: 4px 10px;
+  padding: 2px 9px;
   border-radius: 999px;
-  border: 1px solid #333;
-  background: #fff;
   font-size: 11px;
   font-weight: 600;
   font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
   flex-shrink: 0;
+  border: 1px solid transparent;
+}
+.doc-status-badge--draft     { background: #f3f4f6; color: #555; border-color: #d1d5db; }
+.doc-status-badge--pending   { background: #fef9c3; color: #854d0e; border-color: #fde68a; }
+.doc-status-badge--approved  { background: #dcfce7; color: #166534; border-color: #86efac; }
+.doc-status-badge--cleared   { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+.doc-status-badge--rejected  { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+.doc-status-badge--cancelled { background: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
+
+/* Approval card accent — yellow-left border */
+.doc-card--pending {
+  border-left-color: #f59e0b;
+}
+.doc-card--pending:hover {
+  border-left-color: #d97706;
+  border-color: #d97706;
 }
 
-.doc-card-meta {
-  font-size: 14px;
-  color: #555;
-  line-height: 1.5;
-  margin-top: 4px;
-  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
+/* Inline CTA link in approval card footer */
+.approval-card-cta {
+  font-size: 12px;
+  font-weight: 700;
+  color: #c0392b;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
 }
-
-.doc-card-job {
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  margin-top: 6px;
-  line-height: 1.5;
-  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
-}
-
-.doc-card-amount {
-  margin-top: 10px;
-  text-align: right;
-  width: 100%;
-  font-size: 14px;
-  color: #555;
-  line-height: 1.5;
-  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
-}
-
-.doc-card-amount-label {
-  font-size: 14px;
-  color: #555;
-  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
-}
-
-.doc-card-amount-value {
-  font-size: 20px;
-  font-weight: 800;
-  color: #1a1a1a;
-  font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
-  letter-spacing: 0.02em;
-  font-variant-numeric: tabular-nums;
+.approval-card-cta:hover {
+  text-decoration: underline;
 }
 
 .doc-card-side {
@@ -1947,11 +2035,7 @@ input.form-input[type='number'] {
   color: #666;
   font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
 }
-
-.doc-card-stat {
-  margin-bottom: 2px;
-}
-
+.doc-card-stat { margin-bottom: 2px; }
 .doc-card-side--buttons {
   display: flex;
   flex-direction: column;
@@ -2853,31 +2937,6 @@ input.form-input[type='number'] {
   box-sizing: border-box;
 }
 
-/* Keep text on top of lines in PDF / print (avoid text slipping under underlines) */
-.document-print-wrapper .adv-meta-val,
-.document-print-wrapper .adv-info-label,
-.document-print-wrapper .adv-info-val,
-.document-print-wrapper .adv-purpose,
-.document-print-wrapper .adv-sig-name,
-.document-print-wrapper .adv-sig-date,
-.document-print-wrapper .adv-receiver-extra-line {
-  position: relative;
-  z-index: 1;
-  background: #fff;
-}
-.document-print-wrapper .adv-meta-line,
-.document-print-wrapper .adv-sig-line {
-  position: relative;
-  z-index: 0;
-}
-.document-print-wrapper .adv-tbl td,
-.document-print-wrapper .adv-tbl th,
-.document-print-wrapper .adc-tbl td,
-.document-print-wrapper .adc-tbl th {
-  position: relative;
-  z-index: 1;
-  background: #fff;
-}
 
 /* ----- A4 Advance Payment Form (from AdvancePaymentForm.tsx) ----- */
 .a4-sheet {
@@ -3236,7 +3295,7 @@ input.form-input[type='number'] {
   font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
   font-size: 14px;
   color: #000;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .adv-header {
@@ -3276,26 +3335,39 @@ input.form-input[type='number'] {
 /* Title box */
 .adv-title-box {
   border: 1px solid #000;
-  padding: 18px 16px 16px;
-  text-align: center;
   position: relative;
+  min-height: 64px;
+  padding: 14px 16px;
 }
 
+/* APC has 4 meta lines — needs taller box */
+.adc-sheet .adv-title-box {
+  min-height: 100px;
+}
+
+/* Title spans full box width, centered both ways */
 .adv-title-text {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
   font-size: 20px;
   font-weight: 700;
   margin: 0;
+  text-align: center;
+  padding: 0 16px;
 }
 
 .adv-title-meta {
   position: absolute;
   right: 14px;
   top: 10px;
-  transform: none;
   display: flex;
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
+  text-align: right;
 }
 
 .adv-page {
@@ -3315,9 +3387,10 @@ input.form-input[type='number'] {
 
 .adv-meta-val {
   min-width: 80px;
-  border-bottom: 1px dotted #000;
+  border-bottom: 1px solid #555;
   text-align: center;
   display: inline-block;
+  padding-bottom: 2px;
 }
 
 /* Requester info section */
@@ -3338,8 +3411,8 @@ input.form-input[type='number'] {
 .adv-info-cell {
   flex: 1;
   display: flex;
-  align-items: center;
-  padding: 8px 10px;
+  align-items: flex-end;
+  padding: 8px 10px 4px;
 }
 
 .adv-info-cell + .adv-info-cell {
@@ -3368,9 +3441,11 @@ input.form-input[type='number'] {
 
 .adv-info-val {
   flex: 1;
-  border-bottom: 1px dotted #000;
+  border-bottom: 1px solid #555;
   text-align: center;
   min-width: 20px;
+  padding-bottom: 3px;
+  align-self: flex-end;
 }
 
 .adv-info-row--col {
@@ -3443,7 +3518,7 @@ input.form-input[type='number'] {
 
 /* Signature section */
 .adv-sigs {
-  margin-top: 24px;
+  margin-top: 14px;
 }
 
 .adv-sigs-heading {
@@ -3475,7 +3550,7 @@ input.form-input[type='number'] {
 }
 
 .adv-sig-area {
-  height: 68px;
+  height: 52px;
   width: 100%;
   display: flex;
   align-items: center;
@@ -3484,20 +3559,20 @@ input.form-input[type='number'] {
 }
 
 .adv-sig-area img {
-  max-height: 62px;
+  max-height: 48px;
   max-width: 100%;
   object-fit: contain;
-}
-
-.adv-sig-line {
-  width: 80%;
-  border-bottom: 1px solid #000;
-  margin-bottom: 6px;
 }
 
 .adv-sig-name {
   font-size: 12px;
   text-align: center;
+  display: block;
+  width: 80%;
+  margin-top: 8px;
+  padding-bottom: 3px;
+  border-bottom: 1.5px solid #000;
+  margin-bottom: 4px;
 }
 
 .adv-sig-date {
@@ -3527,11 +3602,11 @@ input.form-input[type='number'] {
   color: #c00;
   font-weight: 700;
   font-size: 13px;
-  margin-top: 26px;
+  margin-top: 12px;
 }
 
 .adv-footer + .adv-footer {
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 /* ===== ADC (ใบเคลียร์เงินทดรองจ่าย) - same scale as APR, 4-col table + summary ===== */

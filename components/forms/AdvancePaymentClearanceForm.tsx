@@ -181,7 +181,7 @@ export function AdvancePaymentClearanceForm({
     }
   }, [])
 
-  // Default assignees (APC): ผู้อนุมัติ/ตรวจสอบ = tassanee, ผู้รับเคลียร์เงิน = pc, ผู้อนุมัติ = bee
+  // Default assignees (APC): ผู้ตรวจสอบ = tassanee, ผู้รับเคลียร์เงิน = pc, ผู้อนุมัติ = bee
   useEffect(() => {
     if (users.length === 0) return
     const existingApprover = defaultValues.userAssignments?.approver || defaultValues.approverUserId
@@ -762,7 +762,7 @@ export function AdvancePaymentClearanceForm({
           <div className="signature-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
             {[
               { label: 'ผู้ขอเคลียร์', name: 'requesterSignature', userIdField: null as string | null, selectPlaceholder: '' },
-              { label: 'ผู้อนุมัติ/ตรวจสอบ', name: 'approverSignature', userIdField: 'approverUserId', selectPlaceholder: 'เลือกผู้ใช้' },
+              { label: 'ผู้ตรวจสอบ', name: 'approverSignature', userIdField: 'approverUserId', selectPlaceholder: 'เลือกผู้ใช้' },
               { label: 'ผู้รับเคลียร์เงิน', name: 'recipientSignature', userIdField: 'recipientUserId', selectPlaceholder: 'เลือกผู้รับเคลียร์เงิน' },
               { label: 'ผู้อนุมัติ', name: 'financeManagerSignature', userIdField: 'payerUserId', selectPlaceholder: 'เลือกผู้ใช้' },
             ].map(({ label, name, userIdField, selectPlaceholder }) => {
@@ -865,7 +865,7 @@ export function AdvancePaymentClearanceForm({
             isOpen={!!openSignatureModal}
             onClose={() => setOpenSignatureModal(null)}
             onSave={(data) => handleSignatureSave(openSignatureModal, data)}
-            label={['ผู้ขอเคลียร์', 'ผู้อนุมัติ/ตรวจสอบ', 'ผู้รับเคลียร์เงิน', 'ผู้อนุมัติ'][
+            label={['ผู้ขอเคลียร์', 'ผู้ตรวจสอบ', 'ผู้รับเคลียร์เงิน', 'ผู้อนุมัติ'][
               ['requesterSignature', 'approverSignature', 'recipientSignature', 'financeManagerSignature'].indexOf(openSignatureModal)
             ] || openSignatureModal}
           />

@@ -129,7 +129,6 @@ export function PrintableDocumentFormAPR({ document, assignedUsers }: { document
                     <div className="adv-sig-area">
                       {sig.requesterSignature && <img src={sig.requesterSignature} alt="" />}
                     </div>
-                    <div className="adv-sig-line" />
                     <span className="adv-sig-name">{data.requesterSignatureName || data.requesterName || ''}</span>
                     <span className="adv-sig-date">{data.requesterSignatureDate ? formatDateDMY(data.requesterSignatureDate) : '__/__/__'}</span>
                   </div>
@@ -138,7 +137,6 @@ export function PrintableDocumentFormAPR({ document, assignedUsers }: { document
                     <div className="adv-sig-area">
                       {sig.approverSignature && <img src={sig.approverSignature} alt="" />}
                     </div>
-                    <div className="adv-sig-line" />
                     <span className="adv-sig-name">{data.approverSignatureName || assignedUsers?.approver?.fullName || assignedUsers?.approver?.email || ''}</span>
                     <span className="adv-sig-date">{data.approverSignatureDate ? formatDateDMY(data.approverSignatureDate) : '__/__/__'}</span>
                   </div>
@@ -147,7 +145,6 @@ export function PrintableDocumentFormAPR({ document, assignedUsers }: { document
                     <div className="adv-sig-area">
                       {sig.payerSignature && <img src={sig.payerSignature} alt="" />}
                     </div>
-                    <div className="adv-sig-line" />
                     <span className="adv-sig-name">{data.payerSignatureName || assignedUsers?.payer?.fullName || assignedUsers?.payer?.email || ''}</span>
                     <span className="adv-sig-date">{data.payerSignatureDate ? formatDateDMY(data.payerSignatureDate) : '__/__/__'}</span>
                   </div>
@@ -156,7 +153,6 @@ export function PrintableDocumentFormAPR({ document, assignedUsers }: { document
                     <div className="adv-sig-area">
                       {sig.receiverSignature && <img src={sig.receiverSignature} alt="" />}
                     </div>
-                    <div className="adv-sig-line" />
                     <span className="adv-sig-name">{data.receiverSignatureName || data.requesterName || ''}</span>
                     <span className="adv-sig-date">{data.receiverSignatureDate ? formatDateDMY(data.receiverSignatureDate) : (data.dateMoneyNeeded ? formatDateDMY(data.dateMoneyNeeded) : '__/__/__')}</span>
                     <div className="adv-receiver-extras">
@@ -336,7 +332,6 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
                     <div className="adv-sig-area">
                       {sig.requesterSignature && <img src={sig.requesterSignature} alt="" />}
                     </div>
-                    <div className="adv-sig-line" />
                     <span className="adv-sig-name">{data.requesterSignatureName || data.requesterName || ''}</span>
                     <span className="adv-sig-date">{data.requesterSignatureDate ? formatDateDMY(data.requesterSignatureDate) : '__/__/__'}</span>
                   </div>
@@ -345,7 +340,6 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
                     <div className="adv-sig-area">
                       {sig.approverSignature && <img src={sig.approverSignature} alt="" />}
                     </div>
-                    <div className="adv-sig-line" />
                     <span className="adv-sig-name">{data.approverSignatureName || assignedUsers?.approver?.fullName || assignedUsers?.approver?.email || ''}</span>
                     <span className="adv-sig-date">{data.approverSignatureDate ? formatDateDMY(data.approverSignatureDate) : '__/__/__'}</span>
                   </div>
@@ -354,7 +348,6 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
                     <div className="adv-sig-area">
                       {sig.recipientSignature && <img src={sig.recipientSignature} alt="" />}
                     </div>
-                    <div className="adv-sig-line" />
                     <span className="adv-sig-name">{data.recipientSignatureName || assignedUsers?.recipient?.fullName || assignedUsers?.recipient?.email || ''}</span>
                     <span className="adv-sig-date">{data.recipientSignatureDate ? formatDateDMY(data.recipientSignatureDate) : '__/__/__'}</span>
                   </div>
@@ -363,7 +356,6 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
                     <div className="adv-sig-area">
                       {sig.financeManagerSignature && <img src={sig.financeManagerSignature} alt="" />}
                     </div>
-                    <div className="adv-sig-line" />
                     <span className="adv-sig-name">{data.financeManagerSignatureName || assignedUsers?.payer?.fullName || assignedUsers?.payer?.email || 'tassanee@cheinproduction.co.th'}</span>
                     <span className="adv-sig-date">{data.financeManagerSignatureDate ? formatDateDMY(data.financeManagerSignatureDate) : '__/__/__'}</span>
                   </div>

@@ -151,7 +151,13 @@ export default function AdvanceRegisterPage() {
   if (userLoading || !user) {
     return (
       <div className="list-page">
-        <div className="list-loading">โหลด...</div>
+        <div className="list-panel" style={{ marginTop: 24 }}>
+          <div className="list-loading">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <span key={i} className="skel skel--line" style={{ width: `${70 + (i % 3) * 10}%` }} />
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -169,7 +175,11 @@ export default function AdvanceRegisterPage() {
         <section className="list-content">
           <div className="list-panel">
             {loading ? (
-              <div className="list-loading">โหลด...</div>
+              <div className="list-loading">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <span key={i} className="skel skel--line" style={{ width: `${60 + (i % 4) * 10}%` }} />
+                ))}
+              </div>
             ) : items.length === 0 ? (
               <div className="list-empty">ไม่มีรายการใบเบิกเงินทดรอง</div>
             ) : (
