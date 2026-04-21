@@ -2302,8 +2302,8 @@ export default function BoqEditorPage() {
   const DiscountCells = ({ rowTotal, discountShare, pct }: { rowTotal: number; discountShare: number; pct: number }) => (
     <>
       <td className="boq-td boq-td-num boq-td-sec-pct">{grandTotal > 0 ? `${pct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : ''}</td>
-      <td className="boq-td boq-td-num boq-td-sec-discount">{discountAmt > 0 ? fmt(discountShare) : ''}</td>
-      <td className="boq-td boq-td-num boq-td-sec-net">{discountAmt > 0 ? fmt(rowTotal - discountShare) : fmt(rowTotal)}</td>
+      <td className="boq-td boq-td-num boq-td-sec-discount">{fmt(discountShare)}</td>
+      <td className="boq-td boq-td-num boq-td-sec-net">{fmt(rowTotal - discountShare)}</td>
     </>
   )
 
@@ -2881,6 +2881,8 @@ export default function BoqEditorPage() {
                         )}
 
                         {(() => {
+                          const secTotal = actualCompareMode ? calcSecAdjustedMoneyTotal(section) : calcSecMoneyTotal(section)
+                          const groupDisc = groupDiscountAlloc[groupIdx] ?? 0
                           const renderBoqLines = (rows: SubRow[], numPrefix: string, depth: number): React.ReactNode[] =>
                             rows.flatMap((sr, i) => {
                               const displayNo = `${numPrefix}.${i + 1}`
@@ -2889,6 +2891,9 @@ export default function BoqEditorPage() {
                               const rowLocked = !editing
                               const planRow = planTxBySubRow.get(sr.id)
                               const actRow = actTxBySubRow.get(sr.id)
+                              const rowTotal = actualCompareMode ? calcRowTreeAdjusted(sr) : calcRowTreeTotal(sr)
+                              const rowPct = secTotal > 0 ? (rowTotal / secTotal) * 100 : 0
+                              const rowDiscountShare = groupTotal > 0 ? (rowTotal / groupTotal) * groupDisc : 0
                               const planCells = planRow ? (
                                 <PlanSideDataCells r={planRow} ro={!planTxInteractive} interactive={planTxInteractive}
                                   boqRefLinkLocked rolledUpPlanCost={planTxCostRollup?.get(sr.id)}
@@ -3059,7 +3064,7 @@ export default function BoqEditorPage() {
                                     <AutoTextarea className="boq-input boq-textarea" value={sr.note} readOnly={!editing}
                                       onChange={v => editing && updSubRow(group.id,section.id,sr.id,'note',v)} />
                                   </td>
-                                  {tableShowSecDiscount && <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/></>}
+                                  {tableShowSecDiscount && <DiscountCells rowTotal={rowTotal} discountShare={rowDiscountShare} pct={rowPct} />}
                                   {planCells}
                                   {actCells}
                                 </tr>,
