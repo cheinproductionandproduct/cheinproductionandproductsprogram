@@ -2882,11 +2882,13 @@ export default function BoqEditorPage() {
                 const allSubRowIds = group.sections.flatMap(sec => sec.subRows.map(sr => sr.id))
                 for (const sid of allSubRowIds) {
                   const pr = planTxBySubRow.get(sid)
+                  const syncedNet = boqSyncMap.get(sid)?.net
+                  const lp = syncedNet ?? (pr ? Number(pr.listPrice) || 0 : 0)
+                  sumList += lp
                   if (!pr) continue
                   const c = effectivePlanCostForRow(pr, planTxCostRollup, planTxSubRowById)
                   const { gpAmount, sellPrice } = planSideRowDerived(pr, c)
-                  const lp = boqSyncMap.get(sid)?.net ?? (Number(pr.listPrice) || 0)
-                  sumCost += c; sumGp += gpAmount; sumSell += sellPrice; sumList += lp
+                  sumCost += c; sumGp += gpAmount; sumSell += sellPrice
                   weightedGp += c * (Number(pr.gpPct) || 0)
                 }
                 const avgGpPct = sumCost > 0 ? weightedGp / sumCost : 0
@@ -2911,11 +2913,13 @@ export default function BoqEditorPage() {
                 const allSubRowIds = group.sections.flatMap(sec => sec.subRows.map(sr => sr.id))
                 for (const sid of allSubRowIds) {
                   const pr = actTxBySubRow.get(sid)
+                  const syncedNet = boqSyncMap.get(sid)?.net
+                  const lp = syncedNet ?? (pr ? Number(pr.listPrice) || 0 : 0)
+                  sumList += lp
                   if (!pr) continue
                   const c = effectivePlanCostForRow(pr, actTxCostRollup, actTxSubRowById)
                   const { gpAmount, sellPrice } = planSideRowDerived(pr, c)
-                  const lp = boqSyncMap.get(sid)?.net ?? (Number(pr.listPrice) || 0)
-                  sumCost += c; sumGp += gpAmount; sumSell += sellPrice; sumList += lp
+                  sumCost += c; sumGp += gpAmount; sumSell += sellPrice
                   weightedGp += c * (Number(pr.gpPct) || 0)
                 }
                 const avgGpPct = sumCost > 0 ? weightedGp / sumCost : 0
