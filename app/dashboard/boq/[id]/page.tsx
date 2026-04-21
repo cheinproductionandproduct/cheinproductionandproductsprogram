@@ -3350,13 +3350,6 @@ export default function BoqEditorPage() {
           </tfoot>
         </table>
       </div>
-      {boqKind === 'PLAN' && planSideEditing && (
-        <div className="boq-side-panel__actions">
-          <button type="button" className="boq-add-row-btn boq-side-add-row-btn" onClick={addPlanRow}>
-            + เพิ่มแถวแผนราคา
-          </button>
-        </div>
-      )}
       {boqKind === 'ACTUAL' && actualSideEditing && (
         <div className="boq-side-panel__actions">
           <button type="button" className="boq-add-row-btn boq-side-add-row-btn" onClick={addPlanRow}>
