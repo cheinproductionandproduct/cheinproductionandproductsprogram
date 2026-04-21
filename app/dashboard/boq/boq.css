@@ -275,6 +275,10 @@
   padding-right: 8px;
   color: #222;
   font-size: 13px;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow: visible;
 }
 
 .boq-side-td--doc-issue,
@@ -738,6 +742,11 @@
 
 .boq-table--fixed .boq-td {
   overflow: hidden;
+}
+
+/* PLAN/ACTUAL text cells should wrap, not clip */
+.boq-table--fixed .boq-td.boq-side-td--text {
+  overflow: visible;
 }
 
 .boq-table--fixed .boq-td-desc {
