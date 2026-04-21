@@ -1581,6 +1581,16 @@
   color: #555;
 }
 
+/* ── Plan panel column hide rules ── */
+.boq-ph-lp   .ppc-lp                       { display: none !important; }
+.boq-ph-sub  .ppc-sub                      { display: none !important; }
+.boq-ph-doc  .ppc-di,
+.boq-ph-doc  .ppc-dt                       { display: none !important; }
+.boq-ph-ppu  .ppc-ppu                      { display: none !important; }
+.boq-ph-cost .ppc-cost                     { display: none !important; }
+.boq-ph-gp   .ppc-gppct,
+.boq-ph-gp   .ppc-gpamt                    { display: none !important; }
+
 .boq-summary-label-stack {
   display: flex;
   flex-direction: row;
