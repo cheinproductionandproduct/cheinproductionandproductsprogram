@@ -711,6 +711,8 @@ function PlanSidePricingDataRow({
   linkOptions,
   onUpdateRow,
   onDeleteRow,
+  syncedListPrice,
+  syncedSub,
 }: {
   r: PlanSideRow
   trClassName?: string
@@ -726,6 +728,10 @@ function PlanSidePricingDataRow({
   linkOptions: { subRowId: string; displayNo: string }[]
   onUpdateRow: (rowId: string, field: keyof PlanSideRow, val: string | number | '') => void
   onDeleteRow?: (rowId: string) => void
+  /** Live BOQ หลังส่วนลด — overrides stored listPrice for display */
+  syncedListPrice?: number
+  /** Live BOQ รายการ (top-level rows only) — overrides stored sub for display */
+  syncedSub?: string
 }) {
   const useCostRollup = typeof rolledUpPlanCost === 'number'
   const derivedCost =
@@ -773,23 +779,27 @@ function PlanSidePricingDataRow({
         </div>
       </td>
       <td className="boq-td boq-td-num boq-td-sub-no boq-side-td">
-        {ro ? (
-          r.listPrice === '' ? null : fmt(Number(r.listPrice))
-        ) : (
-          <NumInput
-            className="boq-input boq-input-num"
-            value={r.listPrice}
-            readOnly={false}
-            onChange={v => onUpdateRow(r.id, 'listPrice', v)}
-          />
-        )}
+        {syncedListPrice !== undefined
+          ? fmt(syncedListPrice)
+          : ro ? (
+            r.listPrice === '' ? null : fmt(Number(r.listPrice))
+          ) : (
+            <NumInput
+              className="boq-input boq-input-num"
+              value={r.listPrice}
+              readOnly={false}
+              onChange={v => onUpdateRow(r.id, 'listPrice', v)}
+            />
+          )}
       </td>
       <td className="boq-td boq-side-td boq-side-td--text">
-        {ro ? (
-          r.sub || null
-        ) : (
-          <input type="text" className="boq-input" value={r.sub} onChange={e => onUpdateRow(r.id, 'sub', e.target.value)} />
-        )}
+        {syncedSub !== undefined
+          ? (syncedSub || null)
+          : ro ? (
+            r.sub || null
+          ) : (
+            <input type="text" className="boq-input" value={r.sub} onChange={e => onUpdateRow(r.id, 'sub', e.target.value)} />
+          )}
       </td>
       <td className="boq-td boq-side-td boq-side-td--text boq-side-td--doc-issue">
         {ro ? (
@@ -883,12 +893,16 @@ function PlanSidePricingDataRow({
 function PlanSideDataCells({
   r, ro, interactive, boqRefLinkLocked, rolledUpPlanCost, linkedSubRowQuantity,
   displayNoBySubRowId, linkOptions, onUpdateRow, onDeleteRow, panelStart,
+  syncedListPrice, syncedSub,
 }: {
   r: PlanSideRow; ro: boolean; interactive: boolean; boqRefLinkLocked?: boolean
   rolledUpPlanCost?: number; linkedSubRowQuantity?: number; panelStart?: boolean
   displayNoBySubRowId: Record<string, string>; linkOptions: { subRowId: string; displayNo: string }[]
   onUpdateRow: (rowId: string, field: keyof PlanSideRow, val: string | number | '') => void
   onDeleteRow?: (rowId: string) => void
+  /** Live-synced from BOQ: overrides stored listPrice / sub as read-only display. */
+  syncedListPrice?: number
+  syncedSub?: string
 }) {
   const useCostRollup = typeof rolledUpPlanCost === 'number'
   const derivedCost = !useCostRollup && linkedSubRowQuantity !== undefined
@@ -924,11 +938,15 @@ function PlanSideDataCells({
         </div>
       </td>
       <td className="boq-td boq-td-num boq-td-sub-no boq-side-td">
-        {ro ? (r.listPrice === '' ? null : fmt(Number(r.listPrice)))
+        {syncedListPrice !== undefined
+          ? fmt(syncedListPrice)
+          : ro ? (r.listPrice === '' ? null : fmt(Number(r.listPrice)))
           : <NumInput className="boq-input boq-input-num" value={r.listPrice} readOnly={false} onChange={v => onUpdateRow(r.id, 'listPrice', v)} />}
       </td>
       <td className="boq-td boq-side-td boq-side-td--text">
-        {ro ? (r.sub || null) : <input type="text" className="boq-input" value={r.sub} onChange={e => onUpdateRow(r.id, 'sub', e.target.value)} />}
+        {syncedSub !== undefined
+          ? (syncedSub || null)
+          : ro ? (r.sub || null) : <input type="text" className="boq-input" value={r.sub} onChange={e => onUpdateRow(r.id, 'sub', e.target.value)} />}
       </td>
       <td className="boq-td boq-side-td boq-side-td--text boq-side-td--doc-issue">
         {ro ? (r.docIssue || null) : <input type="text" className="boq-input boq-side-doc-field" value={r.docIssue} aria-label="เลขที่" onChange={e => onUpdateRow(r.id, 'docIssue', e.target.value)} />}
@@ -2072,7 +2090,11 @@ export default function BoqEditorPage() {
           if (existing) {
             return rows.map(r => (r.id === existing.id ? { ...r, [field]: val } : r))
           }
-          return [...rows, { ...emptyPlanSideRow(), linkedSubRowId: subRowId, [field]: val }]
+          return [...rows, {
+            ...emptyPlanSideRow(),
+            linkedSubRowId: subRowId,
+            [field]: val,
+          }]
         })
         return
       }
@@ -2179,6 +2201,25 @@ export default function BoqEditorPage() {
       actualCompareMode ? calcGrpAdjustedMoneyTotal(g) : calcGrpMoneyTotal(g)
     )
     return distributeProportionalAmounts(weights, discountAmt)
+  }, [groups, actualCompareMode, discountAmt])
+
+  /** Live map: subRowId → { net: หลังส่วนลด, description (top-level rows only), topLevel } */
+  const boqSyncMap = useMemo(() => {
+    const map = new Map<string, { description: string; topLevel: boolean; net: number }>()
+    const weights = groups.map(g => actualCompareMode ? calcGrpAdjustedMoneyTotal(g) : calcGrpMoneyTotal(g))
+    const gDiscs = distributeProportionalAmounts(weights, discountAmt)
+    groups.forEach((group, gi) => {
+      const gTotal = weights[gi]
+      const gDisc = gDiscs[gi]
+      const walk = (sr: SubRow, depth: number) => {
+        const rowTotal = actualCompareMode ? calcRowTreeAdjusted(sr) : calcRowTreeTotal(sr)
+        const rowDisc = gTotal > 0 ? (rowTotal / gTotal) * gDisc : 0
+        map.set(sr.id, { description: sr.description, topLevel: depth === 0, net: rowTotal - rowDisc })
+        for (const child of sr.children ?? []) walk(child, depth + 1)
+      }
+      for (const sec of group.sections) for (const sr of sec.subRows) walk(sr, 0)
+    })
+    return map
   }, [groups, actualCompareMode, discountAmt])
 
   const { planBoqLinkOptions, planBoqDisplayNoBySubRowId } = useMemo(() => {
@@ -2894,12 +2935,16 @@ export default function BoqEditorPage() {
                               const rowTotal = actualCompareMode ? calcRowTreeAdjusted(sr) : calcRowTreeTotal(sr)
                               const rowPct = secTotal > 0 ? (rowTotal / secTotal) * 100 : 0
                               const rowDiscountShare = groupTotal > 0 ? (rowTotal / groupTotal) * groupDisc : 0
+                              const boqSync = boqSyncMap.get(sr.id)
+                              const syncedNet = boqSync?.net
+                              const syncedDesc = boqSync?.topLevel ? boqSync.description : undefined
                               const planCells = planRow ? (
                                 <PlanSideDataCells r={planRow} ro={!planTxInteractive} interactive={planTxInteractive}
                                   boqRefLinkLocked rolledUpPlanCost={planTxCostRollup?.get(sr.id)}
                                   linkedSubRowQuantity={getLinkedPlanQty(sr.id)}
                                   displayNoBySubRowId={planTxDisplayNo} linkOptions={planTxLinkOpts}
-                                  onUpdateRow={planTxUpdate} onDeleteRow={planTxDelete} panelStart />
+                                  onUpdateRow={planTxUpdate} onDeleteRow={planTxDelete} panelStart
+                                  syncedListPrice={syncedNet} syncedSub={syncedDesc} />
                               ) : planTxInteractive && planTxEnsureRow ? (
                                 <PlanSideDataCells
                                   r={{ ...emptyPlanSideRow(), id: triplexPendingPlanRowId(sr.id), linkedSubRowId: sr.id }}
@@ -2907,14 +2952,23 @@ export default function BoqEditorPage() {
                                   rolledUpPlanCost={planTxCostRollup?.get(sr.id)}
                                   linkedSubRowQuantity={getLinkedPlanQty(sr.id)}
                                   displayNoBySubRowId={planTxDisplayNo} linkOptions={planTxLinkOpts}
-                                  onUpdateRow={planTxUpdate} onDeleteRow={planTxDelete} panelStart />
+                                  onUpdateRow={planTxUpdate} onDeleteRow={planTxDelete} panelStart
+                                  syncedListPrice={syncedNet} syncedSub={syncedDesc} />
+                              ) : (syncedNet !== undefined) ? (
+                                <PlanSideDataCells
+                                  r={{ ...emptyPlanSideRow(), id: triplexPendingPlanRowId(sr.id), linkedSubRowId: sr.id }}
+                                  ro={true} interactive={false} boqRefLinkLocked
+                                  displayNoBySubRowId={planTxDisplayNo} linkOptions={planTxLinkOpts}
+                                  onUpdateRow={planTxUpdate} panelStart
+                                  syncedListPrice={syncedNet} syncedSub={syncedDesc} />
                               ) : <PlanEmptyCells panelStart />
                               const actCells = boqKind === 'ACTUAL' ? (actRow ? (
                                 <PlanSideDataCells r={actRow} ro={!actTxInteractive} interactive={actTxInteractive}
                                   boqRefLinkLocked rolledUpPlanCost={actTxCostRollup?.get(sr.id)}
                                   linkedSubRowQuantity={getLinkedActQty(sr.id)}
                                   displayNoBySubRowId={actTxDisplayNo} linkOptions={actTxLinkOpts}
-                                  onUpdateRow={actTxUpdate} onDeleteRow={actTxDelete} panelStart />
+                                  onUpdateRow={actTxUpdate} onDeleteRow={actTxDelete} panelStart
+                                  syncedListPrice={syncedNet} syncedSub={syncedDesc} />
                               ) : actTxInteractive && actTxEnsureRow ? (
                                 <PlanSideDataCells
                                   r={{ ...emptyPlanSideRow(), id: triplexPendingPlanRowId(sr.id), linkedSubRowId: sr.id }}
@@ -2922,7 +2976,8 @@ export default function BoqEditorPage() {
                                   rolledUpPlanCost={actTxCostRollup?.get(sr.id)}
                                   linkedSubRowQuantity={getLinkedActQty(sr.id)}
                                   displayNoBySubRowId={actTxDisplayNo} linkOptions={actTxLinkOpts}
-                                  onUpdateRow={actTxUpdate} onDeleteRow={actTxDelete} panelStart />
+                                  onUpdateRow={actTxUpdate} onDeleteRow={actTxDelete} panelStart
+                                  syncedListPrice={syncedNet} syncedSub={syncedDesc} />
                               ) : <PlanEmptyCells panelStart />) : null
                               return [
                                 <tr key={sr.id} className={depth >= 1 ? 'boq-row boq-row--nested' : 'boq-row'}>
