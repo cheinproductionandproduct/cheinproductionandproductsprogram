@@ -387,7 +387,7 @@ function distributeProportionalAmounts(weights: number[], total: number): number
 const DEFAULT_WIDTHS = { no: 60, refPage: 60, refCode: 60, width: 64, length: 64, desc: 380, qty: 64, unit: 48, matPrice: 110, matAmt: 115, laborPrice: 110, laborAmt: 115, total: 120, action: 100, note: 140, secPct: 70, secDiscount: 120, secNet: 130 }
 type ColKey = keyof typeof DEFAULT_WIDTHS
 
-const DEFAULT_SIDE_WIDTHS = { ref: 100, lead: 80, sub: 220, docIssue: 120, docTitle: 140, pricePerUnit: 110, cost: 110, gpPct: 80, gpAmt: 110, sell: 120 }
+const DEFAULT_SIDE_WIDTHS = { ref: 100, lead: 80, gpSaleAmt: 90, gpSalePct: 70, sub: 220, docIssue: 120, docTitle: 140, pricePerUnit: 110, cost: 110, gpPct: 80, gpAmt: 110, sell: 120 }
 type SideColKey = keyof typeof DEFAULT_SIDE_WIDTHS
 
 /** Column visibility (กรอง). ราคาวัสดุ (4) ปิด → หัวคอลัมน์แรงแสดง ค่าวัสดุและแรงงาน แทน ค่าแรงงาน */
@@ -910,6 +910,10 @@ function PlanSideDataCells({
   const effectiveCost = useCostRollup ? rolledUpPlanCost
     : derivedCost !== undefined ? derivedCost : Number(r.cost) || 0
   const { gpAmount, sellPrice } = planSideRowDerived(r, effectiveCost)
+  const effectiveListPrice = syncedListPrice !== undefined ? syncedListPrice : (Number(r.listPrice) || 0)
+  const gpSaleAmt = effectiveListPrice - effectiveCost
+  const gpSalePct = effectiveListPrice !== 0 ? (gpSaleAmt / effectiveListPrice) * 100 : 0
+  const gpSalePctDisp = `${gpSalePct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
   const linkedDisp = r.linkedSubRowId ? displayNoBySubRowId[r.linkedSubRowId] ?? '' : ''
   const linkOrphan = Boolean(r.linkedSubRowId && !linkedDisp)
   const pctDisp = ro && r.gpPct === '' ? ''
@@ -943,6 +947,8 @@ function PlanSideDataCells({
           : ro ? (r.listPrice === '' ? null : fmt(Number(r.listPrice)))
           : <NumInput className="boq-input boq-input-num" value={r.listPrice} readOnly={false} onChange={v => onUpdateRow(r.id, 'listPrice', v)} />}
       </td>
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps">{effectiveListPrice !== 0 ? fmt(gpSaleAmt) : null}</td>
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps">{effectiveListPrice !== 0 ? gpSalePctDisp : null}</td>
       <td className="boq-td boq-side-td boq-side-td--text ppc-sub">
         {syncedSub !== undefined
           ? (syncedSub || null)
@@ -987,13 +993,15 @@ function PlanSideDataCells({
   )
 }
 
-/** 10 empty PLAN/ACTUAL cells for non-data rows (group/section headers, discount ghosts). */
+/** 12 empty PLAN/ACTUAL cells for non-data rows (group/section headers, discount ghosts). */
 function PlanEmptyCells({ panelStart }: { panelStart?: boolean }) {
   const ps = panelStart ? ' boq-side-td--panel-start' : ''
   return (
     <>
       <td className={`boq-td boq-td-no boq-td-sub-no boq-side-td boq-side-td--boq-ref${ps}`} />
       <td className="boq-td boq-td-num boq-td-sub-no boq-side-td ppc-lp" />
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps" />
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps" />
       <td className="boq-td boq-side-td boq-side-td--text ppc-sub" />
       <td className="boq-td boq-side-td boq-side-td--text boq-side-td--doc-issue ppc-di" />
       <td className="boq-td boq-side-td boq-side-td--text boq-side-td--doc-title ppc-dt" />
@@ -1438,7 +1446,7 @@ export default function BoqEditorPage() {
   const [confirm, setConfirm]   = useState<{ msg: string; fn: () => void }|null>(null)
   const [filterOpen, setFilterOpen] = useState(false)
   const [planFilterOpen, setPlanFilterOpen] = useState(false)
-  const [planColVis, setPlanColVis] = useState({ lp: true, sub: true, doc: true, ppu: true, cost: true, gp: true })
+  const [planColVis, setPlanColVis] = useState({ lp: true, gps: true, sub: true, doc: true, ppu: true, cost: true, gp: true })
   const filterDocWrapRef = useRef<HTMLDivElement>(null)
   const planFilterWrapRef = useRef<HTMLDivElement>(null)
   const historyRef = useRef<{ past: EditorSnapshot[]; future: EditorSnapshot[] }>({ past: [], future: [] })
@@ -2362,6 +2370,7 @@ export default function BoqEditorPage() {
 
   const planHideClass = [
     !planColVis.lp   && 'boq-ph-lp',
+    !planColVis.gps  && 'boq-ph-gps',
     !planColVis.sub  && 'boq-ph-sub',
     !planColVis.doc  && 'boq-ph-doc',
     !planColVis.ppu  && 'boq-ph-ppu',
@@ -2554,6 +2563,10 @@ export default function BoqEditorPage() {
                   <span>ราคาขาย BOQ</span>
                 </label>
                 <label className="boq-filter-dropdown__option">
+                  <input type="checkbox" checked={planColVis.gps} onChange={e => setPlanColVis(v => ({ ...v, gps: e.target.checked }))} />
+                  <span>GP จากราคาขาย</span>
+                </label>
+                <label className="boq-filter-dropdown__option">
                   <input type="checkbox" checked={planColVis.sub} onChange={e => setPlanColVis(v => ({ ...v, sub: e.target.checked }))} />
                   <span>Sub</span>
                 </label>
@@ -2637,9 +2650,11 @@ export default function BoqEditorPage() {
                 <col style={mainTableFixed ? { width: colW.secNet } : undefined} />
               </>
             )}
-            {/* ── PLAN cols (10) ── */}
+            {/* ── PLAN cols (12) ── */}
             <col className="boq-side-col boq-side-col--boq-ref" style={{ width: sideColW.ref }} />
             <col className="boq-side-col boq-side-col--lead ppc-lp"    style={{ width: sideColW.lead }} />
+            <col className="boq-side-col ppc-gps" style={{ width: sideColW.gpSaleAmt }} />
+            <col className="boq-side-col ppc-gps" style={{ width: sideColW.gpSalePct }} />
             <col className="boq-side-col boq-side-col--sub ppc-sub"     style={{ width: sideColW.sub }} />
             <col className="boq-side-col ppc-di" style={{ width: sideColW.docIssue }} />
             <col className="boq-side-col ppc-dt" style={{ width: sideColW.docTitle }} />
@@ -2670,11 +2685,11 @@ export default function BoqEditorPage() {
                 <th colSpan={boqMainTableColCount - (editing ? 0 : 1)} className="boq-th boq-side-th boq-side-th--plan-band" lang="en">
                   BOQ
                 </th>
-                <th colSpan={10} className="boq-th boq-side-th boq-side-th--plan-band boq-side-td--panel-start" lang="en">
+                <th colSpan={12} className="boq-th boq-side-th boq-side-th--plan-band boq-side-td--panel-start" lang="en">
                   PLAN
                 </th>
                 {boqKind === 'ACTUAL' && (
-                  <th colSpan={10} className="boq-th boq-side-th boq-side-th--plan-band boq-side-td--panel-start" lang="en">
+                  <th colSpan={12} className="boq-th boq-side-th boq-side-th--plan-band boq-side-td--panel-start" lang="en">
                     ACTUAL
                   </th>
                 )}
@@ -2758,6 +2773,7 @@ export default function BoqEditorPage() {
               {boqMainHeadSubRow ? (<>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--boq-ref-head boq-side-td--panel-start" title="ลำดับบรรทัด BOQ">ลำดับ BOQ<RHS col="ref"/></th>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead ppc-lp">ราคาขาย<RHS col="lead"/></th>
+                <th colSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gps">GP จากราคาขาย</th>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf ppc-sub">Sub<RHS col="sub"/></th>
                 <th colSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-main ppc-di ppc-dt">เลขที่เอกสาร</th>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf ppc-ppu">ราคา/หน่วย<RHS col="pricePerUnit"/></th>
@@ -2768,6 +2784,7 @@ export default function BoqEditorPage() {
               </>) : (<>
                 <th className="boq-th boq-side-th boq-side-th--boq-ref-head boq-side-td--panel-start">ลำดับ BOQ<RHS col="ref"/></th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead ppc-lp"><span className="boq-side-th__kind" lang="en">PLAN</span><span className="boq-side-th__rowhead-label">ราคาขาย</span><RHS col="lead"/></th>
+                <th colSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gps">GP จากราคาขาย</th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf ppc-sub">Sub<RHS col="sub"/></th>
                 <th colSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-main-merged ppc-di ppc-dt">เลขที่เอกสาร</th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf ppc-ppu">ราคา/หน่วย<RHS col="pricePerUnit"/></th>
@@ -2780,6 +2797,7 @@ export default function BoqEditorPage() {
               {boqKind === 'ACTUAL' && (boqMainHeadSubRow ? (<>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--boq-ref-head boq-side-td--panel-start">ลำดับ BOQ</th>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead">ราคาขาย</th>
+                <th colSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">GP จากราคาขาย</th>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">Sub</th>
                 <th colSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-main">เลขที่เอกสาร</th>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">ราคา/หน่วย</th>
@@ -2790,6 +2808,7 @@ export default function BoqEditorPage() {
               </>) : (<>
                 <th className="boq-th boq-side-th boq-side-th--boq-ref-head boq-side-td--panel-start">ลำดับ BOQ</th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead"><span className="boq-side-th__kind" lang="en">ACTUAL</span><span className="boq-side-th__rowhead-label">ราคาขาย</span></th>
+                <th colSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">GP จากราคาขาย</th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf">Sub</th>
                 <th colSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-main-merged">เลขที่เอกสาร</th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf">ราคา/หน่วย</th>
@@ -2814,11 +2833,16 @@ export default function BoqEditorPage() {
                   <th data-col="laborPrice" className="boq-th boq-th-sub">ราคาต่อหน่วย<RH col="laborPrice"/></th>
                   <th data-col="laborAmt" className="boq-th boq-th-sub">จำนวนเงิน<RH col="laborAmt"/></th>
                 </>)}
+                {/* PLAN GP-from-sale sub-headers */}
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gps">Baht<RHS col="gpSaleAmt"/></th>
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gps">%<RHS col="gpSalePct"/></th>
                 {/* PLAN doc sub-headers */}
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf ppc-di">เลขที่<RHS col="docIssue"/></th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf ppc-dt">เอกสาร<RHS col="docTitle"/></th>
-                {/* ACTUAL doc sub-headers */}
+                {/* ACTUAL GP-from-sale + doc sub-headers */}
                 {boqKind === 'ACTUAL' && (<>
+                  <th className="boq-th boq-side-th boq-side-th--sell-leaf">Baht</th>
+                  <th className="boq-th boq-side-th boq-side-th--sell-leaf">%</th>
                   <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf">เลขที่</th>
                   <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf">เอกสาร</th>
                 </>)}
@@ -2854,20 +2878,25 @@ export default function BoqEditorPage() {
               }
               // PLAN group summary cells
               const planGroupSummaryCells = (() => {
-                let sumCost = 0, sumGp = 0, sumSell = 0, weightedGp = 0
+                let sumCost = 0, sumGp = 0, sumSell = 0, sumList = 0, weightedGp = 0
                 const allSubRowIds = group.sections.flatMap(sec => sec.subRows.map(sr => sr.id))
                 for (const sid of allSubRowIds) {
                   const pr = planTxBySubRow.get(sid)
                   if (!pr) continue
                   const c = effectivePlanCostForRow(pr, planTxCostRollup, planTxSubRowById)
                   const { gpAmount, sellPrice } = planSideRowDerived(pr, c)
-                  sumCost += c; sumGp += gpAmount; sumSell += sellPrice
+                  const lp = Number(pr.listPrice) || 0
+                  sumCost += c; sumGp += gpAmount; sumSell += sellPrice; sumList += lp
                   weightedGp += c * (Number(pr.gpPct) || 0)
                 }
                 const avgGpPct = sumCost > 0 ? weightedGp / sumCost : 0
+                const gpSaleAmt = sumList - sumCost
+                const gpSalePct = sumList !== 0 ? (gpSaleAmt / sumList) * 100 : 0
                 return (<>
                   <td className="boq-td boq-td-no boq-side-td boq-side-td--boq-ref boq-side-td--panel-start" />
                   <td className="boq-td boq-td-num boq-side-td" />
+                  <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps">{sumList !== 0 ? fmt(gpSaleAmt) : null}</td>
+                  <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps">{sumList !== 0 ? `${gpSalePct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : null}</td>
                   <td className="boq-td boq-side-td" colSpan={4} />
                   <td className="boq-td boq-td-num boq-side-td">{fmt(sumCost)}</td>
                   <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell boq-side-td--gp-avg">
@@ -2878,20 +2907,25 @@ export default function BoqEditorPage() {
                 </>)
               })()
               const actGroupSummaryCells = boqKind === 'ACTUAL' ? (() => {
-                let sumCost = 0, sumGp = 0, sumSell = 0, weightedGp = 0
+                let sumCost = 0, sumGp = 0, sumSell = 0, sumList = 0, weightedGp = 0
                 const allSubRowIds = group.sections.flatMap(sec => sec.subRows.map(sr => sr.id))
                 for (const sid of allSubRowIds) {
                   const pr = actTxBySubRow.get(sid)
                   if (!pr) continue
                   const c = effectivePlanCostForRow(pr, actTxCostRollup, actTxSubRowById)
                   const { gpAmount, sellPrice } = planSideRowDerived(pr, c)
-                  sumCost += c; sumGp += gpAmount; sumSell += sellPrice
+                  const lp = Number(pr.listPrice) || 0
+                  sumCost += c; sumGp += gpAmount; sumSell += sellPrice; sumList += lp
                   weightedGp += c * (Number(pr.gpPct) || 0)
                 }
                 const avgGpPct = sumCost > 0 ? weightedGp / sumCost : 0
+                const gpSaleAmt = sumList - sumCost
+                const gpSalePct = sumList !== 0 ? (gpSaleAmt / sumList) * 100 : 0
                 return (<>
                   <td className="boq-td boq-td-no boq-side-td boq-side-td--boq-ref boq-side-td--panel-start" />
                   <td className="boq-td boq-td-num boq-side-td" />
+                  <td className="boq-td boq-td-num boq-td-calc boq-side-td">{sumList !== 0 ? fmt(gpSaleAmt) : null}</td>
+                  <td className="boq-td boq-td-num boq-td-calc boq-side-td">{sumList !== 0 ? `${gpSalePct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : null}</td>
                   <td className="boq-td boq-side-td" colSpan={4} />
                   <td className="boq-td boq-td-num boq-side-td">{fmt(sumCost)}</td>
                   <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell boq-side-td--gp-avg">

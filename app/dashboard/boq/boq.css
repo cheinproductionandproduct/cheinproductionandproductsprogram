@@ -1584,6 +1584,7 @@
 /* ── Plan panel column hide rules ── */
 .boq-ph-lp   .ppc-lp                       { display: none !important; }
 .boq-ph-sub  .ppc-sub                      { display: none !important; }
+.boq-ph-gps  .ppc-gps                      { display: none !important; }
 .boq-ph-doc  .ppc-di,
 .boq-ph-doc  .ppc-dt                       { display: none !important; }
 .boq-ph-ppu  .ppc-ppu                      { display: none !important; }
