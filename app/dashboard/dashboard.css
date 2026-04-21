@@ -3289,20 +3289,23 @@ input.form-input[type='number'] {
 
 .apr-summary span { font-weight: 500; }
 
-/* ===== ADV DOCUMENT DETAIL (paper form replica) ===== */
+/* ===== ADV/ADC DOCUMENT (ใบเบิกเงินทดรองจ่าย / ใบเคลียร์เงินทดรองจ่าย) ===== */
 .adv-sheet {
   width: 100%;
   font-family: 'Sarabun', 'Inter', system-ui, sans-serif;
-  font-size: 14px;
+  font-size: 12.5px;
   color: #000;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
+/* Header: logo left, company info right, separated by bottom border */
 .adv-header {
   display: flex;
   align-items: center;
-  gap: 24px;
-  margin-bottom: 22px;
+  gap: 14px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #000;
+  margin-bottom: 8px;
 }
 
 .adv-logo {
@@ -3311,16 +3314,15 @@ input.form-input[type='number'] {
 
 .adv-logo img {
   display: block;
-  max-width: 150px;
+  width: 72px;
   height: auto;
   object-fit: contain;
 }
 
 .adv-company {
-  border-left: 1px solid #ccc;
-  padding-left: 24px;
-  font-size: 12px;
-  line-height: 1.7;
+  flex: 1;
+  font-size: 11px;
+  line-height: 1.55;
 }
 
 .adv-company p {
@@ -3329,45 +3331,32 @@ input.form-input[type='number'] {
 
 .adv-company-name {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 12px;
+  margin-bottom: 1px;
 }
 
-/* Title box */
+/* Title box: flex row — centered title + meta block on right */
 .adv-title-box {
-  border: 1px solid #000;
-  position: relative;
-  min-height: 64px;
-  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  border: 2px solid #000;
+  padding: 8px 12px;
 }
 
-/* APC has 4 meta lines — needs taller box */
-.adc-sheet .adv-title-box {
-  min-height: 100px;
-}
-
-/* Title spans full box width, centered both ways */
 .adv-title-text {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  transform: translateY(-50%);
-  font-size: 20px;
+  flex: 1;
+  font-size: 16px;
   font-weight: 700;
   margin: 0;
   text-align: center;
-  padding: 0 16px;
 }
 
 .adv-title-meta {
-  position: absolute;
-  right: 14px;
-  top: 10px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  text-align: right;
+  gap: 3px;
+  font-size: 11px;
 }
 
 .adv-page {
@@ -3375,28 +3364,27 @@ input.form-input[type='number'] {
 }
 .adv-page--break {
   page-break-after: always;
-  margin-bottom: 8mm;
 }
 
 .adv-meta-line {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   white-space: nowrap;
 }
 
 .adv-meta-val {
-  min-width: 80px;
-  border-bottom: 1px solid #555;
+  min-width: 88px;
+  border-bottom: 1px solid #444;
   text-align: center;
   display: inline-block;
-  padding-bottom: 2px;
+  padding-bottom: 1px;
 }
 
-/* Requester info section */
+/* Info section — bordered box below title (shares top border) */
 .adv-info {
-  border: 1px solid #000;
-  margin-top: -1px; /* collapse double border with title-box bottom */
+  border: 2px solid #000;
+  border-top: none;
 }
 
 .adv-info-row {
@@ -3412,7 +3400,8 @@ input.form-input[type='number'] {
   flex: 1;
   display: flex;
   align-items: flex-end;
-  padding: 8px 10px 4px;
+  padding: 5px 9px 4px;
+  gap: 5px;
 }
 
 .adv-info-cell + .adv-info-cell {
@@ -3429,36 +3418,37 @@ input.form-input[type='number'] {
 
 .adv-info-cell--full {
   flex: 1 1 100%;
-  width: 100%;
 }
 
 .adv-info-label {
   white-space: nowrap;
   flex-shrink: 0;
-  margin-right: 6px;
-  font-size: 14px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .adv-info-val {
   flex: 1;
   border-bottom: 1px solid #555;
-  text-align: center;
   min-width: 20px;
-  padding-bottom: 3px;
-  align-self: flex-end;
+  padding-bottom: 2px;
+  font-size: 12px;
 }
 
 .adv-info-row--col {
   flex-direction: column;
   align-items: flex-start;
-  padding: 8px 10px;
+  padding: 5px 9px;
+}
+
+.adv-info-row--col .adv-info-label {
+  margin-bottom: 3px;
 }
 
 .adv-purpose {
   width: 100%;
-  min-height: 56px;
-  padding-top: 6px;
-  font-size: 14px;
+  min-height: 40px;
+  font-size: 12px;
   white-space: pre-wrap;
 }
 
@@ -3466,25 +3456,28 @@ input.form-input[type='number'] {
 .adv-tbl {
   width: 100%;
   border-collapse: collapse;
-  margin-top: -1px;
-  font-size: 14px;
+  border-top: none;
+  font-size: 12px;
 }
 
 .adv-tbl th,
 .adv-tbl td {
   border: 1px solid #000;
-  padding: 8px 10px;
+  padding: 4px 8px;
+}
+
+.adv-tbl thead tr {
+  background: #ddd;
 }
 
 .adv-tbl th {
   font-weight: 700;
   text-align: center;
-  font-size: 13px;
-  background: #fff;
+  font-size: 12px;
 }
 
 .adv-tbl-no {
-  width: 56px;
+  width: 44px;
   text-align: center;
 }
 
@@ -3493,41 +3486,39 @@ input.form-input[type='number'] {
 }
 
 .adv-tbl-amt {
-  width: 140px;
+  width: 128px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
 .adv-tbl tbody tr {
-  height: 38px;
+  height: 28px;
 }
 
 .adv-tbl-total td {
   font-weight: 700;
+  background: #f0f0f0;
 }
 
-.adv-tbl-total .adv-tbl-no,
-.adv-tbl-total .adv-tbl-desc {
+.adv-tbl-total .adv-tbl-no {
   text-align: right;
-  padding-right: 12px;
-}
-
-.adv-tbl-total .adv-tbl-amt {
-  text-align: right;
+  padding-right: 10px;
 }
 
 /* Signature section */
 .adv-sigs {
-  margin-top: 14px;
+  margin-top: 10px;
+  border: 1px solid #000;
 }
 
 .adv-sigs-heading {
   text-align: center;
   font-weight: 700;
-  font-size: 15px;
-  text-decoration: underline;
-  margin: 0 0 12px;
-  text-transform: none;
+  font-size: 12px;
+  margin: 0;
+  padding: 5px 0;
+  border-bottom: 1px solid #000;
+  background: #efefef;
 }
 
 .adv-sigs-grid {
@@ -3539,100 +3530,112 @@ input.form-input[type='number'] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 6px 10px;
+  padding: 8px 8px 10px;
+  border-right: 1px solid #000;
+}
+
+.adv-sig-col:last-child {
+  border-right: none;
 }
 
 .adv-sig-label {
   font-weight: 600;
-  font-size: 13px;
+  font-size: 11.5px;
   text-align: center;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .adv-sig-area {
   height: 52px;
-  width: 100%;
+  width: 88%;
+  border-bottom: 1.5px solid #000;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   overflow: hidden;
+  padding-bottom: 2px;
 }
 
 .adv-sig-area img {
-  max-height: 48px;
+  max-height: 46px;
   max-width: 100%;
   object-fit: contain;
 }
 
 .adv-sig-name {
-  font-size: 12px;
+  font-size: 11px;
   text-align: center;
   display: block;
-  width: 80%;
-  margin-top: 8px;
-  padding-bottom: 3px;
-  border-bottom: 1.5px solid #000;
-  margin-bottom: 4px;
+  width: 88%;
+  margin-top: 5px;
+  padding-bottom: 2px;
+  border-bottom: 1px dotted #555;
 }
 
 .adv-sig-date {
-  font-size: 12px;
+  font-size: 10.5px;
   color: #333;
   text-align: center;
+  margin-top: 3px;
 }
 
 .adv-receiver-extras {
-  margin-top: 8px;
-  font-size: 11px;
-  color: #333;
-  text-align: center;
+  margin-top: 6px;
+  font-size: 10px;
+  color: #444;
+  text-align: left;
+  width: 100%;
+  padding-left: 2px;
 }
 
 .adv-receiver-extra-line {
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
 .adv-receiver-extra-line:last-child {
   margin-bottom: 0;
 }
 
-/* Footer note */
+/* Footer notes */
 .adv-footer {
   text-align: center;
   color: #c00;
   font-weight: 700;
-  font-size: 13px;
-  margin-top: 12px;
+  font-size: 11.5px;
+  margin-top: 8px;
 }
 
 .adv-footer + .adv-footer {
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
-/* ===== ADC (ใบเคลียร์เงินทดรองจ่าย) - same scale as APR, 4-col table + summary ===== */
+/* ===== ADC (ใบเคลียร์เงินทดรองจ่าย) — 4-col table + summary ===== */
 .adc-tbl {
   width: 100%;
   border-collapse: collapse;
-  margin-top: -1px;
-  font-size: 14px;
+  border-top: none;
+  font-size: 12px;
   table-layout: fixed;
 }
 
 .adc-tbl th,
 .adc-tbl td {
   border: 1px solid #000;
-  padding: 8px 10px;
+  padding: 4px 8px;
+}
+
+.adc-tbl thead tr {
+  background: #ddd;
 }
 
 .adc-tbl th {
   font-weight: 700;
   text-align: center;
-  font-size: 14px;
-  background: #fff;
+  font-size: 12px;
 }
 
 .adc-tbl-no {
-  width: 56px;
+  width: 44px;
   text-align: center;
 }
 
@@ -3642,38 +3645,37 @@ input.form-input[type='number'] {
 
 .adc-tbl-detail {
   text-align: left;
-  width: 120px;
+  width: 110px;
 }
 
 .adc-tbl-amt {
-  width: 140px;
+  width: 128px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
 .adc-tbl tbody tr {
-  height: 38px;
+  height: 28px;
 }
 
 .adc-tbl-total td {
   font-weight: 700;
+  background: #f0f0f0;
 }
 
-.adc-tbl-total .adc-tbl-no,
-.adc-tbl-total .adc-tbl-desc,
-.adc-tbl-total .adc-tbl-detail {
+.adc-tbl-total .adc-tbl-no {
   text-align: right;
-  padding-right: 12px;
+  padding-right: 10px;
 }
 
-.adc-tbl-total .adc-tbl-amt {
-  text-align: right;
+.adc-tbl-summary td {
+  font-weight: 600;
+  background: #f8f8f8;
 }
 
 .adc-tbl-summary-label {
   text-align: right;
-  padding-right: 12px;
-  font-weight: 600;
+  padding-right: 10px;
 }
 
 .adc-tbl-summary-last td {
@@ -3930,7 +3932,7 @@ input.form-input[type='number'] {
   .document-print-wrapper {
     width: 100%;
     margin: 0;
-    padding: 5mm 10mm;
+    padding: 0;
     box-shadow: none;
     min-height: auto;
   }
@@ -3942,7 +3944,7 @@ input.form-input[type='number'] {
     -webkit-print-color-adjust: exact;
   }
 
-  /* Ensure all borders render in print (don't let browser suppress them) */
+  /* Ensure borders and backgrounds render in print */
   .adv-sheet,
   .adv-title-box,
   .adv-info,
@@ -3951,10 +3953,17 @@ input.form-input[type='number'] {
   .adv-tbl,
   .adv-tbl th,
   .adv-tbl td,
+  .adv-tbl thead tr,
+  .adv-tbl-total td,
   .adc-tbl,
   .adc-tbl th,
   .adc-tbl td,
-  .adv-sig-line {
+  .adc-tbl thead tr,
+  .adc-tbl-total td,
+  .adc-tbl-summary td,
+  .adv-sigs,
+  .adv-sigs-heading,
+  .adv-sig-col {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
@@ -3965,7 +3974,7 @@ input.form-input[type='number'] {
   }
 
   .adv-sheet {
-    font-size: 13px;
+    font-size: 12.5px;
   }
 
   .adv-page {
