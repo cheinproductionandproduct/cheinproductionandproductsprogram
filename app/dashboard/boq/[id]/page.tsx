@@ -3070,8 +3070,9 @@ export default function BoqEditorPage() {
                         })()}
                         {colVis.showDesc && tableShowSecDiscount && (() => {
                           const secTotal = actualCompareMode ? calcSecAdjustedMoneyTotal(section) : calcSecMoneyTotal(section)
-                          const secPct = grandTotal > 0 ? (secTotal / grandTotal) * 100 : 0
-                          const secDiscount = grandTotal > 0 ? (secTotal / grandTotal) * discountAmt : 0
+                          const groupDisc = groupDiscountAlloc[groupIdx] ?? 0
+                          const secPct = groupTotal > 0 ? (secTotal / groupTotal) * 100 : 0
+                          const secDiscount = groupTotal > 0 ? (secTotal / groupTotal) * groupDisc : 0
                           return (
                             <SummaryRow
                               label={`ข้อ ${globalNum}${section.title ? ` — ${section.title}` : ''}`}
