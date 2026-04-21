@@ -3304,7 +3304,6 @@ input.form-input[type='number'] {
   align-items: center;
   gap: 14px;
   padding-bottom: 8px;
-  border-bottom: 2px solid #000;
   margin-bottom: 8px;
 }
 
@@ -3339,7 +3338,7 @@ input.form-input[type='number'] {
 .adv-title-box {
   display: flex;
   align-items: center;
-  border: 2px solid #000;
+  border: 1px solid #000;
   padding: 8px 12px;
 }
 
@@ -3383,7 +3382,7 @@ input.form-input[type='number'] {
 
 /* Info section — bordered box below title (shares top border) */
 .adv-info {
-  border: 2px solid #000;
+  border: 1px solid #000;
   border-top: none;
 }
 
