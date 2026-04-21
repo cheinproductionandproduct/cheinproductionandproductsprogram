@@ -2893,8 +2893,8 @@ export default function BoqEditorPage() {
                 const gpSaleAmt = sumList - sumCost
                 const gpSalePct = sumList !== 0 ? (gpSaleAmt / sumList) * 100 : 0
                 return (<>
-                  <td className="boq-td boq-td-no boq-side-td boq-side-td--boq-ref boq-side-td--panel-start" />
-                  <td className="boq-td boq-td-num boq-side-td" />
+                  <td className="boq-td boq-td-no boq-side-td boq-side-td--boq-ref boq-side-td--panel-start boq-side-td--sum-label">รวม</td>
+                  <td className="boq-td boq-td-num boq-side-td ppc-lp">{sumList !== 0 ? fmt(sumList) : null}</td>
                   <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps">{sumList !== 0 ? fmt(gpSaleAmt) : null}</td>
                   <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps">{sumList !== 0 ? `${gpSalePct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : null}</td>
                   <td className="boq-td boq-side-td" colSpan={4} />
@@ -2922,8 +2922,8 @@ export default function BoqEditorPage() {
                 const gpSaleAmt = sumList - sumCost
                 const gpSalePct = sumList !== 0 ? (gpSaleAmt / sumList) * 100 : 0
                 return (<>
-                  <td className="boq-td boq-td-no boq-side-td boq-side-td--boq-ref boq-side-td--panel-start" />
-                  <td className="boq-td boq-td-num boq-side-td" />
+                  <td className="boq-td boq-td-no boq-side-td boq-side-td--boq-ref boq-side-td--panel-start boq-side-td--sum-label">รวม</td>
+                  <td className="boq-td boq-td-num boq-side-td">{sumList !== 0 ? fmt(sumList) : null}</td>
                   <td className="boq-td boq-td-num boq-td-calc boq-side-td">{sumList !== 0 ? fmt(gpSaleAmt) : null}</td>
                   <td className="boq-td boq-td-num boq-td-calc boq-side-td">{sumList !== 0 ? `${gpSalePct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : null}</td>
                   <td className="boq-td boq-side-td" colSpan={4} />

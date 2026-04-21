@@ -317,6 +317,13 @@
   font-weight: 800;
 }
 
+.boq-side-td--sum-label {
+  text-align: center !important;
+  font-weight: 700;
+  font-size: 12px;
+  color: #555;
+}
+
 /* Side thead: same padding/font as main .boq-th so header band height matches BOQ */
 .boq-side-table thead .boq-th {
   padding: 6px 8px;
