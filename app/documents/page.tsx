@@ -85,19 +85,15 @@ function DocumentsPageContent() {
       </div>
 
       {aprSummary && (
-        <div className="apr-summary-inline" style={{ marginBottom: 24 }}>
-          <div className="apr-dashboard-card apr-dashboard-card--total" style={{ maxWidth: 400 }}>
-            <div className="apr-dashboard-card-label">จำนวนเงินที่ขอเบิกแล้วทั้งหมด (ใบเบิกเงินทดรองจ่าย)</div>
+        <div className="apr-summary-inline">
+          <div className="apr-dashboard-card apr-dashboard-card--total">
+            <div className="apr-dashboard-card-label">ยอดเบิกเงินทดรองจ่ายทั้งหมด</div>
             <div className="apr-dashboard-card-value">
               {formatNumber(aprSummary.totalAmount)} <span className="apr-dashboard-unit">บาท</span>
             </div>
-            <div className="apr-dashboard-card-meta">จากเอกสาร {aprSummary.documentCount} รายการ</div>
-            <Link
-              href="/dashboard/advance/new"
-              className="form-button form-button-submit"
-              style={{ marginTop: 12, display: 'inline-block' }}
-            >
-              สร้างใบเบิกใหม่
+            <div className="apr-dashboard-card-meta">จาก {aprSummary.documentCount} รายการ</div>
+            <Link href="/dashboard/advance/new" className="form-button form-button-submit">
+              + สร้างใบเบิกใหม่
             </Link>
           </div>
         </div>
