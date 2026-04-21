@@ -655,7 +655,7 @@ function buildBoqTriplexBodySlots(
   groups: Group[],
   showDesc: boolean,
   tableShowTotal: boolean,
-  discountAmt: number,
+  showSecDiscount: boolean,
 ): BoqTriplexSlot[] {
   const walkLines = (rows: SubRow[], depth: number, slots: BoqTriplexSlot[]) => {
     for (const sr of rows) {
@@ -676,11 +676,10 @@ function buildBoqTriplexBodySlots(
     for (const sec of g.sections) {
       slots.push({ kind: 'section', key: `s-${sec.id}` })
       walkLines(sec.subRows, 0, slots)
-      if (discountAmt > 0 && tableShowTotal) slots.push({ kind: 'sectionDiscount', key: `sd-${sec.id}` })
+      if (tableShowTotal && showSecDiscount) slots.push({ kind: 'sectionDiscount', key: `sd-${sec.id}` })
     }
     const subRowIds = g.sections.flatMap(sec => sec.subRows.map(sr => sr.id))
     slots.push({ kind: 'groupSummary', key: `gs-${g.id}`, subRowIds })
-    if (discountAmt > 0 && tableShowTotal) slots.push({ kind: 'groupDiscount', key: `gd-${g.id}` })
   }
   return slots
 }
@@ -2197,8 +2196,8 @@ export default function BoqEditorPage() {
   }, [planGroups])
 
   const boqTriplexBodySlots = useMemo(
-    () => buildBoqTriplexBodySlots(groups, colVis.showDesc, tableShowTotal, discountAmt),
-    [groups, colVis.showDesc, tableShowTotal, discountAmt],
+    () => buildBoqTriplexBodySlots(groups, colVis.showDesc, tableShowTotal, showSecDiscount),
+    [groups, colVis.showDesc, tableShowTotal, showSecDiscount],
   )
   /** Lookup: group id → render context (needed when iterating flat slots). */
   const groupRenderMap = useMemo(() => {
