@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { Inter } from 'next/font/google'
+import ExcelJS from 'exceljs'
 import { useParams, useRouter } from 'next/navigation'
 import { useUser } from '@/hooks/use-user'
 import { canDeleteBoq, canEditBoq, canSubmitBoq, canSignBoq } from '@/lib/auth/permissions'
@@ -2353,6 +2354,229 @@ export default function BoqEditorPage() {
   const actTxEnsureRow   = actualSideEditing ? ensurePlanRowForSubRow : undefined
   /* PlanEmptyCells is defined at module level below PlanSideDataCells */
 
+  /* ── XLSX export (exceljs — full styling) ─────────────────── */
+  const exportBoqXlsx = useCallback(async () => {
+    const wb = new ExcelJS.Workbook()
+    wb.creator = 'BOQ System'
+    const ws = wb.addWorksheet('BOQ', { views: [{ state: 'frozen', ySplit: 2 }] })
+
+    // ── column definitions ──────────────────────────────────────
+    type ColDef = { header: string; key: string; width: number; numFmt?: string; align?: ExcelJS.Alignment['horizontal'] }
+    const COLS: ColDef[] = [
+      { header: 'หมวดงาน',          key: 'zone',      width: 22 },
+      { header: 'ข้อ',              key: 'no',        width: 10 },
+      { header: 'คำอธิบาย',         key: 'desc',      width: 42 },
+      { header: 'ref',              key: 'ref',       width: 10 },
+      { header: 'รหัส',             key: 'code',      width: 12 },
+      { header: 'กว้าง',            key: 'w',         width: 8,  numFmt: '#,##0.00' },
+      { header: 'ยาว',              key: 'l',         width: 8,  numFmt: '#,##0.00' },
+      { header: 'จำนวน',            key: 'qty',       width: 10, numFmt: '#,##0.00' },
+      { header: 'หน่วย',            key: 'unit',      width: 8 },
+      { header: 'ราคาวัสดุ/หน่วย',  key: 'matU',      width: 14, numFmt: '#,##0.00', align: 'right' },
+      { header: 'ค่าวัสดุรวม',       key: 'matT',      width: 14, numFmt: '#,##0.00', align: 'right' },
+      { header: 'ค่าแรงงาน/หน่วย',   key: 'labU',      width: 14, numFmt: '#,##0.00', align: 'right' },
+      { header: 'ค่าแรงรวม',         key: 'labT',      width: 14, numFmt: '#,##0.00', align: 'right' },
+      { header: 'รวม BOQ',           key: 'boqT',      width: 14, numFmt: '#,##0.00', align: 'right' },
+      { header: 'หมายเหตุ',          key: 'note',      width: 20 },
+      { header: 'หลังส่วนลด (BOQ)',   key: 'net',       width: 16, numFmt: '#,##0.00', align: 'right' },
+      { header: 'ราคาขาย (PLAN)',     key: 'planLp',    width: 16, numFmt: '#,##0.00', align: 'right' },
+      { header: 'GP Baht',           key: 'gpBaht',    width: 13, numFmt: '#,##0.00', align: 'right' },
+      { header: 'GP %',              key: 'gpPct',     width: 9,  numFmt: '0.00"%"',   align: 'right' },
+      { header: 'Sub',               key: 'sub',       width: 18 },
+      { header: 'เลขที่เอกสาร',       key: 'docIssue', width: 16 },
+      { header: 'ชื่อเอกสาร',         key: 'docTitle', width: 20 },
+      { header: 'ราคา/หน่วย (PLAN)',   key: 'planPpu',  width: 16, numFmt: '#,##0.00', align: 'right' },
+      { header: 'ต้นทุน',             key: 'cost',     width: 14, numFmt: '#,##0.00', align: 'right' },
+      { header: 'GP% (PLAN)',         key: 'planGpPct', width: 12, numFmt: '0.00"%"',  align: 'right' },
+      { header: 'GP Amount (PLAN)',    key: 'planGpAmt', width: 16, numFmt: '#,##0.00', align: 'right' },
+      { header: 'ราคาขายสุดท้าย',      key: 'sell',     width: 16, numFmt: '#,##0.00', align: 'right' },
+    ]
+    ws.columns = COLS.map(c => ({ header: c.header, key: c.key, width: c.width }))
+
+    const THAI_FONT = 'Cordia New'
+    const applyFont = (row: ExcelJS.Row, size = 12, bold = false) => {
+      row.eachCell({ includeEmpty: true }, cell => {
+        cell.font = { name: THAI_FONT, size, bold }
+        cell.alignment = { vertical: 'middle', wrapText: false }
+      })
+    }
+    const applyFill = (row: ExcelJS.Row, argb: string) => {
+      row.eachCell({ includeEmpty: true }, cell => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb } }
+      })
+    }
+    const applyBorder = (row: ExcelJS.Row) => {
+      row.eachCell({ includeEmpty: true }, cell => {
+        cell.border = {
+          top:    { style: 'thin', color: { argb: 'FFD0D0D0' } },
+          bottom: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+          left:   { style: 'thin', color: { argb: 'FFD0D0D0' } },
+          right:  { style: 'thin', color: { argb: 'FFD0D0D0' } },
+        }
+      })
+    }
+    const applyNumFmt = (row: ExcelJS.Row) => {
+      COLS.forEach((cd, ci) => {
+        if (cd.numFmt) {
+          const cell = row.getCell(ci + 1)
+          cell.numFmt = cd.numFmt
+          if (cd.align) cell.alignment = { ...cell.alignment, horizontal: cd.align }
+        }
+      })
+    }
+
+    // ── header row ──────────────────────────────────────────────
+    const hdrRow = ws.getRow(1)
+    COLS.forEach((cd, ci) => { hdrRow.getCell(ci + 1).value = cd.header })
+    applyFont(hdrRow, 13, true)
+    applyFill(hdrRow, 'FF1A5C38')   // dark green
+    hdrRow.eachCell({ includeEmpty: true }, cell => {
+      cell.font = { name: THAI_FONT, size: 13, bold: true, color: { argb: 'FFFFFFFF' } }
+      cell.alignment = { vertical: 'middle', horizontal: 'center' }
+      cell.border = { bottom: { style: 'medium', color: { argb: 'FF148A50' } } }
+    })
+    hdrRow.height = 24
+    ws.getRow(2).height = 4   // small gap row
+
+    const numOrNull = (v: number | ''): number | null => v === '' ? null : Number(v) || null
+
+    let secIdx = 0
+    for (const group of groups) {
+      // ── group header row (dark teal) ──────────────────────────
+      const grpRow = ws.addRow({ zone: group.title })
+      applyFont(grpRow, 12, true)
+      applyFill(grpRow, 'FF0F3F28')
+      grpRow.eachCell({ includeEmpty: true }, cell => {
+        cell.font = { name: THAI_FONT, size: 12, bold: true, color: { argb: 'FFFFFFFF' } }
+        cell.alignment = { vertical: 'middle' }
+      })
+      grpRow.height = 20
+
+      for (const sec of group.sections) {
+        secIdx++
+        // ── section header row (light green) ─────────────────────
+        const secRow = ws.addRow({ no: secIdx, desc: sec.title })
+        applyFont(secRow, 12, true)
+        applyFill(secRow, 'FFD6EFE0')
+        secRow.eachCell({ includeEmpty: true }, cell => {
+          cell.font = { name: THAI_FONT, size: 12, bold: true, color: { argb: 'FF0D3D24' } }
+          cell.alignment = { vertical: 'middle' }
+        })
+        secRow.height = 18
+
+        const walkSubRow = (sr: SubRow, prefix: string, depth: number) => {
+          const matAmt = calcMat(sr)
+          const labAmt = calcLab(sr)
+          const boqTotal = calcRowTreeTotal(sr)
+          const syncedNet = boqSyncMap.get(sr.id)?.net ?? null
+          const pr = planTxBySubRow.get(sr.id)
+          let planListPrice: number | null = null
+          let gpBaht: number | null = null
+          let gpPctVal: number | null = null
+          let planCost: number | null = null
+          let planGpPct: number | null = null
+          let planGpAmt: number | null = null
+          let planSell: number | null = null
+          if (pr) {
+            const effectiveLp = syncedNet !== null ? syncedNet : (Number(pr.listPrice) || 0)
+            planListPrice = effectiveLp
+            planCost = effectivePlanCostForRow(pr, planTxCostRollup, planTxSubRowById)
+            gpBaht = effectiveLp - planCost
+            gpPctVal = effectiveLp !== 0 ? (gpBaht / effectiveLp) * 100 : 0
+            const d = planSideRowDerived(pr, planCost)
+            planGpPct = Number(pr.gpPct) || 0
+            planGpAmt = d.gpAmount
+            planSell = d.sellPrice
+          } else if (syncedNet !== null) {
+            planListPrice = syncedNet
+          }
+
+          const dataRow = ws.addRow({
+            zone:      depth === 0 ? group.title : null,
+            no:        prefix,
+            desc:      sr.description || null,
+            ref:       sr.refPage || null,
+            code:      sr.refCode || null,
+            w:         numOrNull(sr.width ?? ''),
+            l:         numOrNull(sr.length ?? ''),
+            qty:       numOrNull(sr.quantity),
+            unit:      sr.unit || null,
+            matU:      numOrNull(sr.materialPrice),
+            matT:      matAmt !== 0 ? matAmt : null,
+            labU:      numOrNull(sr.laborPrice),
+            labT:      labAmt !== 0 ? labAmt : null,
+            boqT:      boqTotal !== 0 ? boqTotal : null,
+            note:      sr.note || null,
+            net:       syncedNet,
+            planLp:    planListPrice,
+            gpBaht:    gpBaht,
+            gpPct:     gpPctVal !== null ? parseFloat(gpPctVal.toFixed(4)) : null,
+            sub:       pr?.sub || null,
+            docIssue:  pr?.docIssue || null,
+            docTitle:  pr?.docTitle || null,
+            planPpu:   pr?.pricePerUnit !== '' && pr?.pricePerUnit != null ? Number(pr.pricePerUnit) : null,
+            cost:      planCost,
+            planGpPct: planGpPct,
+            planGpAmt: planGpAmt,
+            sell:      planSell,
+          })
+          applyFont(dataRow, 12)
+          applyBorder(dataRow)
+          applyNumFmt(dataRow)
+          if (depth > 0) {
+            applyFill(dataRow, 'FFF0F7F4')
+          } else {
+            applyFill(dataRow, 'FFFFFFFF')
+          }
+          // GP % column green tint when positive
+          const gpPctCell = dataRow.getCell('gpPct')
+          if (typeof gpPctCell.value === 'number' && gpPctCell.value > 0) {
+            gpPctCell.font = { name: THAI_FONT, size: 12, color: { argb: 'FF1A6B3C' } }
+          }
+          dataRow.height = 18
+          sr.children?.forEach((ch, ci) => walkSubRow(ch, `${prefix}.${ci + 1}`, depth + 1))
+        }
+        sec.subRows.forEach((sr, i) => walkSubRow(sr, `${secIdx}.${i + 1}`, 0))
+      }
+    }
+
+    // ── summary rows ────────────────────────────────────────────
+    ws.addRow({})
+    const addSumRow = (label: string, val: number, bold = false, fillArgb = 'FFF5F5F5') => {
+      const r = ws.addRow({ desc: label, boqT: val })
+      applyFont(r, 12, bold)
+      applyFill(r, fillArgb)
+      applyNumFmt(r)
+      r.getCell('desc').alignment = { horizontal: 'right', vertical: 'middle' }
+      r.getCell('boqT').alignment = { horizontal: 'right', vertical: 'middle' }
+      r.getCell('boqT').numFmt = '#,##0.00'
+      r.height = 18
+    }
+    addSumRow('รวมทั้งหมด (BOQ)',         grandTotal,            false, 'FFEAF5EE')
+    addSumRow(`ค่าดำเนินการ ${overheadPct}%`, overhead,          false, 'FFF5F5F5')
+    addSumRow('รวมก่อนหักส่วนลด',         subtotalBeforeDiscount,false, 'FFF5F5F5')
+    if (discountAmt > 0) addSumRow('ส่วนลด', -discountAmt,       false, 'FFFFF3F3')
+    addSumRow('ราคารวมหลังหักส่วนลด',      afterDiscount,         true,  'FFD6EFE0')
+    if (vat > 0) addSumRow(`VAT ${vatPct}%`, vat,                false, 'FFF5F5F5')
+    addSumRow('ราคารวมภาษีมูลค่าเพิ่ม',    totalWithVat,          true,  'FF1A5C38')
+
+    // make last summary row white text
+    const lastRow = ws.lastRow!
+    lastRow.eachCell({ includeEmpty: false }, cell => {
+      cell.font = { name: THAI_FONT, size: 13, bold: true, color: { argb: 'FFFFFFFF' } }
+    })
+
+    // ── download ─────────────────────────────────────────────────
+    const buffer = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${boqTitle || 'BOQ'}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [groups, boqSyncMap, planTxBySubRow, planTxCostRollup, planTxSubRowById, grandTotal, overhead, subtotalBeforeDiscount, discountAmt, afterDiscount, vat, totalWithVat, overheadPct, vatPct, boqTitle])
+
   let globalSecIdx   = 0
 
   /* Resize handle elements — double-click RH to reset columns to auto */
@@ -2489,6 +2713,9 @@ export default function BoqEditorPage() {
           )}
           <button type="button" className="boq-submit-btn" onClick={() => { void handleDownloadPDF() }}>
             Export PDF
+          </button>
+          <button type="button" className="boq-submit-btn" onClick={() => { void exportBoqXlsx() }}>
+            Export XLSX
           </button>
           <div className="boq-filter-wrap" ref={filterDocWrapRef}>
             <button
