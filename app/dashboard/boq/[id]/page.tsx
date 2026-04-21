@@ -2885,7 +2885,7 @@ export default function BoqEditorPage() {
                   if (!pr) continue
                   const c = effectivePlanCostForRow(pr, planTxCostRollup, planTxSubRowById)
                   const { gpAmount, sellPrice } = planSideRowDerived(pr, c)
-                  const lp = Number(pr.listPrice) || 0
+                  const lp = boqSyncMap.get(sid)?.net ?? (Number(pr.listPrice) || 0)
                   sumCost += c; sumGp += gpAmount; sumSell += sellPrice; sumList += lp
                   weightedGp += c * (Number(pr.gpPct) || 0)
                 }
@@ -2914,7 +2914,7 @@ export default function BoqEditorPage() {
                   if (!pr) continue
                   const c = effectivePlanCostForRow(pr, actTxCostRollup, actTxSubRowById)
                   const { gpAmount, sellPrice } = planSideRowDerived(pr, c)
-                  const lp = Number(pr.listPrice) || 0
+                  const lp = boqSyncMap.get(sid)?.net ?? (Number(pr.listPrice) || 0)
                   sumCost += c; sumGp += gpAmount; sumSell += sellPrice; sumList += lp
                   weightedGp += c * (Number(pr.gpPct) || 0)
                 }
