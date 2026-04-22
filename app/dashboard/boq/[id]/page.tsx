@@ -882,7 +882,7 @@ function PlanSidePricingDataRow({
       <td className="boq-td boq-td-num boq-td-total boq-side-td">{fmt(sellPrice)}</td>
       <td className="boq-td boq-td-num boq-td-calc boq-side-td boq-side-td--last-cell">
         <div className="boq-side-last-cell-inner">
-          <span className="boq-side-last-val">{pctDisp}</span>
+          <span className="boq-side-last-val">{gpFromCostPctDisp}</span>
           {interactive && onDeleteRow && !isTriplexPendingPlanRowId(r.id) && (
             <button type="button" className="boq-side-row-del" title="ลบแถว" onClick={() => onDeleteRow(r.id)}>
               ×
@@ -992,7 +992,7 @@ function PlanSideDataCells({
       <td className="boq-td boq-td-num boq-td-total boq-side-td">{fmt(sellPrice)}</td>
       <td className="boq-td boq-td-num boq-td-calc boq-side-td boq-side-td--last-cell">
         <div className="boq-side-last-cell-inner">
-          <span className="boq-side-last-val">{pctDisp}</span>
+          <span className="boq-side-last-val">{gpFromCostPctDisp}</span>
           {interactive && onDeleteRow && !isTriplexPendingPlanRowId(r.id) && (
             <button type="button" className="boq-side-row-del" title="ลบแถว" onClick={() => onDeleteRow(r.id)}>×</button>
           )}
@@ -1105,24 +1105,27 @@ function PlanSidePricingTable({
           continue
         }
         if (s.kind === 'groupSummary') {
-          let sumCost = 0, sumGp = 0, sumSell = 0, weightedGp = 0
+          let sumCost = 0, sumGp = 0, sumSell = 0, weightedGp = 0, sumGpSale = 0
           for (const sid of s.subRowIds) {
             const pr = bySubRow.get(sid)
             if (!pr) continue
             const c = effectivePlanCostForRow(pr, planCostRollupBySubRowId, subRowById)
             const gpp = Number(pr.gpPct) || 0
             const { gpAmount, sellPrice } = planSideRowDerived(pr, c)
+            const lp = Number(pr.listPrice) || 0
             sumCost += c
             sumGp += gpAmount
             sumSell += sellPrice
             weightedGp += c * gpp
+            sumGpSale += lp - c
           }
           const avgGpPct = sumCost > 0 ? weightedGp / sumCost : 0
           lines.push(
             <tr key={s.key} className="boq-row boq-summary-row boq-side-summary-row">
               <td className="boq-td boq-td-no boq-side-td boq-side-td--boq-ref" />
               <td className="boq-td boq-td-num boq-side-td" />
-              <td className="boq-td boq-side-td" colSpan={4} />
+              <td className="boq-td boq-td-num boq-td-calc boq-side-td">{sumGpSale !== 0 ? fmt(sumGpSale) : null}</td>
+              <td className="boq-td boq-side-td" colSpan={3} />
               <td className="boq-td boq-td-num boq-side-td">{fmt(sumCost)}</td>
               <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(sumGp)}</td>
               <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell boq-side-td--gp-avg">
@@ -3133,7 +3136,7 @@ export default function BoqEditorPage() {
                 return (<>
                   <td className="boq-td boq-td-no boq-side-td boq-side-td--boq-ref boq-side-td--panel-start boq-side-td--sum-label">รวม</td>
                   <td className="boq-td boq-td-num boq-side-td ppc-lp">{sumList !== 0 ? fmt(sumList) : null}</td>
-                  <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps">{sumList !== 0 ? fmt(gpSaleAmt) : null}</td>
+                  <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps">{(sumCost > 0 || sumList > 0) ? fmt(gpSaleAmt) : null}</td>
                   <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps">{sumList !== 0 ? `${gpSalePct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : null}</td>
                   <td className="boq-td boq-side-td" colSpan={4} />
                   <td className="boq-td boq-td-num boq-side-td">{fmt(sumCost)}</td>
