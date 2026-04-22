@@ -860,6 +860,7 @@ function PlanSidePricingDataRow({
           />
         )}
       </td>
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(gpAmount)}</td>
       <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell">
         {ro ? (
           pctDisp
@@ -875,10 +876,10 @@ function PlanSidePricingDataRow({
           </span>
         )}
       </td>
-      <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(gpAmount)}</td>
-      <td className="boq-td boq-td-num boq-td-total boq-side-td boq-side-td--last-cell">
+      <td className="boq-td boq-td-num boq-td-total boq-side-td">{fmt(sellPrice)}</td>
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td boq-side-td--last-cell">
         <div className="boq-side-last-cell-inner">
-          <span className="boq-side-last-val">{fmt(sellPrice)}</span>
+          <span className="boq-side-last-val">{pctDisp}</span>
           {interactive && onDeleteRow && !isTriplexPendingPlanRowId(r.id) && (
             <button type="button" className="boq-side-row-del" title="ลบแถว" onClick={() => onDeleteRow(r.id)}>
               ×
@@ -973,6 +974,7 @@ function PlanSideDataCells({
           : ro ? (r.cost === '' ? null : fmt(Number(r.cost)))
           : <NumInput className="boq-input boq-input-num" value={r.cost} readOnly={false} onChange={v => onUpdateRow(r.id, 'cost', v)} />}
       </td>
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gpamt">{fmt(gpAmount)}</td>
       <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell ppc-gppct">
         {ro ? pctDisp : (
           <span className="boq-side-pct-wrap">
@@ -981,10 +983,10 @@ function PlanSideDataCells({
           </span>
         )}
       </td>
-      <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gpamt">{fmt(gpAmount)}</td>
-      <td className="boq-td boq-td-num boq-td-total boq-side-td boq-side-td--last-cell">
+      <td className="boq-td boq-td-num boq-td-total boq-side-td">{fmt(sellPrice)}</td>
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td boq-side-td--last-cell">
         <div className="boq-side-last-cell-inner">
-          <span className="boq-side-last-val">{fmt(sellPrice)}</span>
+          <span className="boq-side-last-val">{pctDisp}</span>
           {interactive && onDeleteRow && !isTriplexPendingPlanRowId(r.id) && (
             <button type="button" className="boq-side-row-del" title="ลบแถว" onClick={() => onDeleteRow(r.id)}>×</button>
           )}
@@ -1008,9 +1010,10 @@ function PlanEmptyCells({ panelStart }: { panelStart?: boolean }) {
       <td className="boq-td boq-side-td boq-side-td--text boq-side-td--doc-title ppc-dt" />
       <td className="boq-td boq-td-num boq-side-td ppc-ppu" />
       <td className="boq-td boq-td-num boq-side-td ppc-cost" />
-      <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell ppc-gppct" />
       <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gpamt" />
-      <td className="boq-td boq-td-num boq-td-total boq-side-td boq-side-td--last-cell" />
+      <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell ppc-gppct" />
+      <td className="boq-td boq-td-num boq-td-total boq-side-td" />
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td boq-side-td--last-cell" />
     </>
   )
 }
@@ -1068,9 +1071,10 @@ function PlanSidePricingTable({
       <td className="boq-td boq-side-td boq-side-td--text boq-side-td--doc-title" />
       <td className="boq-td boq-td-num boq-side-td" />
       <td className="boq-td boq-td-num boq-side-td" />
-      <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell" />
       <td className="boq-td boq-td-num boq-td-calc boq-side-td" />
-      <td className="boq-td boq-td-num boq-td-total boq-side-td boq-side-td--last-cell" />
+      <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell" />
+      <td className="boq-td boq-td-num boq-td-total boq-side-td" />
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td boq-side-td--last-cell" />
     </>
   )
   const renderBody = () => {
@@ -1114,11 +1118,12 @@ function PlanSidePricingTable({
               <td className="boq-td boq-td-num boq-side-td" />
               <td className="boq-td boq-side-td" colSpan={4} />
               <td className="boq-td boq-td-num boq-side-td">{fmt(sumCost)}</td>
+              <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(sumGp)}</td>
               <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell boq-side-td--gp-avg">
                 {sumCost > 0 ? `${avgGpPct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : ''}
               </td>
-              <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(sumGp)}</td>
-              <td className="boq-td boq-td-num boq-td-total boq-side-td boq-side-td--last-cell">{fmt(sumSell)}</td>
+              <td className="boq-td boq-td-num boq-td-total boq-side-td">{fmt(sumSell)}</td>
+              <td className="boq-td boq-td-num boq-td-calc boq-side-td boq-side-td--last-cell" />
             </tr>,
           )
           continue
@@ -1369,12 +1374,12 @@ function PlanSidePricingTable({
               รวม
             </td>
             <td className="boq-td boq-td-num boq-side-td">{fmt(footer.sumCost)}</td>
+            <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(footer.sumGp)}</td>
             <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell boq-side-td--gp-avg">
               {footer.sumCost > 0
                 ? `${footer.avgGpPct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
                 : ''}
             </td>
-            <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(footer.sumGp)}</td>
             <td className="boq-td boq-td-num boq-td-total boq-side-td">{fmt(footer.sumSell)}</td>
           </tr>
         </tfoot>
@@ -1447,7 +1452,7 @@ export default function BoqEditorPage() {
   const [confirm, setConfirm]   = useState<{ msg: string; fn: () => void }|null>(null)
   const [filterOpen, setFilterOpen] = useState(false)
   const [planFilterOpen, setPlanFilterOpen] = useState(false)
-  const [planColVis, setPlanColVis] = useState({ lp: true, gps: true, sub: true, doc: true, ppu: true, cost: true, gp: true })
+  const [planColVis, setPlanColVis] = useState({ gps: true, sub: true, doc: true, ppu: true, cost: true, gp: true })
   const filterDocWrapRef = useRef<HTMLDivElement>(null)
   const planFilterWrapRef = useRef<HTMLDivElement>(null)
   const historyRef = useRef<{ past: EditorSnapshot[]; future: EditorSnapshot[] }>({ past: [], future: [] })
@@ -2379,7 +2384,6 @@ export default function BoqEditorPage() {
       { header: 'รวม BOQ',           key: 'boqT',      width: 14, numFmt: '#,##0.00', align: 'right' },
       { header: 'หมายเหตุ',          key: 'note',      width: 20 },
       { header: 'หลังส่วนลด (BOQ)',   key: 'net',       width: 16, numFmt: '#,##0.00', align: 'right' },
-      { header: 'ราคาขาย (PLAN)',     key: 'planLp',    width: 16, numFmt: '#,##0.00', align: 'right' },
       { header: 'GP Baht',           key: 'gpBaht',    width: 13, numFmt: '#,##0.00', align: 'right' },
       { header: 'GP %',              key: 'gpPct',     width: 9,  numFmt: '0.00"%"',   align: 'right' },
       { header: 'Sub',               key: 'sub',       width: 18 },
@@ -2389,7 +2393,6 @@ export default function BoqEditorPage() {
       { header: 'ต้นทุน',             key: 'cost',     width: 14, numFmt: '#,##0.00', align: 'right' },
       { header: 'GP% (PLAN)',         key: 'planGpPct', width: 12, numFmt: '0.00"%"',  align: 'right' },
       { header: 'GP Amount (PLAN)',    key: 'planGpAmt', width: 16, numFmt: '#,##0.00', align: 'right' },
-      { header: 'ราคาขายสุดท้าย',      key: 'sell',     width: 16, numFmt: '#,##0.00', align: 'right' },
     ]
     ws.columns = COLS.map(c => ({ header: c.header, key: c.key, width: c.width }))
 
@@ -2508,7 +2511,6 @@ export default function BoqEditorPage() {
             boqT:      boqTotal !== 0 ? boqTotal : null,
             note:      sr.note || null,
             net:       syncedNet,
-            planLp:    planListPrice,
             gpBaht:    gpBaht,
             gpPct:     gpPctVal !== null ? parseFloat(gpPctVal.toFixed(4)) : null,
             sub:       pr?.sub || null,
@@ -2518,7 +2520,6 @@ export default function BoqEditorPage() {
             cost:      planCost,
             planGpPct: planGpPct,
             planGpAmt: planGpAmt,
-            sell:      planSell,
           })
           applyFont(dataRow, 12)
           applyBorder(dataRow)
@@ -2593,7 +2594,7 @@ export default function BoqEditorPage() {
   )
 
   const planHideClass = [
-    !planColVis.lp   && 'boq-ph-lp',
+    'boq-ph-lp',
     !planColVis.gps  && 'boq-ph-gps',
     !planColVis.sub  && 'boq-ph-sub',
     !planColVis.doc  && 'boq-ph-doc',
@@ -2786,10 +2787,6 @@ export default function BoqEditorPage() {
             {planFilterOpen && (
               <div className="boq-filter-dropdown boq-filter-dropdown--wide" role="menu">
                 <label className="boq-filter-dropdown__option">
-                  <input type="checkbox" checked={planColVis.lp} onChange={e => setPlanColVis(v => ({ ...v, lp: e.target.checked }))} />
-                  <span>ราคาขาย BOQ</span>
-                </label>
-                <label className="boq-filter-dropdown__option">
                   <input type="checkbox" checked={planColVis.gps} onChange={e => setPlanColVis(v => ({ ...v, gps: e.target.checked }))} />
                   <span>GP จากราคาขาย</span>
                 </label>
@@ -2887,9 +2884,10 @@ export default function BoqEditorPage() {
             <col className="boq-side-col ppc-dt" style={{ width: sideColW.docTitle }} />
             <col className="boq-side-col ppc-ppu" style={{ width: sideColW.pricePerUnit }} />
             <col className="boq-side-col ppc-cost" style={{ width: sideColW.cost }} />
-            <col className="boq-side-col ppc-gppct" style={{ width: sideColW.gpPct }} />
             <col className="boq-side-col ppc-gpamt" style={{ width: sideColW.gpAmt }} />
+            <col className="boq-side-col ppc-gppct" style={{ width: sideColW.gpPct }} />
             <col className="boq-side-col" style={{ width: sideColW.sell }} />
+            <col className="boq-side-col" style={{ width: sideColW.gpSalePct }} />
             {/* ── ACTUAL cols (10, only when boqKind==='ACTUAL') ── */}
             {boqKind === 'ACTUAL' && (<>
               <col className="boq-side-col boq-side-col--boq-ref" />
@@ -3005,9 +3003,8 @@ export default function BoqEditorPage() {
                 <th colSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-main ppc-di ppc-dt">เลขที่เอกสาร</th>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf ppc-ppu">ราคา/หน่วย<RHS col="pricePerUnit"/></th>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf ppc-cost">ราคาทุน<RHS col="cost"/></th>
-                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gppct">GP%<RHS col="gpPct"/></th>
-                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gpamt">GP Amount<RHS col="gpAmt"/></th>
-                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">ราคาขาย<RHS col="sell"/></th>
+                <th colSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gppct ppc-gpamt">GP จากราคาทุน</th>
+                <th colSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">ประเมินราคาขาย</th>
               </>) : (<>
                 <th className="boq-th boq-side-th boq-side-th--boq-ref-head boq-side-td--panel-start">ลำดับ BOQ<RHS col="ref"/></th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead ppc-lp"><span className="boq-side-th__kind" lang="en">PLAN</span><span className="boq-side-th__rowhead-label">ราคาขาย</span><RHS col="lead"/></th>
@@ -3016,9 +3013,10 @@ export default function BoqEditorPage() {
                 <th colSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-main-merged ppc-di ppc-dt">เลขที่เอกสาร</th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf ppc-ppu">ราคา/หน่วย<RHS col="pricePerUnit"/></th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf ppc-cost">ราคาทุน<RHS col="cost"/></th>
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gpamt">GP Baht<RHS col="gpAmt"/></th>
                 <th className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gppct">GP%<RHS col="gpPct"/></th>
-                <th className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gpamt">GP Amount<RHS col="gpAmt"/></th>
-                <th className="boq-th boq-side-th boq-side-th--sell-leaf">ราคาขาย<RHS col="sell"/></th>
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf">ประเมินราคาขาย Baht<RHS col="sell"/></th>
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf">%</th>
               </>)}
               {/* ── ACTUAL main headers ── */}
               {boqKind === 'ACTUAL' && (boqMainHeadSubRow ? (<>
@@ -3029,9 +3027,8 @@ export default function BoqEditorPage() {
                 <th colSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-main">เลขที่เอกสาร</th>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">ราคา/หน่วย</th>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">ราคาทุน</th>
-                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">GP%</th>
-                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">GP Amount</th>
-                <th rowSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">ราคาขาย</th>
+                <th colSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">GP จากราคาทุน</th>
+                <th colSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">ประเมินราคาขาย</th>
               </>) : (<>
                 <th className="boq-th boq-side-th boq-side-th--boq-ref-head boq-side-td--panel-start">ลำดับ BOQ</th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead"><span className="boq-side-th__kind" lang="en">ACTUAL</span><span className="boq-side-th__rowhead-label">ราคาขาย</span></th>
@@ -3040,9 +3037,10 @@ export default function BoqEditorPage() {
                 <th colSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-main-merged">เลขที่เอกสาร</th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf">ราคา/หน่วย</th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf">ราคาทุน</th>
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP Baht</th>
                 <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP%</th>
-                <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP Amount</th>
-                <th className="boq-th boq-side-th boq-side-th--sell-leaf">ราคาขาย</th>
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf">ประเมินราคาขาย Baht</th>
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf">%</th>
               </>))}
             </tr>
             {/* ── Sub-headers row (only when boqMainHeadSubRow) ── */}
@@ -3066,12 +3064,23 @@ export default function BoqEditorPage() {
                 {/* PLAN doc sub-headers */}
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf ppc-di">เลขที่<RHS col="docIssue"/></th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf ppc-dt">เอกสาร<RHS col="docTitle"/></th>
-                {/* ACTUAL GP-from-sale + doc sub-headers */}
+                {/* GP จากราคาทุน + ประเมินราคาขาย sub-headers (PLAN) */}
+                {boqKind !== 'ACTUAL' && (<>
+                  <th className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gpamt">Baht<RHS col="gpAmt"/></th>
+                  <th className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gppct">%<RHS col="gpPct"/></th>
+                  <th className="boq-th boq-side-th boq-side-th--sell-leaf">Baht<RHS col="sell"/></th>
+                  <th className="boq-th boq-side-th boq-side-th--sell-leaf">%</th>
+                </>)}
+                {/* ACTUAL GP-from-sale + doc + GP จากราคาทุน + ประเมินราคาขาย sub-headers */}
                 {boqKind === 'ACTUAL' && (<>
                   <th className="boq-th boq-side-th boq-side-th--sell-leaf">Baht</th>
                   <th className="boq-th boq-side-th boq-side-th--sell-leaf">%</th>
                   <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf">เลขที่</th>
                   <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf">เอกสาร</th>
+                  <th className="boq-th boq-side-th boq-side-th--sell-leaf">Baht</th>
+                  <th className="boq-th boq-side-th boq-side-th--sell-leaf">%</th>
+                  <th className="boq-th boq-side-th boq-side-th--sell-leaf">Baht</th>
+                  <th className="boq-th boq-side-th boq-side-th--sell-leaf">%</th>
                 </>)}
               </tr>
             )}
@@ -3132,7 +3141,8 @@ export default function BoqEditorPage() {
                     {sumCost > 0 ? `${avgGpPct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : ''}
                   </td>
                   <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(sumGp)}</td>
-                  <td className="boq-td boq-td-num boq-td-total boq-side-td boq-side-td--last-cell">{fmt(sumSell)}</td>
+                  <td className="boq-td boq-td-num boq-td-total boq-side-td">{fmt(sumSell)}</td>
+              <td className="boq-td boq-td-num boq-td-calc boq-side-td boq-side-td--last-cell" />
                 </>)
               })()
               const actGroupSummaryCells = boqKind === 'ACTUAL' ? (() => {
@@ -3163,15 +3173,16 @@ export default function BoqEditorPage() {
                     {sumCost > 0 ? `${avgGpPct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : ''}
                   </td>
                   <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(sumGp)}</td>
-                  <td className="boq-td boq-td-num boq-td-total boq-side-td boq-side-td--last-cell">{fmt(sumSell)}</td>
+                  <td className="boq-td boq-td-num boq-td-total boq-side-td">{fmt(sumSell)}</td>
+              <td className="boq-td boq-td-num boq-td-calc boq-side-td boq-side-td--last-cell" />
                 </>)
               })() : null
               return (
                 <React.Fragment key={group.id}>
                   {colVis.showDesc && (
                   <tr className="boq-group-header-row">
-                    <td className="boq-td boq-td-group-no">{groupIdx + 1}</td>
-                    {showRefId && <><td className="boq-td"/><td className="boq-td"/></>}
+                    <td data-col="no" className="boq-td boq-td-group-no">{groupIdx + 1}</td>
+                    {showRefId && <><td data-col="refPage" className="boq-td"/><td data-col="refCode" className="boq-td"/></>}
                     {!tableShowDesc ? (
                       <td colSpan={boqLeadTitleColSpan(colVis)} className="boq-td boq-td-group-title-cell">
                         <input className="boq-input boq-input-group-title" value={group.title} readOnly={!editing}
@@ -3179,19 +3190,19 @@ export default function BoqEditorPage() {
                           placeholder={`หมวดงานที่ ${groupIdx+1} — พิมพ์ชื่อหมวดงาน`} />
                       </td>
                     ) : (
-                      <td className="boq-td boq-td-group-title-cell">
+                      <td data-col="desc" className="boq-td boq-td-group-title-cell">
                         <input className="boq-input boq-input-group-title" value={group.title} readOnly={!editing}
                           onChange={e => editing && updGrpTitle(group.id, e.target.value)}
                           placeholder={`หมวดงานที่ ${groupIdx+1} — พิมพ์ชื่อหมวดงาน`} />
                       </td>
                     )}
-                    {tableShowDesc && <><td className="boq-td"/><td className="boq-td"/></>}
-                    {rowTail.qty2 && <><td className="boq-td"/><td className="boq-td"/></>}
-                    {rowTail.matSlots === 2 && <><td className="boq-td"/><td className="boq-td"/></>}
+                    {tableShowDesc && <><td data-col="width" className="boq-td"/><td data-col="length" className="boq-td"/></>}
+                    {rowTail.qty2 && <><td data-col="qty" className="boq-td"/><td data-col="unit" className="boq-td"/></>}
+                    {rowTail.matSlots === 2 && <><td data-col="matPrice" className="boq-td"/><td data-col="matAmt" className="boq-td"/></>}
                     {rowTail.matSlots === 1 && <td className="boq-td"/>}
-                    {rowTail.lab2 && <><td className="boq-td"/><td className="boq-td"/></>}
-                    {rowTail.tot && (actualCompareMode ? <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/></> : <td className="boq-td"/>)}
-                    <td className="boq-td boq-td-action">
+                    {rowTail.lab2 && <><td data-col="laborPrice" className="boq-td"/><td data-col="laborAmt" className="boq-td"/></>}
+                    {rowTail.tot && (actualCompareMode ? <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/><td data-col="total" className="boq-td"/></> : <td data-col="total" className="boq-td"/>)}
+                    <td data-col="action" className="boq-td boq-td-action">
                       {canMutateStructure && (
                         <div className="boq-action-cell">
                           <button type="button" className="boq-btn boq-action-btn-section-del"
@@ -3210,7 +3221,7 @@ export default function BoqEditorPage() {
                         </div>
                       )}
                     </td>
-                    {rowTail.note && <td className="boq-td"/>}
+                    {rowTail.note && <td data-col="note" className="boq-td"/>}
                     {tableShowSecDiscount && <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/></>}
                     <PlanEmptyCells panelStart />
                     {boqKind === 'ACTUAL' && <PlanEmptyCells panelStart />}
@@ -3224,8 +3235,8 @@ export default function BoqEditorPage() {
                       <React.Fragment key={section.id}>
                         {colVis.showDesc && (
                         <tr className="boq-section-header-row">
-                          <td className="boq-td boq-td-no boq-td-section-no">{globalNum}</td>
-                          {showRefId && <><td className="boq-td"/><td className="boq-td"/></>}
+                          <td data-col="no" className="boq-td boq-td-no boq-td-section-no">{globalNum}</td>
+                          {showRefId && <><td data-col="refPage" className="boq-td"/><td data-col="refCode" className="boq-td"/></>}
                           {!tableShowDesc ? (
                             <td colSpan={boqLeadTitleColSpan(colVis)} className="boq-td boq-td-section-title-cell">
                               <input className="boq-input boq-input-section-title" value={section.title} readOnly={!editing}
@@ -3233,20 +3244,20 @@ export default function BoqEditorPage() {
                                 placeholder={`ข้อ ${globalNum} — พิมพ์ชื่อข้อ`} />
                             </td>
                           ) : (
-                            <td className="boq-td boq-td-section-title-cell">
+                            <td data-col="desc" className="boq-td boq-td-section-title-cell">
                               <input className="boq-input boq-input-section-title" value={section.title} readOnly={!editing}
                                 onChange={e => editing && updSecTitle(group.id, section.id, e.target.value)}
                                 placeholder={`ข้อ ${globalNum} — พิมพ์ชื่อข้อ`} />
                             </td>
                           )}
-                          {tableShowDesc && <><td className="boq-td"/><td className="boq-td"/></>}
-                          {secTail.qty2 && <><td className="boq-td"/><td className="boq-td"/></>}
-                          {secTail.matSlots === 2 && <><td className="boq-td"/><td className="boq-td"/></>}
+                          {tableShowDesc && <><td data-col="width" className="boq-td"/><td data-col="length" className="boq-td"/></>}
+                          {secTail.qty2 && <><td data-col="qty" className="boq-td"/><td data-col="unit" className="boq-td"/></>}
+                          {secTail.matSlots === 2 && <><td data-col="matPrice" className="boq-td"/><td data-col="matAmt" className="boq-td"/></>}
                           {secTail.matSlots === 1 && <td className="boq-td"/>}
-                          {secTail.lab2 && <><td className="boq-td"/><td className="boq-td"/></>}
-                          {secTail.tot && (actualCompareMode ? <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/></> : <td className="boq-td"/>)}
-                          <td className="boq-td boq-td-action"/>
-                          {secTail.note && <td className="boq-td"/>}
+                          {secTail.lab2 && <><td data-col="laborPrice" className="boq-td"/><td data-col="laborAmt" className="boq-td"/></>}
+                          {secTail.tot && (actualCompareMode ? <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/><td data-col="total" className="boq-td"/></> : <td data-col="total" className="boq-td"/>)}
+                          <td data-col="action" className="boq-td boq-td-action"/>
+                          {secTail.note && <td data-col="note" className="boq-td"/>}
                           {tableShowSecDiscount && <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/></>}
                           <PlanEmptyCells panelStart />
                           {boqKind === 'ACTUAL' && <PlanEmptyCells panelStart />}
@@ -3313,21 +3324,21 @@ export default function BoqEditorPage() {
                               ) : <PlanEmptyCells panelStart />) : null
                               return [
                                 <tr key={sr.id} className={depth >= 1 ? 'boq-row boq-row--nested' : 'boq-row'}>
-                                  <td className={`boq-td boq-td-no boq-td-sub-no${nestedNoCls}`}>{displayNo}</td>
+                                  <td data-col="no" className={`boq-td boq-td-no boq-td-sub-no${nestedNoCls}`}>{displayNo}</td>
                                   {showRefId && (
                                     <>
-                                      <td className="boq-td"><input className="boq-input" value={sr.refPage} readOnly={rowLocked} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'refPage',e.target.value)}/></td>
-                                      <td className="boq-td"><input className="boq-input" value={sr.refCode} readOnly={rowLocked} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'refCode',e.target.value)}/></td>
+                                      <td data-col="refPage" className="boq-td"><input className="boq-input" value={sr.refPage} readOnly={rowLocked} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'refPage',e.target.value)}/></td>
+                                      <td data-col="refCode" className="boq-td"><input className="boq-input" value={sr.refCode} readOnly={rowLocked} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'refCode',e.target.value)}/></td>
                                     </>
                                   )}
                                   {tableShowDesc && (
-                                    <td className="boq-td boq-td-desc">
+                                    <td data-col="desc" className="boq-td boq-td-desc">
                                       <AutoTextarea className="boq-input boq-textarea" value={sr.description} readOnly={rowLocked}
                                         onChange={v => editing && updSubRow(group.id,section.id,sr.id,'description',v)}
                                         placeholder={editing ? `รายการที่ ${displayNo}` : ''} />
                                     </td>
                                   )}
-                                  <td className="boq-td boq-td-num">
+                                  <td data-col="width" className="boq-td boq-td-num">
                                     <NumInput className="boq-input boq-input-num" value={sr.width ?? ''} readOnly={rowLocked} onChange={v => {
                                       if (!editing) return
                                       const w = v === '' ? '' : Number(v)
@@ -3336,7 +3347,7 @@ export default function BoqEditorPage() {
                                       updSubRowMulti(group.id, section.id, sr.id, { width: w, quantity: qty })
                                     }}/>
                                   </td>
-                                  <td className="boq-td boq-td-num">
+                                  <td data-col="length" className="boq-td boq-td-num">
                                     <NumInput className="boq-input boq-input-num" value={sr.length ?? ''} readOnly={rowLocked} onChange={v => {
                                       if (!editing) return
                                       const l = v === '' ? '' : Number(v)
@@ -3347,18 +3358,18 @@ export default function BoqEditorPage() {
                                   </td>
                                   {showQtyUnit && (
                                     <>
-                                      <td className="boq-td boq-td-num">
+                                      <td data-col="qty" className="boq-td boq-td-num">
                                         <NumInput className="boq-input boq-input-num" value={sr.quantity} readOnly={rowLocked} onChange={v=>editing&&updSubRow(group.id,section.id,sr.id,'quantity',v)}/>
                                       </td>
-                                      <td className="boq-td"><input className="boq-input boq-input-sm" value={sr.unit} readOnly={rowLocked} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'unit',e.target.value)}/></td>
+                                      <td data-col="unit" className="boq-td"><input className="boq-input boq-input-sm" value={sr.unit} readOnly={rowLocked} onChange={e=>editing&&updSubRow(group.id,section.id,sr.id,'unit',e.target.value)}/></td>
                                     </>
                                   )}
                                   {showMat && !matDetailHidden && (
                                     <>
-                                      <td className="boq-td boq-td-num">
+                                      <td data-col="matPrice" className="boq-td boq-td-num">
                                         <NumInput className="boq-input boq-input-num" value={sr.materialPrice} readOnly={rowLocked} onChange={v=>editing&&updSubRow(group.id,section.id,sr.id,'materialPrice',v)}/>
                                       </td>
-                                      <td className="boq-td boq-td-num boq-td-calc">
+                                      <td data-col="matAmt" className="boq-td boq-td-num boq-td-calc">
                                         {editing ? (
                                           <NumInput
                                             className="boq-input boq-input-num"
@@ -3376,10 +3387,10 @@ export default function BoqEditorPage() {
                                   {showMat && matDetailHidden && <td className="boq-td boq-td-mat-collapsed-slot" aria-hidden />}
                                   {showLabor && (
                                     <>
-                                      <td className="boq-td boq-td-num">
+                                      <td data-col="laborPrice" className="boq-td boq-td-num">
                                         <NumInput className="boq-input boq-input-num" value={sr.laborPrice} readOnly={rowLocked} onChange={v=>editing&&updSubRow(group.id,section.id,sr.id,'laborPrice',v)}/>
                                       </td>
-                                      <td className="boq-td boq-td-num boq-td-calc">
+                                      <td data-col="laborAmt" className="boq-td boq-td-num boq-td-calc">
                                         {editing ? (
                                           <NumInput
                                             className="boq-input boq-input-num"
@@ -3406,13 +3417,13 @@ export default function BoqEditorPage() {
                                           <NumInput className="boq-input boq-input-num" value={sr.workIncrease ?? ''} readOnly={!editing}
                                             onChange={v => editing && updSubRow(group.id, section.id, sr.id, 'workIncrease', v)} />
                                         </td>
-                                        <td className="boq-td boq-td-num boq-td-total">{fmt(calcAdjustedLineTotal(sr))}</td>
+                                        <td data-col="total" className="boq-td boq-td-num boq-td-total">{fmt(calcAdjustedLineTotal(sr))}</td>
                                       </>
                                     ) : (
-                                      <td className="boq-td boq-td-num boq-td-total">{fmt(calcRowMoneyTotal(sr))}</td>
+                                      <td data-col="total" className="boq-td boq-td-num boq-td-total">{fmt(calcRowMoneyTotal(sr))}</td>
                                     )
                                   )}
-                                  <td className="boq-td boq-td-action">
+                                  <td data-col="action" className="boq-td boq-td-action">
                                     {canMutateStructure && (
                                       <div className="boq-action-cell">
                                         {depth === 0 && i === 0 && (
@@ -3447,7 +3458,7 @@ export default function BoqEditorPage() {
                                       </div>
                                     )}
                                   </td>
-                                  <td className="boq-td boq-td-note">
+                                  <td data-col="note" className="boq-td boq-td-note">
                                     <AutoTextarea className="boq-input boq-textarea" value={sr.note} readOnly={!editing}
                                       onChange={v => editing && updSubRow(group.id,section.id,sr.id,'note',v)} />
                                   </td>
