@@ -747,6 +747,9 @@ function PlanSidePricingDataRow({
     ro && r.gpPct === ''
       ? ''
       : `${(Number(r.gpPct) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+  const gpFromCostPctDisp = sellPrice !== 0
+    ? `${(gpAmount / sellPrice * 100).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+    : ''
   const locked = Boolean(boqRefLinkLocked)
   const showSelectForBoqRef = interactive && !locked && !isTriplexPendingPlanRowId(r.id)
   const showStaticBoqRefLabel = !showSelectForBoqRef
@@ -863,7 +866,7 @@ function PlanSidePricingDataRow({
       <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(gpAmount)}</td>
       <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell">
         {ro ? (
-          pctDisp
+          gpFromCostPctDisp
         ) : (
           <span className="boq-side-pct-wrap">
             <NumInput
@@ -920,6 +923,9 @@ function PlanSideDataCells({
   const linkOrphan = Boolean(r.linkedSubRowId && !linkedDisp)
   const pctDisp = ro && r.gpPct === '' ? ''
     : `${(Number(r.gpPct) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+  const gpFromCostPctDisp = sellPrice !== 0
+    ? `${(gpAmount / sellPrice * 100).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+    : ''
   const locked = Boolean(boqRefLinkLocked)
   const showSelectForBoqRef = interactive && !locked && !isTriplexPendingPlanRowId(r.id)
   const showStaticBoqRefLabel = !showSelectForBoqRef
@@ -976,7 +982,7 @@ function PlanSideDataCells({
       </td>
       <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gpamt">{fmt(gpAmount)}</td>
       <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell ppc-gppct">
-        {ro ? pctDisp : (
+        {ro ? gpFromCostPctDisp : (
           <span className="boq-side-pct-wrap">
             <NumInput className="boq-input boq-input-num boq-input-num--pct" value={r.gpPct} readOnly={false} onChange={v => onUpdateRow(r.id, 'gpPct', v)} />
             <span className="boq-side-pct-suffix">%</span>
@@ -2473,25 +2479,19 @@ export default function BoqEditorPage() {
           const boqTotal = calcRowTreeTotal(sr)
           const syncedNet = boqSyncMap.get(sr.id)?.net ?? null
           const pr = planTxBySubRow.get(sr.id)
-          let planListPrice: number | null = null
           let gpBaht: number | null = null
           let gpPctVal: number | null = null
           let planCost: number | null = null
           let planGpPct: number | null = null
           let planGpAmt: number | null = null
-          let planSell: number | null = null
           if (pr) {
             const effectiveLp = syncedNet !== null ? syncedNet : (Number(pr.listPrice) || 0)
-            planListPrice = effectiveLp
             planCost = effectivePlanCostForRow(pr, planTxCostRollup, planTxSubRowById)
             gpBaht = effectiveLp - planCost
             gpPctVal = effectiveLp !== 0 ? (gpBaht / effectiveLp) * 100 : 0
             const d = planSideRowDerived(pr, planCost)
             planGpPct = Number(pr.gpPct) || 0
             planGpAmt = d.gpAmount
-            planSell = d.sellPrice
-          } else if (syncedNet !== null) {
-            planListPrice = syncedNet
           }
 
           const dataRow = ws.addRow({
@@ -3004,7 +3004,7 @@ export default function BoqEditorPage() {
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf ppc-ppu">ราคา/หน่วย<RHS col="pricePerUnit"/></th>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf ppc-cost">ราคาทุน<RHS col="cost"/></th>
                 <th colSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gppct ppc-gpamt">GP จากราคาทุน</th>
-                <th colSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">ประเมินราคาขาย</th>
+                <th colSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">GP ประเมินราคาขาย</th>
               </>) : (<>
                 <th className="boq-th boq-side-th boq-side-th--boq-ref-head boq-side-td--panel-start">ลำดับ BOQ<RHS col="ref"/></th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead ppc-lp"><span className="boq-side-th__kind" lang="en">PLAN</span><span className="boq-side-th__rowhead-label">ราคาขาย</span><RHS col="lead"/></th>
@@ -3015,7 +3015,7 @@ export default function BoqEditorPage() {
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf ppc-cost">ราคาทุน<RHS col="cost"/></th>
                 <th className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gpamt">GP Baht<RHS col="gpAmt"/></th>
                 <th className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gppct">GP%<RHS col="gpPct"/></th>
-                <th className="boq-th boq-side-th boq-side-th--sell-leaf">ประเมินราคาขาย Baht<RHS col="sell"/></th>
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP ประเมินราคาขาย Baht<RHS col="sell"/></th>
                 <th className="boq-th boq-side-th boq-side-th--sell-leaf">%</th>
               </>)}
               {/* ── ACTUAL main headers ── */}
@@ -3028,7 +3028,7 @@ export default function BoqEditorPage() {
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">ราคา/หน่วย</th>
                 <th rowSpan={2} className="boq-th boq-side-th boq-side-th--cost-leaf">ราคาทุน</th>
                 <th colSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">GP จากราคาทุน</th>
-                <th colSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">ประเมินราคาขาย</th>
+                <th colSpan={2} className="boq-th boq-side-th boq-side-th--sell-leaf">GP ประเมินราคาขาย</th>
               </>) : (<>
                 <th className="boq-th boq-side-th boq-side-th--boq-ref-head boq-side-td--panel-start">ลำดับ BOQ</th>
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--rowhead"><span className="boq-side-th__kind" lang="en">ACTUAL</span><span className="boq-side-th__rowhead-label">ราคาขาย</span></th>
@@ -3039,7 +3039,7 @@ export default function BoqEditorPage() {
                 <th className="boq-th boq-side-th boq-side-th--cost-leaf">ราคาทุน</th>
                 <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP Baht</th>
                 <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP%</th>
-                <th className="boq-th boq-side-th boq-side-th--sell-leaf">ประเมินราคาขาย Baht</th>
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP ประเมินราคาขาย Baht</th>
                 <th className="boq-th boq-side-th boq-side-th--sell-leaf">%</th>
               </>))}
             </tr>
