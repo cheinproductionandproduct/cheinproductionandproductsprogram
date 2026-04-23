@@ -1443,6 +1443,8 @@ export default function BoqEditorPage() {
   const [showTotal, setShowTotal] = useState(true)
   const [showNote, setShowNote] = useState(true)
   const [showSecDiscount, setShowSecDiscount] = useState(true)
+  const [showGroupHeaders, setShowGroupHeaders] = useState(true)
+  const [showNestedRows, setShowNestedRows] = useState(true)
   const [overheadPct, setOverheadPct]         = useState(12)
   const [vatPct, setVatPct]                   = useState(7)
   const [discount, setDiscount]               = useState<number|''>(0)
@@ -2607,6 +2609,41 @@ export default function BoqEditorPage() {
   ].filter(Boolean).join(' ')
   const planFilterActive = Object.values(planColVis).some(v => !v)
 
+  const planGrandTotalCells = boqKind !== 'ACTUAL' ? (() => {
+    let sumCost = 0, sumGp = 0, sumSell = 0, sumList = 0, weightedGp = 0
+    for (const group of groups) {
+      const allSubRowIds = group.sections.flatMap(sec => sec.subRows.map(sr => sr.id))
+      for (const sid of allSubRowIds) {
+        const pr = planTxBySubRow.get(sid)
+        const syncedNet = boqSyncMap.get(sid)?.net
+        const lp = syncedNet ?? (pr ? Number(pr.listPrice) || 0 : 0)
+        sumList += lp
+        if (!pr) continue
+        const c = effectivePlanCostForRow(pr, planTxCostRollup, planTxSubRowById)
+        const { gpAmount, sellPrice } = planSideRowDerived(pr, c)
+        sumCost += c; sumGp += gpAmount; sumSell += sellPrice
+        weightedGp += c * (Number(pr.gpPct) || 0)
+      }
+    }
+    const avgGpPct = sumCost > 0 ? weightedGp / sumCost : 0
+    const gpSaleAmt = sumList - sumCost
+    const gpSalePct = sumList !== 0 ? (gpSaleAmt / sumList) * 100 : 0
+    return (<>
+      <td className="boq-td boq-td-no boq-side-td boq-side-td--boq-ref boq-side-td--panel-start boq-side-td--sum-label">รวม</td>
+      <td className="boq-td boq-td-num boq-side-td ppc-lp">{sumList !== 0 ? fmt(sumList) : null}</td>
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps">{fmt(gpSaleAmt)}</td>
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps">{sumList !== 0 ? `${gpSalePct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : null}</td>
+      <td className="boq-td boq-side-td" colSpan={4} />
+      <td className="boq-td boq-td-num boq-side-td">{fmt(sumCost)}</td>
+      <td className="boq-td boq-td-num boq-side-td boq-side-td--segment-sell boq-side-td--gp-avg">
+        {sumCost > 0 ? `${avgGpPct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : ''}
+      </td>
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td">{fmt(sumGp)}</td>
+      <td className="boq-td boq-td-num boq-td-total boq-side-td">{fmt(sumSell)}</td>
+      <td className="boq-td boq-td-num boq-td-calc boq-side-td boq-side-td--last-cell" />
+    </>)
+  })() : null
+
   if (loading) return <div className="list-page boq-page"><p style={{ padding:32, color:'#888' }}>กำลังโหลด...</p></div>
 
   return (
@@ -2724,7 +2761,7 @@ export default function BoqEditorPage() {
           <div className="boq-filter-wrap" ref={filterDocWrapRef}>
             <button
               type="button"
-              className={`boq-filter-btn${(boqColVisFilterActive(colVis) || !showSecDiscount) ? ' boq-filter-btn--active' : ''}`}
+              className={`boq-filter-btn${(boqColVisFilterActive(colVis) || !showSecDiscount || !showGroupHeaders || !showNestedRows) ? ' boq-filter-btn--active' : ''}`}
               onClick={() => setFilterOpen(o => !o)}
               aria-expanded={filterOpen}
               aria-haspopup="true"
@@ -2766,6 +2803,14 @@ export default function BoqEditorPage() {
                 <label className="boq-filter-dropdown__option">
                   <input type="checkbox" checked={showSecDiscount} onChange={e => setShowSecDiscount(e.target.checked)} />
                   <span>7. % / ส่วนลดแต่ละข้อ / ยอดหลังส่วนลด</span>
+                </label>
+                <label className="boq-filter-dropdown__option">
+                  <input type="checkbox" checked={showGroupHeaders} onChange={e => setShowGroupHeaders(e.target.checked)} />
+                  <span>8. แถวหัวหมวด</span>
+                </label>
+                <label className="boq-filter-dropdown__option">
+                  <input type="checkbox" checked={showNestedRows} onChange={e => setShowNestedRows(e.target.checked)} />
+                  <span>9. แถวย่อย (สีฟ้า 1.1.1)</span>
                 </label>
 
                 <button type="button" className="boq-filter-dropdown__close" onClick={() => setFilterOpen(false)}>
@@ -3136,7 +3181,7 @@ export default function BoqEditorPage() {
                 return (<>
                   <td className="boq-td boq-td-no boq-side-td boq-side-td--boq-ref boq-side-td--panel-start boq-side-td--sum-label">รวม</td>
                   <td className="boq-td boq-td-num boq-side-td ppc-lp">{sumList !== 0 ? fmt(sumList) : null}</td>
-                  <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps">{(sumCost > 0 || sumList > 0) ? fmt(gpSaleAmt) : null}</td>
+                  <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps">{fmt(gpSaleAmt)}</td>
                   <td className="boq-td boq-td-num boq-td-calc boq-side-td ppc-gps">{sumList !== 0 ? `${gpSalePct.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : null}</td>
                   <td className="boq-td boq-side-td" colSpan={4} />
                   <td className="boq-td boq-td-num boq-side-td">{fmt(sumCost)}</td>
@@ -3182,7 +3227,7 @@ export default function BoqEditorPage() {
               })() : null
               return (
                 <React.Fragment key={group.id}>
-                  {colVis.showDesc && (
+                  {colVis.showDesc && showGroupHeaders && (
                   <tr className="boq-group-header-row">
                     <td data-col="no" className="boq-td boq-td-group-no">{groupIdx + 1}</td>
                     {showRefId && <><td data-col="refPage" className="boq-td"/><td data-col="refCode" className="boq-td"/></>}
@@ -3272,6 +3317,7 @@ export default function BoqEditorPage() {
                           const groupDisc = groupDiscountAlloc[groupIdx] ?? 0
                           const renderBoqLines = (rows: SubRow[], numPrefix: string, depth: number): React.ReactNode[] =>
                             rows.flatMap((sr, i) => {
+                              if (depth >= 1 && !showNestedRows) return []
                               const displayNo = `${numPrefix}.${i + 1}`
                               const nestedNoCls = depth >= 1 ? ' boq-td-sub-no--nested' : ''
                               const planSr = planRowById.get(sr.id)
@@ -3511,6 +3557,7 @@ export default function BoqEditorPage() {
                   : undefined
               }
               discountCells={emptyDiscCells}
+              extraCells={planGrandTotalCells}
             />
             <SummaryRow
               label={
