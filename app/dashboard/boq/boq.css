@@ -118,6 +118,8 @@
 .boq-split-scroll.boq-split-scroll--triplex .boq-triplex__panel--boq table.boq-table tbody tr > .boq-td:last-child,
 .boq-split-scroll.boq-split-scroll--triplex .boq-triplex__panel--boq table.boq-table tfoot tr > .boq-td:last-child {
   border-right: 2px solid #6d6d6d;
+  background-clip: padding-box;
+  box-sizing: border-box;
 }
 
 .boq-split-scroll.boq-split-scroll--triplex .boq-triplex-row {
@@ -1200,9 +1202,13 @@
 .boq-summary-row > .boq-td {
   background: #e6e6e6;
   font-weight: 700;
+  background-clip: padding-box;
+  box-sizing: border-box;
 }
 .boq-summary-row--highlight > .boq-td {
   background: #f4ef00;
+  background-clip: padding-box;
+  box-sizing: border-box;
 }
 
 .boq-summary-label,
@@ -1214,11 +1220,15 @@
 .boq-summary-cell {
   background: #e6e6e6;
   border: 1px solid #bbb;
+  background-clip: padding-box;
+  box-sizing: border-box;
 }
 
 .boq-summary-cell--highlight {
   background: #f4ef00;
   border: 1px solid #bbb;
+  background-clip: padding-box;
+  box-sizing: border-box;
 }
 
 .boq-summary-label {
@@ -1235,6 +1245,8 @@
   text-align: right;
   font-size: 14px;
 }
+
+/* Hard kill: remove blank summary numeric placeholders entirely. */
 
 /* Group discount detail row — flat fill, no box */
 .boq-summary-row--group-discount > .boq-td {
@@ -1943,7 +1955,30 @@ h1.page-title.boq-page-title-row {
   align-items: center;
   gap: 10px;
   margin-left: auto;
+  flex-shrink: 1;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* PDF / XLSX / A4 stay grouped so middle buttons aren’t clipped when the edit strip is wide */
+.boq-export-cluster {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.boq-export-cluster .boq-submit-btn {
   flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.boq-export-a4-btn {
+  font-weight: 800;
 }
 
 /* Edit / save / structure controls — top bar so users don’t scroll past the table */
@@ -2289,24 +2324,29 @@ h1.page-title.boq-page-title-row {
 }
 
 /* Alternating row shading */
-.boq-row:nth-child(even) .boq-td { background-color: #fafafa; }
+.boq-row:nth-child(even) .boq-td:not(.boq-side-td) { background-color: #fafafa; }
 
 /* Nested lines (1.1.1 …): full-row light blue band + soft left accent (matches nested + button hue) */
-.boq-row.boq-row--nested > .boq-td {
+.boq-row.boq-row--nested > .boq-td:not(.boq-side-td) {
   background-color: #d6defa;
+  background-clip: padding-box;
+  box-sizing: border-box;
 }
-.boq-row:nth-child(even).boq-row--nested > .boq-td {
+.boq-row:nth-child(even).boq-row--nested > .boq-td:not(.boq-side-td) {
   background-color: #cdd6f3;
 }
 
 /* ── Group header row ────────────────────────── */
-.boq-group-header-row .boq-td {
+.boq-group-header-row .boq-td:not(.boq-side-td) {
   background: #b0bec5;
   border: 1px solid #bbb;
+  background-clip: padding-box;
+  box-sizing: border-box;
 }
 
 .boq-td-group-no {
   text-align: center;
+  vertical-align: middle;
   font-weight: 800;
   font-size: 14px;
   color: #1a1a1a;
@@ -2330,12 +2370,16 @@ h1.page-title.boq-page-title-row {
 }
 
 /* ── Section header row ──────────────────────── */
-.boq-section-header-row .boq-td {
+.boq-section-header-row .boq-td:not(.boq-side-td) {
   background: #e8e8e8;
   border: 1px solid #bbb;
+  background-clip: padding-box;
+  box-sizing: border-box;
 }
 
 .boq-td-section-no {
+  text-align: center;
+  vertical-align: middle;
   font-weight: 700;
   font-size: 14px;
 }
@@ -2432,6 +2476,19 @@ h1.page-title.boq-page-title-row {
 .boq-table tbody .boq-group-header-row > .boq-side-td,
 .boq-table tbody .boq-section-header-row > .boq-side-td {
   background: #f5f0e8;
+}
+
+/* BOQ highlight bands must stop at หมายเหตุ; side-panel cells are outside BOQ area. */
+.boq-table tbody .boq-summary-row > .boq-side-td,
+.boq-table tfoot .boq-summary-row > .boq-side-td,
+.boq-table tbody .boq-group-header-row > .boq-side-td,
+.boq-table tbody .boq-section-header-row > .boq-side-td {
+  background: #fff !important;
+}
+
+.boq-table tbody .boq-summary-row--highlight > .boq-side-td,
+.boq-table tfoot .boq-summary-row--highlight > .boq-side-td {
+  background: #fff !important;
 }
 
 /* Unified triplex table: don't stretch to fill container width — each col has explicit width */

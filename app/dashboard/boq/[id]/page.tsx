@@ -519,6 +519,7 @@ function AutoTextarea({ value, onChange, placeholder, readOnly, className }: { v
 /* ── SummaryRow ───────────────────────────────────────── */
 function SummaryRow({
   label, amount, highlight, editNode, vis, actualMoneyTail4 = false, actualFourCols, extraCells, discountCells,
+  showActionCell = true,
 }: {
   label: React.ReactNode
   amount: string
@@ -532,6 +533,8 @@ function SummaryRow({
   extraCells?: React.ReactNode
   /** Per-section discount cells (ส่วนลดแต่ละข้อ + ยอดงานหลังส่วนลด) — inserted before action column. */
   discountCells?: React.ReactNode
+  /** Must match thead/colgroup: action column exists only while editing. */
+  showActionCell?: boolean
 }) {
   const hl = highlight ? ' boq-summary-label--highlight' : ''
   const rowCls = highlight ? 'boq-summary-row boq-summary-row--highlight' : 'boq-summary-row'
@@ -554,7 +557,7 @@ function SummaryRow({
 
   return (
     <tr className={rowCls}>
-      <td className={`boq-td${cellCls}${hl}`}/>
+      <td data-col="no" className={`boq-td boq-td-no${cellCls}${hl}`} aria-hidden />
       {showRefId && (<><td className={`boq-td${cellCls}${hl}`}/><td className={`boq-td${cellCls}${hl}`}/></>)}
       {!showDesc ? (
         <td colSpan={leadSpan} className={`boq-td boq-summary-label${cellCls}${hl}`}>
@@ -565,24 +568,34 @@ function SummaryRow({
           {labelContent}
         </td>
       )}
-      {showDesc && (<><td className={`boq-td${cellCls}${hl}`}/><td className={`boq-td${cellCls}${hl}`}/></>)}
+      {showDesc && (<><td data-col="width" className={`boq-td${cellCls}${hl}`}/><td data-col="length" className={`boq-td${cellCls}${hl}`}/></>)}
       {tail.qty2 && (<><td className={`boq-td${cellCls}${hl}`}/><td className={`boq-td${cellCls}${hl}`}/></>)}
       {tail.matSlots === 2 && (
-        <>
-          <td className={`boq-td${cellCls}${hl}`}/>
-          <td className={`boq-td boq-td-num${cellCls}${hl}${amountInMatAmtCol ? ' boq-summary-amount' : ''}`}>
-            {amountInMatAmtCol ? amountBlock : ''}
-          </td>
-        </>
+        amountInMatAmtCol ? (
+          <>
+            <td className={`boq-td${cellCls}${hl}`}/>
+            <td data-col="total" className={`boq-td boq-td-num${cellCls}${hl} boq-summary-amount`}>
+              {amountBlock}
+            </td>
+          </>
+        ) : (
+          /* Single cell spanning mat cols — avoids an extra narrow boq-td-num strip vs two empty <td>s */
+          <td colSpan={2} className={`boq-td${cellCls}${hl}`} aria-hidden={!showTotal ? true : undefined} />
+        )
       )}
       {tail.matSlots === 1 && <td className={`boq-td${cellCls}${hl}`}/>}
       {tail.lab2 && (
-        <>
-          <td className={`boq-td${cellCls}${hl}`}/>
-          <td className={`boq-td boq-td-num${cellCls}${hl} ${amountInTotalCol ? 'boq-summary-dash' : 'boq-summary-amount'}`}>
-            {amountInTotalCol ? '-' : amountBlock}
-          </td>
-        </>
+        amountInTotalCol ? (
+          /* Total is already in รวมค่าวัสดุและแรงงาน — avoid extra labor placeholder block in summary rows. */
+          <td colSpan={2} className={`boq-td${cellCls}${hl}`} aria-hidden />
+        ) : (
+          <>
+            <td className={`boq-td${cellCls}${hl}`}/>
+            <td className={`boq-td boq-td-num boq-summary-amount${cellCls}${hl}`}>
+              {amountBlock}
+            </td>
+          </>
+        )
       )}
       {tail.tot && (
         actualMoneyTail4 ? (
@@ -591,31 +604,154 @@ function SummaryRow({
               <td className={`boq-td boq-td-num${cellCls}${hl}`}>{actualFourCols.plan}</td>
               <td className={`boq-td boq-td-num${cellCls}${hl}`}>{actualFourCols.dec}</td>
               <td className={`boq-td boq-td-num${cellCls}${hl}`}>{actualFourCols.inc}</td>
-              <td className={`boq-td boq-td-num boq-summary-amount${cellCls}${hl}`}>{actualFourCols.adj}</td>
+              <td
+                data-col="total"
+                className={`boq-td boq-td-num boq-summary-amount${cellCls}${hl}`}
+              >
+                {actualFourCols.adj}
+              </td>
             </>
           ) : (
             <>
-              <td className={`boq-td${cellCls}${hl}`} />
-              <td className={`boq-td${cellCls}${hl}`} />
-              <td className={`boq-td${cellCls}${hl}`} />
-              <td className={`boq-td boq-td-num boq-summary-amount${cellCls}${hl}`}>
+              {/* One cell spanning แผน / งานลด / งานเพิ่ม — avoids three thin edge strips */}
+              <td colSpan={3} className={`boq-td${cellCls}${hl}`} />
+              <td
+                data-col="total"
+                className={`boq-td boq-td-num boq-summary-amount${cellCls}${hl}`}
+              >
                 {amountInTotalCol ? amountBlock : ''}
               </td>
             </>
           )
         ) : (
-          <td className={`boq-td boq-td-num boq-summary-amount${cellCls}${hl}`}>
+          <td
+            data-col="total"
+            className={`boq-td boq-td-num boq-summary-amount${cellCls}${hl}`}
+          >
             {amountInTotalCol ? amountBlock : ''}
           </td>
         )
       )}
-      {/* action | หมายเหตุ | discount cols */}
-      <td className={`boq-td boq-td-action${cellCls}${hl}`}/>
-      {tail.note && <td className={`boq-td${cellCls}${hl}`}/>}
+      {/* action | หมายเหตุ | discount cols — action column only when editing (matches thead/colgroup) */}
+      {showActionCell && <td className={`boq-td boq-td-action${cellCls}${hl}`}/>}
+      {tail.note && <td data-col="note" className={`boq-td boq-td-note${cellCls}${hl}`}/>}
       {discountCells}
       {extraCells}
     </tr>
   )
+}
+
+/**
+ * A4 print: logical column index of รวมค่าวัสดุและแรงงาน (`data-col="total"`) after side/action/discount strips.
+ * Prefer `tr.boq-row`: group headers merge columns differently than lines/summaries — counting `total` alone skewed placement.
+ */
+function boqPrintTotalColumnLogicalStart(clone: HTMLElement): number | null {
+  const refTd =
+    clone.querySelector('tbody tr.boq-row td[data-col="total"]') ??
+    clone.querySelector('thead th[data-col="total"]') ??
+    clone.querySelector('tbody tr:not(.boq-summary-row) td[data-col="total"]')
+  const refRow = refTd?.closest('tr')
+  if (!refRow || !refTd) return null
+  let pos = 0
+  for (const c of refRow.children) {
+    if (c === refTd) return pos
+    pos += (c as HTMLTableCellElement).colSpan || 1
+  }
+  return null
+}
+
+function boqPrintLogicalStartOfCell(tr: HTMLTableRowElement, cell: Element): number | null {
+  let pos = 0
+  for (const c of tr.children) {
+    if (c === cell) return pos
+    pos += (c as HTMLTableCellElement).colSpan || 1
+  }
+  return null
+}
+
+function boqPrintCellAtLogicalStart(tr: HTMLTableRowElement, logical: number): HTMLTableCellElement | null {
+  let pos = 0
+  for (const c of tr.children) {
+    const td = c as HTMLTableCellElement
+    const span = td.colSpan || 1
+    if (logical >= pos && logical < pos + span) return td
+    pos += span
+  }
+  return null
+}
+
+/** Primary amount for รวมค่าวัสดุและแรงงาน on a summary row (adj / combined total). */
+function boqPrintExtractPrimarySummaryTotal(tr: HTMLTableRowElement): string | null {
+  const tot = tr.querySelector('td[data-col="total"].boq-summary-amount')
+  if (tot) {
+    const raw = (tot.textContent ?? '').replace(/\s/g, '')
+    if (raw && raw !== '-') return (tot.textContent ?? '').trim()
+  }
+  const inline = tr.querySelector('span.boq-summary-inline-amt')
+  if (inline) {
+    const raw = (inline.textContent ?? '').replace(/\s/g, '')
+    if (raw) return (inline.textContent ?? '').trim()
+  }
+  const amounts = Array.from(tr.querySelectorAll<HTMLTableCellElement>('td.boq-summary-amount')).filter(td => {
+    const t = (td.textContent ?? '').replace(/\s/g, '')
+    return t !== '' && t !== '-'
+  })
+  if (amounts.length === 0) return null
+  return (amounts[amounts.length - 1].textContent ?? '').trim()
+}
+
+/**
+ * Rebuild each `tr.boq-summary-row` for print: strip labor placeholders, wipe stray amount cells,
+ * then write the primary total under รวมค่าวัสดุและแรงงาน.
+ * Action / discount columns are stripped before this — that column is immediately left of หมายเหตุ, so we
+ * anchor from each row's own `note` cell (global line-total index can still land on หมายเหตุ for summary rows).
+ * Run after clone strips + optional column chop, and after inputs are flattened to text.
+ */
+function rewriteBoqSummaryRowsForPrint(clone: HTMLElement): void {
+  const fallbackTotalLogical = boqPrintTotalColumnLogicalStart(clone)
+
+  clone.querySelectorAll<HTMLTableRowElement>('tr.boq-summary-row').forEach(tr => {
+    const primary = boqPrintExtractPrimarySummaryTotal(tr)
+    const explicitTotalCell = tr.querySelector<HTMLTableCellElement>('td[data-col="total"]')
+
+    tr.querySelectorAll<HTMLElement>('.boq-summary-dash').forEach(el => {
+      el.textContent = ''
+    })
+    tr.querySelectorAll<HTMLTableCellElement>('td.boq-summary-amount').forEach(td => {
+      if (explicitTotalCell && td === explicitTotalCell) return
+      td.textContent = ''
+      td.removeAttribute('data-col')
+      td.classList.remove('boq-summary-amount')
+    })
+    tr.querySelectorAll('span.boq-summary-inline-amt').forEach(el => {
+      el.textContent = ''
+    })
+
+    if (!primary) return
+
+    let target: HTMLTableCellElement | null = null
+    if (explicitTotalCell) {
+      target = explicitTotalCell
+    } else {
+      const noteTd =
+        tr.querySelector<HTMLTableCellElement>('td[data-col="note"]') ??
+        tr.querySelector<HTMLTableCellElement>('td.boq-td-note')
+      if (noteTd) {
+        const noteStart = boqPrintLogicalStartOfCell(tr, noteTd)
+        if (noteStart != null && noteStart >= 1) {
+          target = boqPrintCellAtLogicalStart(tr, noteStart - 1)
+        }
+      }
+    }
+    if (!target && fallbackTotalLogical != null) {
+      target = boqPrintCellAtLogicalStart(tr, fallbackTotalLogical)
+    }
+    if (!target) return
+
+    target.textContent = primary
+    target.classList.add('boq-td-num', 'boq-summary-amount')
+    target.setAttribute('data-col', 'total')
+  })
 }
 
 type PlanSideFooterAgg = { sumList: number; sumCost: number; sumGp: number; sumSell: number; avgGpPct: number }
@@ -1276,7 +1412,7 @@ function PlanSidePricingTable({
         <col className="boq-side-col boq-side-col--boq-ref" />
         <col className="boq-side-col boq-side-col--lead" />
         <col className="boq-side-col boq-side-col--sub" />
-        <col className="boq-side-col" />
+        <col className="boq-side-col boq-side-col--last-cell" />
         <col className="boq-side-col" />
         <col className="boq-side-col" />
         <col className="boq-side-col" />
@@ -2177,7 +2313,7 @@ export default function BoqEditorPage() {
     else if (showMat && matDetailHidden) n += 1
     if (showLabor) n += 2
     if (tableShowTotal) n += actualCompareMode ? 4 : 1
-    n += 1  // action
+    if (editing) n += 1  // จัดการ — matches thead/colgroup (hidden when not editing)
     n += 1  // หมายเหตุ
     return n
   }, [
@@ -2189,6 +2325,7 @@ export default function BoqEditorPage() {
     showLabor,
     tableShowTotal,
     actualCompareMode,
+    editing,
   ])
   /** ราคาวัสดุสิ่งก่อสร้าง เปิด → ค่าแรงงาน; ปิด → ค่าวัสดุและแรงงาน (ความหมายรวมให้ทีมงาน) */
   const laborGroupHeaderLabel = showMat ? 'ค่าแรงงาน' : 'ค่าวัสดุและแรงงาน'
@@ -2228,7 +2365,7 @@ export default function BoqEditorPage() {
   const boqMainTableColCount = boqMainTableColCountBase + (tableShowSecDiscount ? 3 : 0)
   const boqMainBandColSpans = planBandColSpansForMain(boqMainTableColCount)
   const emptyDiscCells: React.ReactNode = tableShowSecDiscount
-    ? <><td className="boq-td boq-summary-cell"/><td className="boq-td boq-summary-cell"/><td className="boq-td boq-summary-cell"/></>
+    ? <td className="boq-td" colSpan={3} aria-hidden />
     : undefined
   const vat             = afterDiscount * (vatPct || 0) / 100
   const totalWithVat    = afterDiscount + vat
@@ -2646,6 +2783,231 @@ export default function BoqEditorPage() {
 
   if (loading) return <div className="list-page boq-page"><p style={{ padding:32, color:'#888' }}>กำลังโหลด...</p></div>
 
+  const printBoqA4 = () => {
+    const table = mainTableRef.current
+    if (!table) return
+
+    const clone = table.cloneNode(true) as HTMLElement
+
+    // Physically remove PLAN/ACTUAL cells, action cols, discount cols, resize handles
+    // — CSS hiding alone doesn't collapse <col> space
+    clone.querySelectorAll(
+      '.boq-side-th, .boq-side-td, ' +
+      '.boq-td-action, ' +
+      '.boq-td-sec-pct, .boq-td-sec-discount, .boq-td-sec-net, ' +
+      'col.boq-side-col, ' +
+      '.boq-col-resize, ' +
+      'tr.boq-thead-triplex-band, ' +
+      // Remove nested ("blue 1.1.1") rows — internal use only, not for customers
+      'tr.boq-row--nested'
+    ).forEach(el => el.remove())
+
+    // Also remove action <th> cells (data-col="action") + discount header cells
+    clone.querySelectorAll('[data-col="action"], [data-col="secPct"], [data-col="secDiscount"], [data-col="secNet"]')
+      .forEach(el => el.remove())
+
+    // Remove กว้าง / ยาว (do not rely on display:none — hidden cells still participate in the table grid
+    // and stretch the last columns, so summary totals stick to the right edge vs body numbers).
+    clone.querySelectorAll('[data-col="width"], [data-col="length"]').forEach(el => el.remove())
+
+    // Logical column count through หมายเหตุ (or รวม if note hidden) — align print grid across thead/tbody/tfoot.
+    let maxCells = 0
+    {
+      const dataRows = Array.from(clone.querySelectorAll<HTMLTableRowElement>('thead tr, tbody tr, tfoot tr'))
+      for (const tr of dataRows) {
+        const cells = Array.from(tr.children)
+        const anchor =
+          cells.find(
+            c =>
+              c.getAttribute('data-col') === 'note' ||
+              c.classList.contains('boq-td-note'),
+          ) ?? cells.find(c => c.getAttribute('data-col') === 'total')
+        if (!anchor) continue
+        let count = 0
+        for (const c of cells) {
+          count += (c as HTMLTableCellElement).colSpan || 1
+          if (c === anchor) break
+        }
+        maxCells = Math.max(maxCells, count)
+      }
+    }
+
+    // Chop each row to maxCells logical columns (colspan-aware); trim wide colspan so summary money lines up with รวมค่าวัสดุและแรงงาน.
+    if (maxCells > 0) {
+      clone.querySelectorAll<HTMLTableRowElement>('tr').forEach(tr => {
+        let pos = 0
+        const rowCells = Array.from(tr.children) as HTMLTableCellElement[]
+        for (const c of rowCells) {
+          if (!c.parentNode) continue
+          const span = c.colSpan || 1
+          if (pos >= maxCells) {
+            c.remove()
+            continue
+          }
+          if (pos + span <= maxCells) {
+            pos += span
+            continue
+          }
+          const keepSpan = maxCells - pos
+          if (keepSpan <= 0) {
+            c.remove()
+            continue
+          }
+          if (keepSpan < span) {
+            c.colSpan = keepSpan
+          }
+          pos = maxCells
+          let next = c.nextElementSibling
+          while (next) {
+            const n = next.nextElementSibling
+            next.remove()
+            next = n
+          }
+          break
+        }
+      })
+    }
+
+    // Replace inputs/textareas/selects with plain text so values show in print
+    clone.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea').forEach(el => {
+      const span = document.createElement('span')
+      span.textContent = el.value
+      el.parentNode?.replaceChild(span, el)
+    })
+    clone.querySelectorAll<HTMLSelectElement>('select').forEach(el => {
+      const span = document.createElement('span')
+      span.textContent = el.options[el.selectedIndex]?.text ?? ''
+      el.parentNode?.replaceChild(span, el)
+    })
+
+    // Summary / รวม rows: place รวมค่าวัสดุและแรงงาน under the same column as line totals (see rewriteBoqSummaryRowsForPrint).
+    rewriteBoqSummaryRowsForPrint(clone)
+
+    // Hard-stop print rows at หมายเหตุ for non-line BOQ rows.
+    // Prevents any stray trailing cells (e.g. discount/side remnants) from showing as right-side ghost blocks.
+    clone.querySelectorAll<HTMLTableRowElement>(
+      'tr.boq-summary-row, tr.boq-group-header-row, tr.boq-section-header-row',
+    ).forEach(tr => {
+      const note =
+        tr.querySelector<HTMLTableCellElement>('td[data-col="note"]') ??
+        tr.querySelector<HTMLTableCellElement>('td.boq-td-note')
+      if (!note) return
+      let next = note.nextElementSibling
+      while (next) {
+        const n = next.nextElementSibling
+        next.remove()
+        next = n
+      }
+      // Remove the empty note cell — summary/header rows never have note content, and the
+      // column count now matches data rows (width/length fillers were fixed in SummaryRow),
+      // so removing this cell leaves the total cell correctly aligned with data row totals.
+      note.remove()
+    })
+
+    // Replace colgroup with a fresh one matching maxCells, so columns are deterministic
+    if (maxCells > 0) {
+      clone.querySelectorAll('colgroup').forEach(c => c.remove())
+      const cg = document.createElement('colgroup')
+      for (let i = 0; i < maxCells; i++) {
+        const col = document.createElement('col')
+        cg.appendChild(col)
+      }
+      clone.insertBefore(cg, clone.firstChild)
+    }
+
+    const dateStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
+    const title = [boqTitle, jobName].filter(Boolean).join(' — ') || 'BOQ'
+
+    const html = `<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>${title}</title>
+<style>
+@page { size: A4 landscape; margin: 8mm 10mm; }
+*  { box-sizing: border-box; }
+body {
+  margin: 0; padding: 0;
+  font-family: 'Sarabun', 'Arial', sans-serif;
+  font-size: 8.5pt;
+  color: #111;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  overflow-x: hidden;
+}
+h1  { font-size: 12pt; margin: 0 0 2mm; text-align: center; }
+.sub { font-size: 8pt; color: #555; margin-bottom: 4mm; text-align: center; }
+.boq-print-table-clip {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+table {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 7.5pt;
+  box-sizing: border-box;
+}
+thead { display: table-header-group; }
+tfoot { display: table-row-group; }
+tr    { page-break-inside: avoid; }
+th, td {
+  border: 0.4pt solid #aaa;
+  padding: 1.5pt 3pt;
+  vertical-align: middle;
+  box-sizing: border-box;
+  background-clip: padding-box;
+}
+th { background: #e0e0e0 !important; font-weight: 700; text-align: center; }
+/* Row type colours */
+.boq-group-header-row   td { background: #b0bec5 !important; font-weight: 800; }
+.boq-section-header-row td { background: #e8e8e8 !important; font-weight: 700; }
+.boq-summary-row        td { background: #e6e6e6 !important; font-weight: 700; }
+.boq-summary-row--highlight td { background: #f4ef00 !important; font-weight: 700; }
+.boq-row--nested        td { background: #d6defa !important; }
+/* Alignment */
+.boq-td-num { text-align: right; }
+.boq-td-no  { text-align: center; }
+/* รายการ (description) — always left aligned */
+[data-col="desc"], .boq-td-desc, .boq-td-section-title-cell, .boq-td-group-title-cell { text-align: left !important; }
+/* Summary amount cell — make sure the number sits in the total column on the right */
+.boq-summary-amount, .boq-td.boq-summary-amount { text-align: right !important; }
+[data-col="action"], [data-col="secPct"], [data-col="secDiscount"], [data-col="secNet"],
+.boq-td-action, .boq-td-sec-pct, .boq-td-sec-discount, .boq-td-sec-net { display: none !important; }
+/* หมายเหตุ: always show */
+[data-col="note"], .boq-td-note { display: table-cell !important; }
+/* Hide PLAN / ACTUAL panel completely — cells, headers, and col widths */
+.boq-side-th, .boq-side-td { display: none !important; }
+col.boq-side-col { width: 0 !important; min-width: 0 !important; max-width: 0 !important; }
+/* Hide the band row that says BOQ / PLAN */
+tr.boq-thead-triplex-band { display: none !important; }
+/* Kill resize handle columns */
+.boq-col-resize { display: none !important; }
+/* Cancel sticky for print */
+th, td, tr { position: static !important; top: auto !important; left: auto !important; }
+/* Hide UI chrome inside cells */
+.boq-col-resize, .boq-action-cell, button { display: none !important; }
+</style>
+</head>
+<body>
+<h1>${title}</h1>
+<div class="sub">วันที่พิมพ์: ${dateStr}</div>
+<div class="boq-print-table-clip">${clone.outerHTML}</div>
+</body>
+</html>`
+
+    const win = window.open('', '_blank', 'width=850,height=700')
+    if (!win) { alert('กรุณาอนุญาต pop-up สำหรับการพิมพ์'); return }
+    win.document.write(html)
+    win.document.close()
+    // Wait for fonts/images then print
+    win.onload = () => { win.focus(); win.print() }
+  }
+
   return (
     <div className="list-page boq-page">
       <header className="list-header boq-document-page-header">
@@ -2752,12 +3114,22 @@ export default function BoqEditorPage() {
               {signing ? 'กำลังอนุมัติ...' : 'อนุมัติ / ลงนาม'}
             </button>
           )}
-          <button type="button" className="boq-submit-btn" onClick={() => { void handleDownloadPDF() }}>
-            Export PDF
-          </button>
-          <button type="button" className="boq-submit-btn" onClick={() => { void exportBoqXlsx() }}>
-            Export XLSX
-          </button>
+          <div className="boq-export-cluster" role="group" aria-label="ส่งออกและพิมพ์ BOQ">
+            <button type="button" className="boq-submit-btn" onClick={() => { void handleDownloadPDF() }}>
+              Export PDF
+            </button>
+            <button type="button" className="boq-submit-btn" onClick={() => { void exportBoqXlsx() }}>
+              Export XLSX
+            </button>
+            <button
+              type="button"
+              className="boq-submit-btn boq-export-a4-btn"
+              onClick={printBoqA4}
+              title="เปิดหน้าต่างพิมพ์ A4 — บันทึกเป็น PDF จากเมนูของเบราว์เซอร์ได้"
+            >
+              พิมพ์ A4
+            </button>
+          </div>
           <div className="boq-filter-wrap" ref={filterDocWrapRef}>
             <button
               type="button"
@@ -2935,12 +3307,12 @@ export default function BoqEditorPage() {
             <col className="boq-side-col ppc-gpamt" style={{ width: sideColW.gpAmt }} />
             <col className="boq-side-col ppc-gppct" style={{ width: sideColW.gpPct }} />
             <col className="boq-side-col" style={{ width: sideColW.sell }} />
-            <col className="boq-side-col" style={{ width: sideColW.gpSalePct }} />
+            <col className="boq-side-col boq-side-col--last-cell" style={{ width: sideColW.gpSalePct }} />
             {/* ── ACTUAL cols (10, only when boqKind==='ACTUAL') ── */}
             {boqKind === 'ACTUAL' && (<>
               <col className="boq-side-col boq-side-col--boq-ref" />
               <col className="boq-side-col boq-side-col--lead" />
-              <col className="boq-side-col" />
+              <col className="boq-side-col boq-side-col--last-cell" />
               <col className="boq-side-col" />
               <col className="boq-side-col" />
               <col className="boq-side-col" />
@@ -2955,7 +3327,7 @@ export default function BoqEditorPage() {
             {/* ── Band row (only when multi-row thead) ── */}
             {boqMainHeadSubRow && (
               <tr className="boq-thead-triplex-band">
-                <th colSpan={boqMainTableColCount - (editing ? 0 : 1)} className="boq-th boq-side-th boq-side-th--plan-band" lang="en">
+                <th colSpan={boqMainTableColCount} className="boq-th boq-side-th boq-side-th--plan-band" lang="en">
                   BOQ
                 </th>
                 <th colSpan={12} className="boq-th boq-side-th boq-side-th--plan-band boq-side-td--panel-start" lang="en">
@@ -3064,7 +3436,7 @@ export default function BoqEditorPage() {
                 <th className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gpamt">GP Baht<RHS col="gpAmt"/></th>
                 <th className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gppct">GP%<RHS col="gpPct"/></th>
                 <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP ประเมินราคาขาย Baht<RHS col="sell"/></th>
-                <th className="boq-th boq-side-th boq-side-th--sell-leaf">%</th>
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf boq-side-th--last-cell">%</th>
               </>)}
               {/* ── ACTUAL main headers ── */}
               {boqKind === 'ACTUAL' && (boqMainHeadSubRow ? (<>
@@ -3088,7 +3460,7 @@ export default function BoqEditorPage() {
                 <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP Baht</th>
                 <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP%</th>
                 <th className="boq-th boq-side-th boq-side-th--sell-leaf">GP ประเมินราคาขาย Baht</th>
-                <th className="boq-th boq-side-th boq-side-th--sell-leaf">%</th>
+                <th className="boq-th boq-side-th boq-side-th--sell-leaf boq-side-th--last-cell">%</th>
               </>))}
             </tr>
             {/* ── Sub-headers row (only when boqMainHeadSubRow) ── */}
@@ -3117,12 +3489,12 @@ export default function BoqEditorPage() {
                   <th className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gpamt">Baht<RHS col="gpAmt"/></th>
                   <th className="boq-th boq-side-th boq-side-th--sell-leaf ppc-gppct">%<RHS col="gpPct"/></th>
                   <th className="boq-th boq-side-th boq-side-th--sell-leaf">Baht<RHS col="sell"/></th>
-                  <th className="boq-th boq-side-th boq-side-th--sell-leaf">%</th>
+                  <th className="boq-th boq-side-th boq-side-th--sell-leaf boq-side-th--last-cell">%</th>
                 </>)}
                 {/* ACTUAL GP-from-sale + doc + GP จากราคาทุน + ประเมินราคาขาย sub-headers */}
                 {boqKind === 'ACTUAL' && (<>
                   <th className="boq-th boq-side-th boq-side-th--sell-leaf">Baht</th>
-                  <th className="boq-th boq-side-th boq-side-th--sell-leaf">%</th>
+                  <th className="boq-th boq-side-th boq-side-th--sell-leaf boq-side-th--last-cell">%</th>
                   <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf">เลขที่</th>
                   <th className="boq-th boq-side-th boq-side-th--cost-leaf boq-side-th--doc-leaf">เอกสาร</th>
                   <th className="boq-th boq-side-th boq-side-th--sell-leaf">Baht</th>
@@ -3229,7 +3601,7 @@ export default function BoqEditorPage() {
                 <React.Fragment key={group.id}>
                   {colVis.showDesc && showGroupHeaders && (
                   <tr className="boq-group-header-row">
-                    <td data-col="no" className="boq-td boq-td-group-no">{groupIdx + 1}</td>
+                    <td data-col="no" className="boq-td boq-td-no boq-td-group-no">{groupIdx + 1}</td>
                     {showRefId && <><td data-col="refPage" className="boq-td"/><td data-col="refCode" className="boq-td"/></>}
                     {!tableShowDesc ? (
                       <td colSpan={boqLeadTitleColSpan(colVis)} className="boq-td boq-td-group-title-cell">
@@ -3246,31 +3618,33 @@ export default function BoqEditorPage() {
                     )}
                     {tableShowDesc && <><td data-col="width" className="boq-td"/><td data-col="length" className="boq-td"/></>}
                     {rowTail.qty2 && <><td data-col="qty" className="boq-td"/><td data-col="unit" className="boq-td"/></>}
-                    {rowTail.matSlots === 2 && <><td data-col="matPrice" className="boq-td"/><td data-col="matAmt" className="boq-td"/></>}
+                    {rowTail.matSlots === 2 && <td className="boq-td" colSpan={2} aria-hidden />}
                     {rowTail.matSlots === 1 && <td className="boq-td"/>}
                     {rowTail.lab2 && <><td data-col="laborPrice" className="boq-td"/><td data-col="laborAmt" className="boq-td"/></>}
                     {rowTail.tot && (actualCompareMode ? <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/><td data-col="total" className="boq-td"/></> : <td data-col="total" className="boq-td"/>)}
-                    <td data-col="action" className="boq-td boq-td-action">
-                      {canMutateStructure && (
-                        <div className="boq-action-cell">
-                          <button type="button" className="boq-btn boq-action-btn-section-del"
-                            onClick={() => askConfirm(`ลบหมวดงานที่ ${groupIdx+1} "${group.title||'ไม่มีชื่อ'}" ?`, () => { delGroup(group.id); setConfirm(null) })}
-                            title="ลบหมวดงานนี้">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                              <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
-                            </svg>
-                          </button>
-                          <button type="button" className="boq-btn boq-action-btn-add" onClick={() => addSection(group.id)} title="เพิ่มข้อในหมวดนี้">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                            </svg>
-                          </button>
-                        </div>
-                      )}
-                    </td>
+                    {editing && (
+                      <td data-col="action" className="boq-td boq-td-action">
+                        {canMutateStructure && (
+                          <div className="boq-action-cell">
+                            <button type="button" className="boq-btn boq-action-btn-section-del"
+                              onClick={() => askConfirm(`ลบหมวดงานที่ ${groupIdx+1} "${group.title||'ไม่มีชื่อ'}" ?`, () => { delGroup(group.id); setConfirm(null) })}
+                              title="ลบหมวดงานนี้">
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+                              </svg>
+                            </button>
+                            <button type="button" className="boq-btn boq-action-btn-add" onClick={() => addSection(group.id)} title="เพิ่มข้อในหมวดนี้">
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    )}
                     {rowTail.note && <td data-col="note" className="boq-td"/>}
-                    {tableShowSecDiscount && <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/></>}
+                    {tableShowSecDiscount && <td className="boq-td" colSpan={3} aria-hidden />}
                     <PlanEmptyCells panelStart />
                     {boqKind === 'ACTUAL' && <PlanEmptyCells panelStart />}
                   </tr>
@@ -3300,13 +3674,13 @@ export default function BoqEditorPage() {
                           )}
                           {tableShowDesc && <><td data-col="width" className="boq-td"/><td data-col="length" className="boq-td"/></>}
                           {secTail.qty2 && <><td data-col="qty" className="boq-td"/><td data-col="unit" className="boq-td"/></>}
-                          {secTail.matSlots === 2 && <><td data-col="matPrice" className="boq-td"/><td data-col="matAmt" className="boq-td"/></>}
+                          {secTail.matSlots === 2 && <td className="boq-td" colSpan={2} aria-hidden />}
                           {secTail.matSlots === 1 && <td className="boq-td"/>}
                           {secTail.lab2 && <><td data-col="laborPrice" className="boq-td"/><td data-col="laborAmt" className="boq-td"/></>}
                           {secTail.tot && (actualCompareMode ? <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/><td data-col="total" className="boq-td"/></> : <td data-col="total" className="boq-td"/>)}
-                          <td data-col="action" className="boq-td boq-td-action"/>
+                          {editing && <td data-col="action" className="boq-td boq-td-action"/>}
                           {secTail.note && <td data-col="note" className="boq-td"/>}
-                          {tableShowSecDiscount && <><td className="boq-td"/><td className="boq-td"/><td className="boq-td"/></>}
+                          {tableShowSecDiscount && <td className="boq-td" colSpan={3} aria-hidden />}
                           <PlanEmptyCells panelStart />
                           {boqKind === 'ACTUAL' && <PlanEmptyCells panelStart />}
                         </tr>
@@ -3472,41 +3846,43 @@ export default function BoqEditorPage() {
                                       <td data-col="total" className="boq-td boq-td-num boq-td-total">{fmt(calcRowMoneyTotal(sr))}</td>
                                     )
                                   )}
-                                  <td data-col="action" className="boq-td boq-td-action">
-                                    {canMutateStructure && (
-                                      <div className="boq-action-cell">
-                                        {depth === 0 && i === 0 && (
-                                          <>
-                                            <button type="button" className="boq-btn boq-action-btn-section-del"
-                                              onClick={() => askConfirm(`ลบข้อ ${globalNum} "${section.title||'ไม่มีชื่อ'}" ?`, () => { delSection(group.id, section.id); setConfirm(null) })}
-                                              title="ลบข้อนี้">
-                                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                                <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
-                                              </svg>
-                                            </button>
-                                            <button type="button" className="boq-btn boq-action-btn-add" onClick={() => addSubRow(group.id,section.id)} title="เพิ่มรายการย่อย (1.2, 1.3…)">
-                                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                                              </svg>
-                                            </button>
-                                          </>
-                                        )}
-                                        <button type="button" className="boq-btn boq-action-btn-add-nested" onClick={() => addNestedSubRow(group.id,section.id,sr.id)} title="เพิ่มระดับถัดไป (เช่น 1.1.1)">
-                                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                                          </svg>
-                                        </button>
-                                        <button type="button" className="boq-btn boq-action-btn-del-row"
-                                          onClick={() => askConfirm('ลบแถวนี้?', () => { delSubRow(group.id, section.id, sr.id); setConfirm(null) })}
-                                          title="ลบแถวนี้">
-                                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                                          </svg>
-                                        </button>
-                                      </div>
-                                    )}
-                                  </td>
+                                  {editing && (
+                                    <td data-col="action" className="boq-td boq-td-action">
+                                      {canMutateStructure && (
+                                        <div className="boq-action-cell">
+                                          {depth === 0 && i === 0 && (
+                                            <>
+                                              <button type="button" className="boq-btn boq-action-btn-section-del"
+                                                onClick={() => askConfirm(`ลบข้อ ${globalNum} "${section.title||'ไม่มีชื่อ'}" ?`, () => { delSection(group.id, section.id); setConfirm(null) })}
+                                                title="ลบข้อนี้">
+                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                                  <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+                                                </svg>
+                                              </button>
+                                              <button type="button" className="boq-btn boq-action-btn-add" onClick={() => addSubRow(group.id,section.id)} title="เพิ่มรายการย่อย (1.2, 1.3…)">
+                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                                                </svg>
+                                              </button>
+                                            </>
+                                          )}
+                                          <button type="button" className="boq-btn boq-action-btn-add-nested" onClick={() => addNestedSubRow(group.id,section.id,sr.id)} title="เพิ่มระดับถัดไป (เช่น 1.1.1)">
+                                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                                            </svg>
+                                          </button>
+                                          <button type="button" className="boq-btn boq-action-btn-del-row"
+                                            onClick={() => askConfirm('ลบแถวนี้?', () => { delSubRow(group.id, section.id, sr.id); setConfirm(null) })}
+                                            title="ลบแถวนี้">
+                                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                            </svg>
+                                          </button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  )}
                                   <td data-col="note" className="boq-td boq-td-note">
                                     <AutoTextarea className="boq-input boq-textarea" value={sr.note} readOnly={!editing}
                                       onChange={v => editing && updSubRow(group.id,section.id,sr.id,'note',v)} />
@@ -3531,6 +3907,7 @@ export default function BoqEditorPage() {
                         actualFourCols={groupSummaryFour}
                         discountCells={tableShowSecDiscount ? <DiscountCells rowTotal={groupTotal} discountShare={groupDiscountAlloc[groupIdx] ?? 0} pct={grandTotal > 0 ? (groupTotal / grandTotal) * 100 : 0} /> : undefined}
                         extraCells={<>{planGroupSummaryCells}{actGroupSummaryCells}</>}
+                        showActionCell={editing}
                       />
                     </>
                   )}
@@ -3557,7 +3934,7 @@ export default function BoqEditorPage() {
                   : undefined
               }
               discountCells={emptyDiscCells}
-              extraCells={planGrandTotalCells}
+              showActionCell={editing}
             />
             <SummaryRow
               label={
@@ -3574,8 +3951,8 @@ export default function BoqEditorPage() {
                   </span>
                 ) : `ค่าดำเนินการ ${overheadPct}%`
               }
-              amount={fmt(overhead)} highlight={false} vis={colVis} actualMoneyTail4={actualCompareMode} discountCells={emptyDiscCells} />
-            <SummaryRow label="ราคารวมค่าดำเนินการ" amount={fmt(subtotalBeforeDiscount)} highlight={false} vis={colVis} actualMoneyTail4={actualCompareMode} discountCells={emptyDiscCells} />
+              amount={fmt(overhead)} highlight={false} vis={colVis} actualMoneyTail4={actualCompareMode} discountCells={emptyDiscCells} showActionCell={editing} />
+            <SummaryRow label="ราคารวมค่าดำเนินการ" amount={fmt(subtotalBeforeDiscount)} highlight={false} vis={colVis} actualMoneyTail4={actualCompareMode} discountCells={emptyDiscCells} showActionCell={editing} />
             <SummaryRow
               label={
                 <span className="boq-summary-editable-label">
@@ -3616,8 +3993,9 @@ export default function BoqEditorPage() {
                 ) : undefined
               }
               discountCells={emptyDiscCells}
+              showActionCell={editing}
             />
-            <SummaryRow label="ราคารวมหลังหักส่วนลด" amount={fmt(afterDiscount)} highlight={true} vis={colVis} actualMoneyTail4={actualCompareMode} discountCells={emptyDiscCells} />
+            <SummaryRow label="ราคารวมหลังหักส่วนลด" amount={fmt(afterDiscount)} highlight={true} vis={colVis} actualMoneyTail4={actualCompareMode} discountCells={emptyDiscCells} showActionCell={editing} />
             <SummaryRow
               label={
                 editing ? (
@@ -3633,8 +4011,8 @@ export default function BoqEditorPage() {
                   </span>
                 ) : `ภาษีมูลค่าเพิ่ม ${vatPct}%`
               }
-              amount={fmt(vat)} highlight={false} vis={colVis} actualMoneyTail4={actualCompareMode} discountCells={emptyDiscCells} />
-            <SummaryRow label="ราคารวมภาษีมูลค่าเพิ่ม" amount={fmt(totalWithVat)} highlight={false} vis={colVis} actualMoneyTail4={actualCompareMode} discountCells={emptyDiscCells} />
+              amount={fmt(vat)} highlight={false} vis={colVis} actualMoneyTail4={actualCompareMode} discountCells={emptyDiscCells} showActionCell={editing} />
+            <SummaryRow label="ราคารวมภาษีมูลค่าเพิ่ม" amount={fmt(totalWithVat)} highlight={false} vis={colVis} actualMoneyTail4={actualCompareMode} discountCells={emptyDiscCells} showActionCell={editing} />
           </tfoot>
         </table>
       </div>

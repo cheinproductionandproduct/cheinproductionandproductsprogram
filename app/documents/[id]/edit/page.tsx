@@ -14,6 +14,11 @@ const AdvancePaymentRequestForm = dynamic(
   { loading: () => <div className="list-loading">โหลดฟอร์ม...</div>, ssr: false }
 )
 
+const AdvancePaymentClearanceForm = dynamic(
+  () => import('@/components/forms/AdvancePaymentClearanceForm').then((m) => ({ default: m.AdvancePaymentClearanceForm })),
+  { loading: () => <div className="list-loading">โหลดฟอร์ม...</div>, ssr: false }
+)
+
 export default function DocumentEditPage() {
   const params = useParams()
   const router = useRouter()
@@ -22,6 +27,7 @@ export default function DocumentEditPage() {
   const cachedEdit = id ? getCachedDocumentForEdit(id) : undefined
   const [document, setDocument] = useState<any>(() => cachedEdit?.document ?? null)
   const [fields, setFields] = useState<FormField[]>(() => cachedEdit?.fields ?? [])
+  const [templateSlug, setTemplateSlug] = useState<string>(() => cachedEdit?.document?.formTemplate?.slug ?? '')
   const [loading, setLoading] = useState(() => !cachedEdit?.document)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +40,7 @@ export default function DocumentEditPage() {
     if (cached?.document && cached?.fields?.length) {
       setDocument(cached.document)
       setFields(cached.fields)
+      setTemplateSlug(cached.document?.formTemplate?.slug ?? templateSlug)
       setLoading(false)
       setError(null)
       return
@@ -63,25 +70,35 @@ export default function DocumentEditPage() {
         const doc = docData.document
 
         if (doc.status !== 'DRAFT') {
-          throw new Error('Only draft documents can be edited')
+          throw new Error('เฉพาะเอกสารร่าง (Draft) เท่านั้นที่สามารถแก้ไขได้')
         }
 
-        setDocument(doc)
+        if (!stale) setDocument(doc)
 
         const templateRes = await fetch('/api/form-templates')
         if (!templateRes.ok) throw new Error('Failed to fetch form template')
         const { templates } = await templateRes.json()
         const template = templates.find((t: any) => t.id === doc.formTemplateId)
         if (!template) throw new Error('Form template not found')
-        if (template.slug !== 'advance-payment-request') {
-          throw new Error('Edit page only supports advance payment request forms')
+
+        const slug = template.slug as string
+        const supported = ['advance-payment-request', 'advance-payment-clearance']
+        if (!supported.includes(slug)) {
+          throw new Error(`ไม่รองรับการแก้ไขแบบฟอร์มประเภทนี้ (${template.name})`)
         }
 
-        const formConfig = template.fields as { fields: FormField[] }
-        const fieldList = formConfig.fields || []
         if (!stale) {
-          setFields(fieldList)
-          setCachedDocumentForEdit(id, doc, fieldList)
+          setTemplateSlug(slug)
+          // APR needs field config; ADC has its own built-in structure
+          if (slug === 'advance-payment-request') {
+            const formConfig = template.fields as { fields: FormField[] }
+            const fieldList = formConfig.fields || []
+            setFields(fieldList)
+            setCachedDocumentForEdit(id, doc, fieldList)
+          } else {
+            setFields([{ id: '_adc' } as any]) // non-empty sentinel so !fields.length stays false
+            setCachedDocumentForEdit(id, doc, [])
+          }
         }
       } catch (err: any) {
         if (stale) return
@@ -146,7 +163,7 @@ export default function DocumentEditPage() {
     )
   }
 
-  if (error && !document) {
+  if (error) {
     return (
       <DashboardLayout>
         <div className="list-page">
@@ -204,13 +221,22 @@ export default function DocumentEditPage() {
             </div>
           )}
 
-          <AdvancePaymentRequestForm
-            fields={fields}
-            onSubmit={handleSubmit}
-            defaultValues={defaultValues}
-            loading={submitting}
-            isEditingExistingDocument
-          />
+          {templateSlug === 'advance-payment-clearance' ? (
+            <AdvancePaymentClearanceForm
+              creNumber={document.documentNumber || ''}
+              onSubmit={handleSubmit}
+              defaultValues={defaultValues}
+              loading={submitting}
+            />
+          ) : (
+            <AdvancePaymentRequestForm
+              fields={fields}
+              onSubmit={handleSubmit}
+              defaultValues={defaultValues}
+              loading={submitting}
+              isEditingExistingDocument
+            />
+          )}
         </section>
       </div>
     </DashboardLayout>

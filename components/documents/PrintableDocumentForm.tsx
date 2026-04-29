@@ -356,7 +356,7 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
                     <div className="adv-sig-area">
                       {sig.financeManagerSignature && <img src={sig.financeManagerSignature} alt="" />}
                     </div>
-                    <span className="adv-sig-name">{data.financeManagerSignatureName || assignedUsers?.payer?.fullName || assignedUsers?.payer?.email || 'tassanee@cheinproduction.co.th'}</span>
+                    <span className="adv-sig-name">{data.financeManagerSignatureName || assignedUsers?.payer?.fullName || assignedUsers?.payer?.email || ''}</span>
                     <span className="adv-sig-date">{data.financeManagerSignatureDate ? formatDateDMY(data.financeManagerSignatureDate) : '__/__/__'}</span>
                   </div>
                 </div>

@@ -65,6 +65,25 @@ export default function AdminPanelPage() {
     }
   }
 
+  const exportAnalytics = async () => {
+    setLoading('analytics')
+    try {
+      const res = await fetch('/api/analytics/export')
+      if (!res.ok) { setLineResult({ ok: false, error: 'Export failed' }); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `analytics_${new Date().toISOString().slice(0, 10)}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setLineResult({ ok: false, error: e instanceof Error ? e.message : 'Network error' })
+    } finally {
+      setLoading(null)
+    }
+  }
+
   const sendAdvanceRegister = async () => {
     setLoading('advance_register')
     setLineResult(null)
@@ -103,6 +122,23 @@ export default function AdminPanelPage() {
       </header>
 
       <section className="list-content">
+        <div className="list-panel" style={{ marginBottom: 24 }}>
+          <h2 className="form-section-title" style={{ marginBottom: 16 }}>
+            Analytics Export
+          </h2>
+          <p className="form-hint" style={{ marginBottom: 16 }} lang="th">
+            Export ข้อมูลการใช้งานทั้งหมด (Users, BOQ Documents, Forms, Approvals, Vehicle Requests)
+          </p>
+          <button
+            type="button"
+            className="form-button"
+            disabled={!!loading}
+            onClick={exportAnalytics}
+          >
+            {loading === 'analytics' ? 'กำลัง Export...' : '⬇ Download Analytics (.xlsx)'}
+          </button>
+        </div>
+
         <div className="list-panel">
           <h2 className="form-section-title" style={{ marginBottom: 16 }}>
             LINE OA / Cron tests
