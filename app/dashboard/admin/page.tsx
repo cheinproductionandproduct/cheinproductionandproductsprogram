@@ -84,6 +84,28 @@ export default function AdminPanelPage() {
     }
   }
 
+  const fixAdcAssignments = async () => {
+    if (!window.confirm('อัปเดตผู้ลงนามในเอกสาร APC แบบร่างทั้งหมดให้ตรงกับผู้ลงนามปัจจุบัน (tassanee / pc / bee) ใช่หรือไม่?')) return
+    setLoading('fix_adc')
+    setLineResult(null)
+    try {
+      const res = await fetch('/api/admin/fix-adc-assignments', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setLineResult({ ok: false, error: data.error || 'Request failed' })
+        return
+      }
+      setLineResult({
+        ok: data.ok,
+        message: `อัปเดตแล้ว ${data.updated} เอกสาร — ผู้อนุมัติ: ${data.assignedTo?.approver}, ผู้รับ: ${data.assignedTo?.recipient}, ฝ่ายบัญชี: ${data.assignedTo?.payer}`,
+      })
+    } catch (e) {
+      setLineResult({ ok: false, error: e instanceof Error ? e.message : 'Network error' })
+    } finally {
+      setLoading(null)
+    }
+  }
+
   const sendAdvanceRegister = async () => {
     setLoading('advance_register')
     setLineResult(null)
@@ -122,6 +144,23 @@ export default function AdminPanelPage() {
       </header>
 
       <section className="list-content">
+        <div className="list-panel" style={{ marginBottom: 24 }}>
+          <h2 className="form-section-title" style={{ marginBottom: 16 }}>
+            แก้ไขผู้ลงนาม APC เก่า
+          </h2>
+          <p className="form-hint" style={{ marginBottom: 16 }} lang="th">
+            อัปเดตเอกสาร APC (ใบเคลียร์เงินทดรองจ่าย) ทุกฉบับที่ยังเป็นร่าง ให้ใช้ผู้ลงนามปัจจุบัน (tassanee / pc / bee) — ทำได้ครั้งเดียว ไม่กระทบเอกสารที่อนุมัติแล้ว
+          </p>
+          <button
+            type="button"
+            className="form-button"
+            disabled={!!loading}
+            onClick={fixAdcAssignments}
+          >
+            {loading === 'fix_adc' ? 'กำลังอัปเดต...' : 'อัปเดตผู้ลงนาม APC ทั้งหมด'}
+          </button>
+        </div>
+
         <div className="list-panel" style={{ marginBottom: 24 }}>
           <h2 className="form-section-title" style={{ marginBottom: 16 }}>
             Analytics Export
