@@ -133,7 +133,7 @@ export function PrintableDocumentFormAPR({ document, assignedUsers }: { document
                     <span className="adv-sig-date">{data.requesterSignatureDate ? formatDateDMY(data.requesterSignatureDate) : '__/__/__'}</span>
                   </div>
                   <div className="adv-sig-col">
-                    <span className="adv-sig-label">ผู้อนุมัติ/ตรวจสอบ</span>
+                    <span className="adv-sig-label">ผู้ตรวจสอบ/อนุมัติ</span>
                     <div className="adv-sig-area">
                       {sig.approverSignature && <img src={sig.approverSignature} alt="" />}
                     </div>
@@ -336,7 +336,7 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
                     <span className="adv-sig-date">{data.requesterSignatureDate ? formatDateDMY(data.requesterSignatureDate) : '__/__/__'}</span>
                   </div>
                   <div className="adv-sig-col">
-                    <span className="adv-sig-label">ผู้อนุมัติ/ตรวจสอบ</span>
+                    <span className="adv-sig-label">ผู้ตรวจสอบ/อนุมัติ</span>
                     <div className="adv-sig-area">
                       {sig.approverSignature && <img src={sig.approverSignature} alt="" />}
                     </div>
@@ -352,7 +352,7 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
                     <span className="adv-sig-date">{data.recipientSignatureDate ? formatDateDMY(data.recipientSignatureDate) : '__/__/__'}</span>
                   </div>
                   <div className="adv-sig-col">
-                    <span className="adv-sig-label">ฝ่ายบัญชี/การเงิน</span>
+                    <span className="adv-sig-label">ผู้อนุมัติ</span>
                     <div className="adv-sig-area">
                       {sig.financeManagerSignature && <img src={sig.financeManagerSignature} alt="" />}
                     </div>
