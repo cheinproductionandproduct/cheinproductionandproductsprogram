@@ -255,6 +255,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 )
               })()}
             </div>
+            <Link
+              href="/dashboard/profile"
+              className={`nav-btn ${pathname === '/dashboard/profile' ? 'nav-btn--active' : ''}`}
+              onClick={closeMobileMenu}
+            >
+              <span className="nav-btn-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                </svg>
+              </span>
+              <span className="nav-btn-label">โปรไฟล์ / ลายเซ็น</span>
+            </Link>
             <LogoutButton className="logout-btn">
               ออกจากระบบ
             </LogoutButton>
