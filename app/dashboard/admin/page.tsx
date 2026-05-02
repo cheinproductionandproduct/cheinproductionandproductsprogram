@@ -146,6 +146,36 @@ export default function AdminPanelPage() {
       <section className="list-content">
         <div className="list-panel" style={{ marginBottom: 24 }}>
           <h2 className="form-section-title" style={{ marginBottom: 16 }}>
+            อัปเดต Workflow APC (3 ขั้นตอน)
+          </h2>
+          <p className="form-hint" style={{ marginBottom: 16 }} lang="th">
+            ตั้งค่า workflow การลงนาม APC ให้เป็น 3 ขั้นตอนตามลำดับ: ผู้ตรวจสอบ/อนุมัติ (tassanee) → ผู้รับเคลียร์เงิน (pc) → ผู้อนุมัติ (bee) — ทำครั้งเดียว
+          </p>
+          <button
+            type="button"
+            className="form-button form-button-submit"
+            disabled={!!loading}
+            onClick={async () => {
+              if (!window.confirm('อัปเดต APC workflow เป็น 3 ขั้นตอน?')) return
+              setLoading('fix_apc_workflow')
+              setLineResult(null)
+              try {
+                const res = await fetch('/api/admin/fix-apc-workflow', { method: 'POST' })
+                const data = await res.json()
+                setLineResult({ ok: data.ok, message: data.message || data.error })
+              } catch (e) {
+                setLineResult({ ok: false, error: e instanceof Error ? e.message : 'Error' })
+              } finally {
+                setLoading(null)
+              }
+            }}
+          >
+            {loading === 'fix_apc_workflow' ? 'กำลังอัปเดต...' : 'อัปเดต APC Workflow → 3 ขั้นตอน'}
+          </button>
+        </div>
+
+        <div className="list-panel" style={{ marginBottom: 24 }}>
+          <h2 className="form-section-title" style={{ marginBottom: 16 }}>
             แก้ไขผู้ลงนาม APC เก่า
           </h2>
           <p className="form-hint" style={{ marginBottom: 16 }} lang="th">

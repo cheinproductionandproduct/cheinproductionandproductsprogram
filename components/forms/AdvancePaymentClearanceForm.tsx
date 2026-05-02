@@ -181,20 +181,25 @@ export function AdvancePaymentClearanceForm({
     }
   }, [])
 
-  // Default assignees (APC): ผู้ตรวจสอบ = tassanee, ผู้รับเคลียร์เงิน = pc, ผู้อนุมัติ = bee
+  // Default assignees — read from signing settings (APC workflow step assignees)
   useEffect(() => {
-    if (users.length === 0) return
-    const existingApprover = defaultValues.userAssignments?.approver || defaultValues.approverUserId
+    const existingApprover  = defaultValues.userAssignments?.approver  || defaultValues.approverUserId
     const existingRecipient = defaultValues.userAssignments?.recipient || defaultValues.recipientUserId
-    const existingPayer = defaultValues.userAssignments?.payer || defaultValues.payerUserId
-    const email = (u: any) => (u.email || '').toLowerCase()
-    const tassanee = users.find((u: any) => email(u) === 'tassanee@cheinproduction.co.th')
-    const pc       = users.find((u: any) => /^pc@chein/.test(email(u)))
-    const bee      = users.find((u: any) => /^bee@chein/.test(email(u)))
-    if (tassanee && !existingApprover)  setValue('approverUserId',  tassanee.id)
-    if (pc       && !existingRecipient) setValue('recipientUserId', pc.id)
-    if (bee      && !existingPayer)     setValue('payerUserId',     bee.id)
-  }, [users, setValue, defaultValues.userAssignments, defaultValues.approverUserId, defaultValues.recipientUserId, defaultValues.payerUserId])
+    const existingPayer     = defaultValues.userAssignments?.payer     || defaultValues.payerUserId
+    if (existingApprover && existingRecipient && existingPayer) return // already assigned
+    fetch('/api/settings/apc-signing')
+      .then(r => r.json())
+      .then(d => {
+        const steps: { stepNumber: number; assigneeId: string | null }[] = d.steps ?? []
+        const s1 = steps.find(s => s.stepNumber === 1)?.assigneeId
+        const s2 = steps.find(s => s.stepNumber === 2)?.assigneeId
+        const s3 = steps.find(s => s.stepNumber === 3)?.assigneeId
+        if (s1 && !existingApprover)  setValue('approverUserId',  s1)
+        if (s2 && !existingRecipient) setValue('recipientUserId', s2)
+        if (s3 && !existingPayer)     setValue('payerUserId',     s3)
+      })
+      .catch(() => {/* settings unavailable — user can select manually */})
+  }, [setValue, defaultValues.userAssignments, defaultValues.approverUserId, defaultValues.recipientUserId, defaultValues.payerUserId])
 
   // When "from" APR is in URL, load that document and pre-fill
   useEffect(() => {

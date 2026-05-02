@@ -740,10 +740,14 @@ export async function updateDocument(
         for (const step of steps) {
           let assignedUserId: string | null = null
 
-          // Map user assignment IDs to workflow steps
+          // step 1 → approver, step 2 → recipient (APC) or payer (APR), step 3 → payer (APC)
           if (step.stepNumber === 1 && newUserAssignments.approver) {
             assignedUserId = newUserAssignments.approver
+          } else if (step.stepNumber === 2 && newUserAssignments.recipient) {
+            assignedUserId = newUserAssignments.recipient
           } else if (step.stepNumber === 2 && newUserAssignments.payer) {
+            assignedUserId = newUserAssignments.payer
+          } else if (step.stepNumber === 3 && newUserAssignments.payer) {
             assignedUserId = newUserAssignments.payer
           } else if (newUserAssignments[step.id]) {
             assignedUserId = newUserAssignments[step.id]
@@ -895,18 +899,18 @@ export async function submitDocument(documentId: string) {
     const approvals = workflow.steps.map((step) => {
       let assignedUserId: string | null = null
 
-      // Map user assignment IDs to workflow steps based on step number
-      // userAssignments.approver -> step 1
-      // userAssignments.payer -> step 2
+      // step 1 → approver, step 2 → recipient (APC) or payer (APR), step 3 → payer (APC)
       if (step.stepNumber === 1 && userAssignments.approver) {
         assignedUserId = userAssignments.approver
+      } else if (step.stepNumber === 2 && userAssignments.recipient) {
+        assignedUserId = userAssignments.recipient
       } else if (step.stepNumber === 2 && userAssignments.payer) {
+        assignedUserId = userAssignments.payer   // APR fallback (no recipient)
+      } else if (step.stepNumber === 3 && userAssignments.payer) {
         assignedUserId = userAssignments.payer
       } else if (userAssignments[step.id]) {
-        // Fallback: check if step.id is in userAssignments
         assignedUserId = userAssignments[step.id]
       } else {
-        // Use step's default assignee
         assignedUserId = step.assigneeId || null
       }
 

@@ -168,21 +168,27 @@ export async function approveDocumentStep(
   const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
 
   if (approval.workflowStep.stepNumber === 1) {
-    // Step 1 = Approver / Manager signature
+    // Step 1 = ผู้ตรวจสอบ/อนุมัติ (tassanee for APC, manager for APR)
     signatures.approverSignature = signatureData
     documentData.approverSignatureName = approverName
     documentData.approverSignatureDate = today
   } else if (approval.workflowStep.stepNumber === 2) {
-    // Step 2 = Payer (APR) or Finance Manager (ADC) signature
     if (isADC) {
-      signatures.financeManagerSignature = signatureData
-      documentData.financeManagerSignatureName = approverName
-      documentData.financeManagerSignatureDate = today
+      // APC step 2 = ผู้รับเคลียร์เงิน (pc)
+      signatures.recipientSignature = signatureData
+      documentData.recipientSignatureName = approverName
+      documentData.recipientSignatureDate = today
     } else {
+      // APR step 2 = ผู้จ่ายเงิน (payer)
       signatures.payerSignature = signatureData
       documentData.payerSignatureName = approverName
       documentData.payerSignatureDate = today
     }
+  } else if (approval.workflowStep.stepNumber === 3 && isADC) {
+    // APC step 3 = ผู้อนุมัติ (bee)
+    signatures.financeManagerSignature = signatureData
+    documentData.financeManagerSignatureName = approverName
+    documentData.financeManagerSignatureDate = today
   }
 
   documentData.signatures = signatures
