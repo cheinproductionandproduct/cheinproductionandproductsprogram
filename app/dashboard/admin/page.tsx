@@ -146,6 +146,41 @@ export default function AdminPanelPage() {
       <section className="list-content">
         <div className="list-panel" style={{ marginBottom: 24 }}>
           <h2 className="form-section-title" style={{ marginBottom: 16 }}>
+            ส่ง APC ที่ค้างอยู่ทั้งหมดให้ tassanee
+          </h2>
+          <p className="form-hint" style={{ marginBottom: 16 }} lang="th">
+            อัปเดตเอกสาร APC ที่ยัง PENDING และ DRAFT ทั้งหมด ให้ tassanee เป็นผู้ลงนามขั้นแรก
+          </p>
+          <button
+            type="button"
+            className="form-button form-button-submit"
+            disabled={!!loading}
+            onClick={async () => {
+              if (!window.confirm('ส่งเอกสาร APC ที่ค้างทั้งหมดให้ tassanee?')) return
+              setLoading('push_apc_tassanee')
+              setLineResult(null)
+              try {
+                const res = await fetch('/api/admin/push-apc-to-tassanee', { method: 'POST' })
+                const data = await res.json()
+                setLineResult({
+                  ok: data.ok,
+                  message: data.ok
+                    ? `ส่งให้ ${data.tassanee} — PENDING: ${data.pendingDocsFound} เอกสาร (${data.approvalsUpdated} approvals), DRAFT: ${data.draftDocsUpdated} เอกสาร`
+                    : data.error,
+                })
+              } catch (e) {
+                setLineResult({ ok: false, error: e instanceof Error ? e.message : 'Error' })
+              } finally {
+                setLoading(null)
+              }
+            }}
+          >
+            {loading === 'push_apc_tassanee' ? 'กำลังอัปเดต...' : 'ส่ง APC ทั้งหมดให้ tassanee'}
+          </button>
+        </div>
+
+        <div className="list-panel" style={{ marginBottom: 24 }}>
+          <h2 className="form-section-title" style={{ marginBottom: 16 }}>
             อัปเดต Workflow APC (3 ขั้นตอน)
           </h2>
           <p className="form-hint" style={{ marginBottom: 16 }} lang="th">
