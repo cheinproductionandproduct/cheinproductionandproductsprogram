@@ -1,10 +1,91 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import '@/app/dashboard/dashboard.css'
 import { formatDateDMY } from '@/lib/utils/date-format'
+
+function SignatureCanvas({ onSignatureChange }: { onSignatureChange: (sig: string | null) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [hasSignature, setHasSignature] = useState(false)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    canvas.width = 600
+    canvas.height = 200
+    ctx.strokeStyle = '#000'
+    ctx.lineWidth = 2.5
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+  }, [])
+
+  const pos = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current!.getBoundingClientRect()
+    const src = 'touches' in e ? e.touches[0] : e
+    return { x: src.clientX - rect.left, y: src.clientY - rect.top }
+  }
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const ctx = canvasRef.current?.getContext('2d')
+    if (!ctx) return
+    const { x, y } = pos(e)
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    setIsDrawing(true)
+    setHasSignature(true)
+  }
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return
+    e.preventDefault()
+    const ctx = canvasRef.current?.getContext('2d')
+    if (!ctx) return
+    const { x, y } = pos(e)
+    ctx.lineTo(x, y)
+    ctx.stroke()
+  }
+
+  const stopDrawing = () => {
+    setIsDrawing(false)
+    if (hasSignature && canvasRef.current) {
+      onSignatureChange(canvasRef.current.toDataURL('image/png'))
+    }
+  }
+
+  const clear = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
+    setHasSignature(false)
+    onSignatureChange(null)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ border: '2px dashed #999', borderRadius: 6, background: '#fff', padding: 6 }}>
+        <canvas
+          ref={canvasRef}
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+          onMouseLeave={stopDrawing}
+          onTouchStart={startDrawing}
+          onTouchMove={draw}
+          onTouchEnd={stopDrawing}
+          style={{ width: '100%', height: 200, cursor: 'crosshair', touchAction: 'none', display: 'block' }}
+        />
+      </div>
+      <button type="button" onClick={clear} className="form-button" style={{ alignSelf: 'flex-start', background: '#fff', color: '#333' }}>
+        ลบ (Clear)
+      </button>
+    </div>
+  )
+}
 
 interface ApprovalCardProps {
   approval: any
@@ -13,41 +94,33 @@ interface ApprovalCardProps {
 
 export function ApprovalCard({ approval, onUpdate }: ApprovalCardProps) {
   const [showModal, setShowModal] = useState(false)
-  const [savedSig, setSavedSig] = useState<string | null>(null)
-  const [sigLoading, setSigLoading] = useState(false)
+  const [signature, setSignature] = useState<string | null>(null)
   const [comments, setComments] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  // Load saved signature when modal opens
-  useEffect(() => {
-    if (!showModal) return
-    setSigLoading(true)
-    fetch('/api/users/me/signature')
-      .then(r => r.json())
-      .then(d => setSavedSig(d.signatureImage ?? null))
-      .catch(() => setSavedSig(null))
-      .finally(() => setSigLoading(false))
-  }, [showModal])
+  const closeModal = () => {
+    setShowModal(false)
+    setError(null)
+    setSignature(null)
+    setComments('')
+  }
 
   const handleApprove = async () => {
-    if (!savedSig) {
-      setError('ยังไม่มีลายเซ็น — กรุณาอัปโหลดลายเซ็นในหน้าโปรไฟล์ก่อน')
-      return
-    }
+    if (!signature) { setError('กรุณาวาดลายเซ็นก่อนอนุมัติ'); return }
     setLoading(true)
     setError(null)
     try {
       const res = await fetch(`/api/approvals/${approval.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signatureData: savedSig, comments: comments.trim() || undefined }),
+        body: JSON.stringify({ signatureData: signature, comments: comments.trim() || undefined }),
       })
       const result = await res.json()
       if (!res.ok) throw new Error(result.message || result.error || 'Failed to approve')
       onUpdate(approval.id)
-      setShowModal(false)
+      closeModal()
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'เกิดข้อผิดพลาดในการอนุมัติ')
@@ -70,20 +143,13 @@ export function ApprovalCard({ approval, onUpdate }: ApprovalCardProps) {
       const result = await res.json()
       if (!res.ok) throw new Error(result.message || 'Failed to reject')
       onUpdate(approval.id)
-      setShowModal(false)
+      closeModal()
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'เกิดข้อผิดพลาด')
     } finally {
       setLoading(false)
     }
-  }
-
-  const closeModal = () => {
-    setShowModal(false)
-    setError(null)
-    setComments('')
-    setSavedSig(null)
   }
 
   return (
@@ -127,9 +193,7 @@ export function ApprovalCard({ approval, onUpdate }: ApprovalCardProps) {
           <div className="signature-modal-content">
             <div className="signature-modal-header">
               <h2 className="signature-modal-title">อนุมัติเอกสาร</h2>
-              <button type="button" onClick={closeModal} className="signature-modal-close-btn">
-                &times;
-              </button>
+              <button type="button" onClick={closeModal} className="signature-modal-close-btn">&times;</button>
             </div>
 
             <div className="signature-modal-body">
@@ -147,35 +211,11 @@ export function ApprovalCard({ approval, onUpdate }: ApprovalCardProps) {
 
               {error && <div className="form-error-box">{error}</div>}
 
-              {/* Signature preview */}
               <div className="form-section" style={{ width: '100%' }}>
-                <label className="form-label">ลายเซ็น</label>
-                {sigLoading ? (
-                  <p style={{ color: '#888', fontSize: 14 }}>กำลังโหลดลายเซ็น...</p>
-                ) : savedSig ? (
-                  <div style={{
-                    border: '1px solid #ddd', borderRadius: 8, padding: 12,
-                    background: '#fafafa', textAlign: 'center',
-                  }}>
-                    <img src={savedSig} alt="signature" style={{ maxHeight: 100, maxWidth: '100%' }} />
-                    <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
-                      ลายเซ็นที่บันทึกไว้ — จะถูกวางในเอกสารเมื่ออนุมัติ
-                    </p>
-                  </div>
-                ) : (
-                  <div style={{
-                    padding: '16px', borderRadius: 8, background: '#fffbeb',
-                    border: '1px solid #f59e0b', color: '#92400e', fontSize: 14,
-                  }}>
-                    ยังไม่มีลายเซ็นที่บันทึกไว้ —{' '}
-                    <Link href="/dashboard/profile" style={{ color: '#1976d2' }}>
-                      อัปโหลดลายเซ็นในหน้าโปรไฟล์
-                    </Link>
-                  </div>
-                )}
+                <label className="form-label">ลายเซ็น *</label>
+                <SignatureCanvas onSignatureChange={sig => { setSignature(sig); setError(null) }} />
               </div>
 
-              {/* Comments */}
               <div className="form-section" style={{ width: '100%', marginBottom: 0 }}>
                 <label className="form-label">หมายเหตุ (ไม่บังคับ)</label>
                 <textarea
@@ -200,7 +240,7 @@ export function ApprovalCard({ approval, onUpdate }: ApprovalCardProps) {
                 <button
                   type="button"
                   onClick={handleApprove}
-                  disabled={loading || !savedSig}
+                  disabled={loading || !signature}
                   className="form-button form-button-submit"
                 >
                   {loading ? 'กำลังอนุมัติ...' : 'อนุมัติและลงนาม'}
