@@ -10,7 +10,8 @@ import { useUser } from '@/hooks/use-user'
 import { formatDateDMY } from '@/lib/utils/date-format'
 import { documentStatusLabelTh } from '@/lib/utils/document-status-label'
 import { getCachedDocument, setCachedDocument, clearCachedDocument } from '@/lib/documents/document-cache'
-import { canCancelApprovedDocument } from '@/lib/auth/permissions'
+import { canCancelApprovedDocument, hasRole } from '@/lib/auth/permissions'
+import { UserRole } from '@prisma/client'
 
 const PrintableDocumentForm = dynamic(
   () => import('@/components/documents/PrintableDocumentForm').then((m) => ({ default: m.PrintableDocumentForm })),
@@ -99,6 +100,7 @@ export default function DocumentDetailPage() {
   const [cancelRemark, setCancelRemark] = useState('')
   const [cancelling, setCancelling] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
+  const [markingStatus, setMarkingStatus] = useState(false)
   const didFetch = useRef(false)
   const lastFetchedId = useRef<string | null>(null)
   const printWrapperRef = useRef<HTMLDivElement | null>(null)
@@ -247,6 +249,26 @@ export default function DocumentDetailPage() {
     } catch (err: any) {
       alert(err.message || 'Failed to delete document')
       setDeleting(false)
+    }
+  }
+
+  const handleMarkStatus = async (newStatus: 'TRANSFERRED' | 'RETURNED' | 'TOPPED_UP', label: string) => {
+    if (!confirm(`ยืนยัน: ${label}?`)) return
+    setMarkingStatus(true)
+    try {
+      const res = await fetch(`/api/documents/${id}/mark-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด')
+      setDoc(data.document)
+      setCachedDocument(id, data.document, assignedUsers)
+    } catch (e: any) {
+      alert(e.message)
+    } finally {
+      setMarkingStatus(false)
     }
   }
 
@@ -425,6 +447,58 @@ export default function DocumentDetailPage() {
                   สร้างใบเคลียร์เงินทดรองจ่าย (ADC)
                 </Link>
               )}
+
+            {/* APR: mark as TRANSFERRED (โอนแล้ว) — MANAGER+ only */}
+            {doc.formTemplate?.slug === 'advance-payment-request' &&
+              doc.status === 'APPROVED' &&
+              currentUser && hasRole(currentUser.role as UserRole, UserRole.MANAGER) && (
+                <button
+                  type="button"
+                  onClick={() => handleMarkStatus('TRANSFERRED', 'โอนเงินทดรองแล้ว')}
+                  disabled={markingStatus}
+                  className="doc-btn-primary"
+                  style={{ background: '#16a34a' }}
+                >
+                  {markingStatus ? 'กำลังอัปเดต...' : '✓ โอนแล้ว'}
+                </button>
+              )}
+
+            {/* APC: mark RETURNED or TOPPED_UP — MANAGER+ only, after CLEARED */}
+            {doc.formTemplate?.slug === 'advance-payment-clearance' &&
+              doc.status === 'CLEARED' &&
+              currentUser && hasRole(currentUser.role as UserRole, UserRole.MANAGER) && (() => {
+                const d = doc.data as any
+                const advance = Number(d?.advanceAmount) || 0
+                const actual = Number(d?.expenseItems?.total ?? d?.totalActualAmount) || 0
+                const toReturn = advance - actual
+                const toTopUp = actual - advance
+                return (
+                  <>
+                    {toReturn > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleMarkStatus('RETURNED', 'โอนคืนบริษัทแล้ว')}
+                        disabled={markingStatus}
+                        className="doc-btn-primary"
+                        style={{ background: '#16a34a' }}
+                      >
+                        {markingStatus ? 'กำลังอัปเดต...' : '✓ โอนคืนบริษัทแล้ว'}
+                      </button>
+                    )}
+                    {toTopUp > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleMarkStatus('TOPPED_UP', 'บริษัทโอนส่วนเติมแล้ว')}
+                        disabled={markingStatus}
+                        className="doc-btn-primary"
+                        style={{ background: '#16a34a' }}
+                      >
+                        {markingStatus ? 'กำลังอัปเดต...' : '✓ บริษัทโอนส่วนเติมแล้ว'}
+                      </button>
+                    )}
+                  </>
+                )
+              })()}
             {canCancelThisApproved && (
               <button
                 type="button"

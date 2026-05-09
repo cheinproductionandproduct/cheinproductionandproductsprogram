@@ -277,7 +277,7 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
                 <th className="adc-tbl-no">ลำดับ</th>
                 <th className="adc-tbl-desc">รายการ</th>
                 <th className="adc-tbl-amt">จำนวนเงิน(บาท)</th>
-                <th className="adc-tbl-amt">จำนวนเงินที่ใช้จริง (บาท)</th>
+                <th className="adc-tbl-amt" style={{ color: '#dc2626' }}>จำนวนเงินที่ใช้จริง (บาท)</th>
               </tr>
             </thead>
             <tbody>
@@ -288,7 +288,7 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
                     <td className="adc-tbl-no">{n + 1}</td>
                     <td className="adc-tbl-desc">{item.description || ''}</td>
                     <td className="adc-tbl-amt">{fmtAmt(item.amount)}</td>
-                    <td className="adc-tbl-amt">{fmtAmt(item.actualAmount ?? item.amount)}</td>
+                    <td className="adc-tbl-amt" style={{ color: '#dc2626' }}>{fmtAmt(item.actualAmount ?? item.amount)}</td>
                   </tr>
                 )
               })}
@@ -311,12 +311,31 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
                   </tr>
                   <tr className="adc-tbl-summary">
                     <td colSpan={2} className="adc-tbl-summary-label">จำนวนที่เหลือส่งคืน</td>
-                    <td className="adc-tbl-amt" colSpan={2}>{fmtAmt(amountToReturn)}</td>
+                    <td className="adc-tbl-amt" colSpan={2} style={amountToReturn > 0 ? { color: '#dc2626', fontWeight: 700 } : {}}>
+                      {fmtAmt(amountToReturn)}
+                    </td>
                   </tr>
                   <tr className="adc-tbl-summary adc-tbl-summary-last">
                     <td colSpan={2} className="adc-tbl-summary-label">จำนวนที่เบิกเพิ่ม</td>
-                    <td className="adc-tbl-amt" colSpan={2}>{fmtAmt(additionalAmount)}</td>
+                    <td className="adc-tbl-amt" colSpan={2} style={additionalAmount > 0 ? { color: '#dc2626', fontWeight: 700 } : {}}>
+                      {fmtAmt(additionalAmount)}
+                    </td>
                   </tr>
+                  {/* Transfer status rows */}
+                  {document.status === 'RETURNED' && (
+                    <tr className="adc-tbl-summary" style={{ background: '#f0fdf4' }}>
+                      <td colSpan={4} className="adc-tbl-summary-label" style={{ color: '#16a34a', textAlign: 'center', fontWeight: 700 }}>
+                        ✓ โอนคืนบริษัทแล้ว
+                      </td>
+                    </tr>
+                  )}
+                  {document.status === 'TOPPED_UP' && (
+                    <tr className="adc-tbl-summary" style={{ background: '#f0fdf4' }}>
+                      <td colSpan={4} className="adc-tbl-summary-label" style={{ color: '#16a34a', textAlign: 'center', fontWeight: 700 }}>
+                        ✓ บริษัทโอนส่วนเติมแล้ว
+                      </td>
+                    </tr>
+                  )}
                 </>
               )}
             </tbody>
@@ -388,10 +407,27 @@ export function PrintableDocumentForm({ document, assignedUsers }: { document: a
     </div>
   ) : null
 
+  const transferredBanner = document?.status === 'TRANSFERRED' ? (
+    <div className="adv-cancelled-banner-print" style={{ background: '#f0fdf4', borderColor: '#16a34a', color: '#166534' }} lang="th">
+      <p><strong>✓ โอนแล้ว</strong> — เงินทดรองจ่ายได้โอนให้ผู้เบิกเรียบร้อยแล้ว</p>
+    </div>
+  ) : null
+
+  const returnedBanner = document?.status === 'RETURNED' ? (
+    <div className="adv-cancelled-banner-print" style={{ background: '#f0fdf4', borderColor: '#16a34a', color: '#166534' }} lang="th">
+      <p><strong>✓ โอนคืนบริษัทแล้ว</strong></p>
+    </div>
+  ) : document?.status === 'TOPPED_UP' ? (
+    <div className="adv-cancelled-banner-print" style={{ background: '#f0fdf4', borderColor: '#16a34a', color: '#166534' }} lang="th">
+      <p><strong>✓ บริษัทโอนส่วนเติมแล้ว</strong></p>
+    </div>
+  ) : null
+
   if (isADC) {
     return (
       <>
         {cancelledBanner}
+        {returnedBanner}
         <PrintableDocumentFormADC document={document} assignedUsers={assignedUsers} />
       </>
     )
@@ -399,6 +435,7 @@ export function PrintableDocumentForm({ document, assignedUsers }: { document: a
   return (
     <>
       {cancelledBanner}
+      {transferredBanner}
       <PrintableDocumentFormAPR document={document} assignedUsers={assignedUsers} />
     </>
   )

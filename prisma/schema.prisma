@@ -186,12 +186,15 @@ model Document {
 }
 
 enum DocumentStatus {
-  DRAFT       // Being created, not submitted
-  PENDING     // Submitted, awaiting approval
-  APPROVED    // All approvals completed
-  CLEARED     // APC fully approved — advance cleared (ใบเคลียร์เงินทดรองจ่าย)
-  REJECTED    // Rejected at some step
-  CANCELLED   // Cancelled by creator
+  DRAFT        // Being created, not submitted
+  PENDING      // Submitted, awaiting approval
+  APPROVED     // All approvals completed
+  CLEARED      // APC fully approved — advance cleared
+  REJECTED     // Rejected at some step
+  CANCELLED    // Cancelled by creator
+  TRANSFERRED  // APR: money transferred to requester (โอนแล้ว)
+  RETURNED     // APC: requester returned excess to company (โอนคืนบริษัทแล้ว)
+  TOPPED_UP    // APC: company transferred top-up to requester (บริษัทโอนส่วนเติมแล้ว)
 }
 
 // ============================================
