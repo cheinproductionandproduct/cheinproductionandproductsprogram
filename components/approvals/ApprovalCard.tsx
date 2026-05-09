@@ -94,11 +94,21 @@ interface ApprovalCardProps {
 
 export function ApprovalCard({ approval, onUpdate }: ApprovalCardProps) {
   const [showModal, setShowModal] = useState(false)
+  const [savedSig, setSavedSig] = useState<string | null | undefined>(undefined) // undefined = not yet loaded
   const [signature, setSignature] = useState<string | null>(null)
   const [comments, setComments] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
+  // Load saved signature when modal opens
+  useEffect(() => {
+    if (!showModal || savedSig !== undefined) return
+    fetch('/api/users/me/signature')
+      .then(r => r.json())
+      .then(d => setSavedSig(d.signatureImage ?? null))
+      .catch(() => setSavedSig(null))
+  }, [showModal, savedSig])
 
   const closeModal = () => {
     setShowModal(false)
@@ -107,15 +117,17 @@ export function ApprovalCard({ approval, onUpdate }: ApprovalCardProps) {
     setComments('')
   }
 
+  const effectiveSig = savedSig || signature
+
   const handleApprove = async () => {
-    if (!signature) { setError('กรุณาวาดลายเซ็นก่อนอนุมัติ'); return }
+    if (!effectiveSig) { setError('กรุณาวาดลายเซ็นก่อนอนุมัติ'); return }
     setLoading(true)
     setError(null)
     try {
       const res = await fetch(`/api/approvals/${approval.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signatureData: signature, comments: comments.trim() || undefined }),
+        body: JSON.stringify({ signatureData: effectiveSig, comments: comments.trim() || undefined }),
       })
       const result = await res.json()
       if (!res.ok) throw new Error(result.message || result.error || 'Failed to approve')
@@ -213,7 +225,19 @@ export function ApprovalCard({ approval, onUpdate }: ApprovalCardProps) {
 
               <div className="form-section" style={{ width: '100%' }}>
                 <label className="form-label">ลายเซ็น *</label>
-                <SignatureCanvas onSignatureChange={sig => { setSignature(sig); setError(null) }} />
+                {savedSig === undefined ? (
+                  <p style={{ color: '#888', fontSize: 14 }}>กำลังโหลดลายเซ็น...</p>
+                ) : savedSig ? (
+                  <div>
+                    <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, background: '#fafafa', textAlign: 'center', marginBottom: 8 }}>
+                      <img src={savedSig} alt="signature" style={{ maxHeight: 90, maxWidth: '100%' }} />
+                    </div>
+                    <p style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>ใช้ลายเซ็นที่บันทึกไว้ — หรือวาดใหม่ด้านล่าง</p>
+                    <SignatureCanvas onSignatureChange={sig => { setSignature(sig); setError(null) }} />
+                  </div>
+                ) : (
+                  <SignatureCanvas onSignatureChange={sig => { setSignature(sig); setError(null) }} />
+                )}
               </div>
 
               <div className="form-section" style={{ width: '100%', marginBottom: 0 }}>
@@ -240,7 +264,7 @@ export function ApprovalCard({ approval, onUpdate }: ApprovalCardProps) {
                 <button
                   type="button"
                   onClick={handleApprove}
-                  disabled={loading || !signature}
+                  disabled={loading || !effectiveSig}
                   className="form-button form-button-submit"
                 >
                   {loading ? 'กำลังอนุมัติ...' : 'อนุมัติและลงนาม'}

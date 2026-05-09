@@ -763,7 +763,7 @@ export function AdvancePaymentClearanceForm({
         {/* Signatures - only the assigned user can sign each box (same as APR) */}
         <div className="form-section">
           <h2 className="form-section-title">เคลียร์เงินทดรองจ่าย</h2>
-          <p className="form-hint" style={{ marginBottom: 12 }} lang="th">คุณลงนามได้เฉพาะช่องที่เลือกคุณเท่านั้น</p>
+          <p className="form-hint" style={{ marginBottom: 12 }} lang="th">ผู้ลงนามถูกกำหนดตามลำดับขั้นตอนอัตโนมัติ</p>
           <div className="signature-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
             {[
               { label: 'ผู้ขอเคลียร์', name: 'requesterSignature', userIdField: null as string | null, selectPlaceholder: '' },
@@ -799,28 +799,12 @@ export function AdvancePaymentClearanceForm({
                     )}
                   </div>
                   {userIdField ? (
-                    <select
-                      className="form-select signature-user-select"
-                      value={watch(userIdField) || ''}
-                      onChange={(e) => {
-                        const selectedUserId = e.target.value
-                        setValue(userIdField, selectedUserId)
-                        if (selectedUserId && selectedUserId !== currentUser?.id) {
-                          setSignatures((prev) => ({ ...prev, [name]: '' }))
-                          setValue(`${name}Date`, '')
-                        }
-                      }}
-                      disabled
-                    >
-                      <option value="">-- {selectPlaceholder} --</option>
-                      {loadingUsers ? (
-                        <option disabled>โหลด...</option>
-                      ) : (
-                        users.map((u) => (
-                          <option key={u.id} value={u.id}>{u.fullName || u.email}</option>
-                        ))
-                      )}
-                    </select>
+                    // Signer is fixed from signing settings — show name only
+                    <p style={{ fontSize: 12, color: '#555', margin: '4px 0 0', textAlign: 'center' }}>
+                      {users.find((u: any) => u.id === watch(userIdField))?.fullName
+                        || users.find((u: any) => u.id === watch(userIdField))?.email
+                        || '—'}
+                    </p>
                   ) : (
                     <input
                       type="text"

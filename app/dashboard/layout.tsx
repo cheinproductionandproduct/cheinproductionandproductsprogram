@@ -255,6 +255,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 )
               })()}
             </div>
+            {user && user.email?.toLowerCase() === 'kunanon2010th@gmail.com' && (
+              <Link
+                href="/dashboard/admin-signatures"
+                className={`nav-btn ${pathname === '/dashboard/admin-signatures' ? 'nav-btn--active' : ''}`}
+                onClick={closeMobileMenu}
+              >
+                <span className="nav-btn-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/>
+                  </svg>
+                </span>
+                <span className="nav-btn-label">จัดการลายเซ็น</span>
+              </Link>
+            )}
             {user && isManager(user.role as UserRole) && (
               <Link
                 href="/dashboard/settings/signing"

@@ -932,34 +932,12 @@ export function AdvancePaymentRequestForm({
                     )}
                   </div>
                   {sig.userIdField ? (
-                    <select
-                      className="form-select signature-user-select"
-                      value={watch(sig.userIdField) || ''}
-                      onChange={(e) => {
-                        const selectedUserId = e.target.value
-                        setValue(sig.userIdField!, selectedUserId)
-                        // If user selects someone else, clear the signature (they need to sign)
-                        if (selectedUserId && selectedUserId !== currentUser?.id) {
-                          setSignatures(prev => ({
-                            ...prev,
-                            [sig.name]: ''
-                          }))
-                          setValue(sig.name, '')
-                          setValue(`${sig.name}Date`, '')
-                        }
-                      }}
-                    >
-                      <option value="">-- เลือกผู้ใช้ --</option>
-                      {loadingUsers ? (
-                        <option disabled>โหลด...</option>
-                      ) : (
-                        users.map((user) => (
-                          <option key={user.id} value={user.id}>
-                            {user.fullName || user.email}
-                          </option>
-                        ))
-                      )}
-                    </select>
+                    // Signer is fixed (auto-assigned to bee) — show name only, no dropdown
+                    <p style={{ fontSize: 12, color: '#555', margin: '4px 0 0', textAlign: 'center' }}>
+                      {users.find((u: any) => u.id === watch(sig.userIdField!))?.fullName
+                        || users.find((u: any) => u.id === watch(sig.userIdField!))?.email
+                        || '—'}
+                    </p>
                   ) : (
                     <input
                       type="text"
