@@ -301,31 +301,46 @@ export function PrintableDocumentFormADC({ document, assignedUsers }: { document
                     <td className="adc-tbl-amt">{fmtAmt(totalActual)}</td>
                   </tr>
                   <tr className="adc-tbl-summary">
-                    <td colSpan={2} className="adc-tbl-summary-label">รวมค่าใช้จ่าย</td>
+                    <td colSpan={2} className="adc-tbl-summary-label">จำนวนเงินที่ใช้จริง</td>
                     <td className="adc-tbl-amt">{fmtAmt(sumAmount)}</td>
-                    <td className="adc-tbl-amt">{fmtAmt(totalActual)}</td>
+                    <td className="adc-tbl-amt" style={{ color: '#dc2626', fontWeight: 700 }}>{fmtAmt(totalActual)}</td>
                   </tr>
                   <tr className="adc-tbl-summary">
-                    <td colSpan={2} className="adc-tbl-summary-label">(หัก) จำนวนที่เบิกทดรอง</td>
+                    <td colSpan={2} className="adc-tbl-summary-label">(หัก) จำนวนเงินเบิกทดรอง</td>
                     <td className="adc-tbl-amt" colSpan={2}>{fmtAmt(advanceAmount)}</td>
                   </tr>
                   <tr className="adc-tbl-summary">
-                    <td colSpan={2} className="adc-tbl-summary-label">จำนวนที่เหลือส่งคืน</td>
+                    <td colSpan={2} className="adc-tbl-summary-label"
+                      style={amountToReturn > 0 ? { color: '#dc2626', fontWeight: 700 } : {}}>
+                      จำนวนที่เหลือส่งคืน
+                    </td>
                     <td className="adc-tbl-amt" colSpan={2} style={amountToReturn > 0 ? { color: '#dc2626', fontWeight: 700 } : {}}>
                       {fmtAmt(amountToReturn)}
                     </td>
                   </tr>
-                  <tr className="adc-tbl-summary adc-tbl-summary-last">
-                    <td colSpan={2} className="adc-tbl-summary-label">จำนวนที่เบิกเพิ่ม</td>
+                  <tr className="adc-tbl-summary">
+                    <td colSpan={2} className="adc-tbl-summary-label"
+                      style={additionalAmount > 0 ? { color: '#dc2626', fontWeight: 700 } : {}}>
+                      จำนวนที่เบิกเพิ่ม
+                    </td>
                     <td className="adc-tbl-amt" colSpan={2} style={additionalAmount > 0 ? { color: '#dc2626', fontWeight: 700 } : {}}>
                       {fmtAmt(additionalAmount)}
                     </td>
                   </tr>
-                  {/* Transfer status rows */}
-                  {document.status === 'RETURNED' && (
-                    <tr className="adc-tbl-summary" style={{ background: '#f0fdf4' }}>
-                      <td colSpan={4} className="adc-tbl-summary-label" style={{ color: '#16a34a', textAlign: 'center', fontWeight: 700 }}>
-                        ✓ โอนคืนบริษัทแล้ว
+                  {/* Remarks */}
+                  {data.remark && (
+                    <tr className="adc-tbl-summary">
+                      <td colSpan={2} className="adc-tbl-summary-label">หมายเหตุ</td>
+                      <td colSpan={2} className="adc-tbl-amt" style={{ textAlign: 'left' }}>{data.remark}</td>
+                    </tr>
+                  )}
+                  {/* Transfer status */}
+                  {(document.status === 'CLEARED' || document.status === 'RETURNED') && amountToReturn > 0 && (
+                    <tr className="adc-tbl-summary" style={{ background: document.status === 'RETURNED' ? '#f0fdf4' : '#fff' }}>
+                      <td colSpan={4} className="adc-tbl-summary-label" style={{ textAlign: 'left', paddingLeft: 12 }}>
+                        {document.status === 'RETURNED'
+                          ? '☑ โอนเงินคืนบริษัทแล้ว'
+                          : '☐ โอนเงินคืนบริษัทแล้ว'}
                       </td>
                     </tr>
                   )}

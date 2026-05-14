@@ -712,7 +712,7 @@ export function AdvancePaymentClearanceForm({
           <p className="form-hint" lang="th">รวมค่าใช้จ่ายมาจากรวมจำนวนเงินที่ใช้จริงด้านบน</p>
           <div className="form-row">
             <div className="form-field-group">
-              <label className="form-label">รวมค่าใช้จ่าย (บาท)</label>
+              <label className="form-label">จำนวนเงินที่ใช้จริง (บาท)</label>
               <input
                 type="text"
                 className="form-input form-input--money"
@@ -722,7 +722,7 @@ export function AdvancePaymentClearanceForm({
               />
             </div>
             <div className="form-field-group">
-              <label className="form-label">(หัก) จำนวนที่เบิกทดรอง (บาท)</label>
+              <label className="form-label">(หัก) จำนวนเงินเบิกทดรอง (บาท)</label>
               <input
                 type="text"
                 className="form-input form-input--money"
@@ -757,6 +757,20 @@ export function AdvancePaymentClearanceForm({
                 placeholder="0.00"
               />
             </div>
+          </div>
+        </div>
+
+        {/* Remarks */}
+        <div className="form-section">
+          <div className="form-field-group">
+            <label className="form-label">หมายเหตุ</label>
+            <textarea
+              className="form-textarea"
+              rows={3}
+              placeholder="หมายเหตุ (ถ้ามี)"
+              value={watch('remark') || ''}
+              onChange={e => setValue('remark', e.target.value)}
+            />
           </div>
         </div>
 

@@ -58,6 +58,8 @@ type EditorSnapshot = {
   showTotal: boolean
   showNote: boolean
   overheadPct: number
+  overheadType: 'pct' | 'amount'
+  overheadAmount: number | ''
   vatPct: number
   discount: number | ''
   discountType: 'pct' | 'amount'
@@ -1582,6 +1584,8 @@ export default function BoqEditorPage() {
   const [showGroupHeaders, setShowGroupHeaders] = useState(true)
   const [showNestedRows, setShowNestedRows] = useState(true)
   const [overheadPct, setOverheadPct]         = useState(12)
+  const [overheadType, setOverheadType]       = useState<'pct'|'amount'>('pct')
+  const [overheadAmount, setOverheadAmount]   = useState<number|''>(0)
   const [vatPct, setVatPct]                   = useState(7)
   const [discount, setDiscount]               = useState<number|''>(0)
   const [discountType, setDiscountType]       = useState<'pct'|'amount'>('amount')
@@ -1704,6 +1708,8 @@ export default function BoqEditorPage() {
     showTotal,
     showNote,
     overheadPct,
+    overheadType,
+    overheadAmount,
     vatPct,
     discount,
     discountType,
@@ -1722,6 +1728,8 @@ export default function BoqEditorPage() {
     setShowTotal(s.showTotal)
     setShowNote(s.showNote)
     setOverheadPct(s.overheadPct)
+    setOverheadType(s.overheadType ?? 'pct')
+    setOverheadAmount(s.overheadAmount ?? 0)
     setVatPct(s.vatPct)
     setDiscount(s.discount)
     setDiscountType(s.discountType)
@@ -1802,10 +1810,12 @@ export default function BoqEditorPage() {
           }))
           setGroups(normalizedLoaded)
           if (isWrapped) {
-            setOverheadPct((raw as { overheadPct?: number }).overheadPct ?? 12)
-            setVatPct((raw as { vatPct?: number }).vatPct ?? 7)
-            setDiscount((raw as { discount?: number }).discount ?? 0)
-            setDiscountType((raw as { discountType?: 'pct' | 'amount' }).discountType ?? 'amount')
+            setOverheadPct((raw as any).overheadPct ?? 12)
+            setOverheadType((raw as any).overheadType ?? 'pct')
+            setOverheadAmount((raw as any).overheadAmount ?? 0)
+            setVatPct((raw as any).vatPct ?? 7)
+            setDiscount((raw as any).discount ?? 0)
+            setDiscountType((raw as any).discountType ?? 'amount')
           }
           setShowMat(d.boq.showMaterial ?? true)
           const loadedKind = String(d.boq.kind ?? '').toUpperCase()
@@ -2353,7 +2363,9 @@ export default function BoqEditorPage() {
       { dec: 0, inc: 0 }
     )
   }, [groups, actualCompareMode])
-  const overhead        = grandTotal * (overheadPct || 0) / 100
+  const overhead        = overheadType === 'amount'
+    ? (Number(overheadAmount) || 0)
+    : grandTotal * (overheadPct || 0) / 100
   const subtotalBeforeDiscount = grandTotal + overhead
   const discountNum     = Number(discount) || 0
   const discountAmt     = discountType === 'pct'
@@ -3938,18 +3950,22 @@ th, td, tr { position: static !important; top: auto !important; left: auto !impo
             />
             <SummaryRow
               label={
-                editing ? (
-                  <span className="boq-summary-editable-label">
-                    ค่าดำเนินการ&nbsp;
-                    <input
-                      type="text" inputMode="decimal"
-                      className="boq-summary-pct-input"
-                      value={overheadPct}
-                      onChange={e => setOverheadPct(parseFloat(e.target.value)||0)}
-                    />
-                    &nbsp;%
-                  </span>
-                ) : `ค่าดำเนินการ ${overheadPct}%`
+                <span className="boq-summary-editable-label">
+                  ค่าดำเนินการ
+                  {editing && (
+                    <span className="boq-discount-type-toggle">
+                      <button type="button" className={`boq-dtype-btn${overheadType==='pct'?' boq-dtype-btn--active':''}`} onClick={() => setOverheadType('pct')}>%</button>
+                      <button type="button" className={`boq-dtype-btn${overheadType==='amount'?' boq-dtype-btn--active':''}`} onClick={() => setOverheadType('amount')}>฿</button>
+                    </span>
+                  )}
+                  {editing && overheadType === 'pct' && (
+                    <><input type="text" inputMode="decimal" className="boq-summary-pct-input" value={overheadPct} onChange={e => setOverheadPct(parseFloat(e.target.value)||0)} />&nbsp;%</>
+                  )}
+                  {editing && overheadType === 'amount' && (
+                    <NumInput className="boq-summary-pct-input" value={overheadAmount} onChange={v => setOverheadAmount(v)} />
+                  )}
+                  {!editing && overheadType === 'pct' && ` ${overheadPct}%`}
+                </span>
               }
               amount={fmt(overhead)} highlight={false} vis={colVis} actualMoneyTail4={actualCompareMode} discountCells={emptyDiscCells} showActionCell={editing} />
             <SummaryRow label="ราคารวมค่าดำเนินการ" amount={fmt(subtotalBeforeDiscount)} highlight={false} vis={colVis} actualMoneyTail4={actualCompareMode} discountCells={emptyDiscCells} showActionCell={editing} />
